@@ -471,13 +471,20 @@ function bindEvents() {
     document.getElementById("shareNewColInput").style.display = (e.target.value === "__new__") ? "" : "none";
   });
   document.getElementById("btnAcceptShare").addEventListener("click", acceptShare);
-  document.getElementById("btnDeclineShare").addEventListener("click", declineShare);
 
   document.querySelectorAll(".modal-close").forEach(btn =>
-    btn.addEventListener("click", () => closeModal(btn.dataset.modal))
+    btn.addEventListener("click", () => {
+      if (btn.dataset.modal === "modalShareDetail") markShareSeen();
+      closeModal(btn.dataset.modal);
+    })
   );
   document.querySelectorAll(".modal-overlay").forEach(o =>
-    o.addEventListener("click", e => { if (e.target === o) closeModal(o.id); })
+    o.addEventListener("click", e => {
+      if (e.target === o) {
+        if (o.id === "modalShareDetail") markShareSeen();
+        closeModal(o.id);
+      }
+    })
   );
 }
 
@@ -542,14 +549,17 @@ function populateCollectionSelects() {
 }
 
 // ── Notificaciones (libros recibidos de otros usuarios) ─────────────────────
+// "seen" es solo un flag para el contador de nuevas — una notificacion
+// pendiente sigue siendo aceptable aunque ya se haya visto, hasta que expire
+// (7 dias desde que se recibio).
 async function loadNotifications() {
   try {
     const res = await fetch("/api/notifications");
     notifications = await res.json();
   } catch (e) { return; }
-  const pendingCount = notifications.filter(n => n.status === "pending").length;
+  const unseenCount = notifications.filter(n => n.status === "pending" && !n.seen).length;
   const badge = document.getElementById("notifBadge");
-  if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display = ""; }
+  if (unseenCount > 0) { badge.textContent = unseenCount; badge.style.display = ""; }
   else { badge.style.display = "none"; }
   renderNotifList();
 }
@@ -561,20 +571,23 @@ function renderNotifList() {
   list.innerHTML = "";
   if (!notifications.length) { empty.style.display = ""; return; }
   empty.style.display = "none";
-  const statusLabel = { accepted: "Aceptado", declined: "Rechazado", unavailable: "Ya no disponible" };
   notifications.forEach(n => {
+    const available = !!n.book_title;
+    const clickable = n.status === "pending" && available;
     const row = document.createElement("div");
-    row.className = "notif-row" + (n.status === "pending" ? " unread" : "");
+    row.className = "notif-row" + (clickable && !n.seen ? " unread" : "");
     const title = n.book_title || "Libro eliminado";
+    let statusHtml;
+    if (n.status === "accepted") statusHtml = "<span class='notif-row-status'>Aceptado</span>";
+    else if (!available) statusHtml = "<span class='notif-row-status'>Ya no disponible</span>";
+    else if (!n.seen) statusHtml = "<span class='notif-row-badge'>Nuevo</span>";
+    else statusHtml = "<span class='notif-row-status'>Pendiente</span>";
     row.innerHTML =
       "<div class='notif-row-info'>" +
         "<span class='notif-row-title'>" + title + "</span>" +
         "<span class='notif-row-meta'>De " + n.from_username + "</span>" +
-      "</div>" +
-      (n.status === "pending"
-        ? "<span class='notif-row-badge'>Nuevo</span>"
-        : "<span class='notif-row-status'>" + (statusLabel[n.status] || n.status) + "</span>");
-    if (n.status === "pending") {
+      "</div>" + statusHtml;
+    if (clickable) {
       row.style.cursor = "pointer";
       row.addEventListener("click", () => openShareDetail(n));
     }
@@ -588,7 +601,7 @@ function openShareDetail(n) {
   document.getElementById("shareBookTitle").textContent = n.book_title || "Libro eliminado";
   document.getElementById("shareFromUser").textContent = "Enviado por " + n.from_username;
   document.getElementById("shareCoverWrap").innerHTML = (available && n.book_has_cover)
-    ? "<img src='/api/books/" + n.book_id + "/cover'>" : "";
+    ? "<img src='/api/notifications/" + n.id + "/cover'>" : "";
   document.getElementById("shareUnavailableMsg").style.display = available ? "none" : "";
   document.getElementById("shareColGroup").style.display = available ? "" : "none";
   document.getElementById("btnAcceptShare").style.display = available ? "" : "none";
@@ -625,19 +638,23 @@ async function acceptShare() {
   const data = await res.json();
   if (res.ok) {
     toast("Libro agregado a tu biblioteca");
+    activeShareId = null;
     closeModal("modalShareDetail");
     await refresh();
   } else {
     toast(data.error || "Error");
-    if (res.status === 410) closeModal("modalShareDetail");
+    if (res.status === 410) { activeShareId = null; closeModal("modalShareDetail"); }
   }
   await loadNotifications();
 }
 
-async function declineShare() {
-  await fetch("/api/notifications/" + activeShareId + "/decline", { method: "POST" });
-  closeModal("modalShareDetail");
-  toast("Rechazado");
+// Se llama al cerrar el modal de "libro recibido" sin aceptar (X o click afuera):
+// solo marca que ya se vio (para el contador), sigue pudiendose aceptar despues.
+async function markShareSeen() {
+  if (!activeShareId) return;
+  const id = activeShareId;
+  activeShareId = null;
+  await fetch("/api/notifications/" + id + "/seen", { method: "POST" });
   await loadNotifications();
 }
 

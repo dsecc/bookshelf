@@ -163,12 +163,20 @@ def init_db():
         'ALTER TABLE books ADD COLUMN page_count INTEGER DEFAULT 0',
         'ALTER TABLE books ADD COLUMN view_mode TEXT DEFAULT "scroll"',
         'ALTER TABLE books ADD COLUMN user_id INTEGER',
+        'ALTER TABLE book_shares ADD COLUMN seen INTEGER DEFAULT 0',
     ]:
         try:
             conn.execute(migration)
             conn.commit()
         except:
             pass
+
+    # "visto" (cerrar sin aceptar) ya no es un estado terminal, es solo un
+    # flag: filas viejas de una version anterior que quedaron en un estado
+    # que ya no existe vuelven a quedar pendientes (y marcadas como vistas),
+    # para poder aceptarlas dentro de la ventana de 7 dias.
+    conn.execute("UPDATE book_shares SET status='pending', seen=1 WHERE status IN ('dismissed', 'declined')")
+    conn.commit()
 
     # Bootstrap: primera vez que corre el proyecto, se crea la cuenta de
     # administracion. El resto de los usuarios se crean desde /admin o manage.py.
@@ -210,8 +218,10 @@ def get_owned_share(conn, share_id):
     return conn.execute("SELECT * FROM book_shares WHERE id=? AND to_user_id=?", (share_id, current_user_id())).fetchone()
 
 def sweep_expired_shares(conn):
+    # Toda notificacion dura SHARE_CLEANUP_DAYS desde que se recibio, la haya
+    # visto/aceptado o no — "visto" es solo un flag, no extiende ni acorta esto.
     conn.execute(
-        "DELETE FROM book_shares WHERE status != 'pending' AND resolved_at < datetime('now', ?)",
+        "DELETE FROM book_shares WHERE created_at < datetime('now', ?)",
         (f"-{SHARE_CLEANUP_DAYS} days",)
     )
     conn.commit()
@@ -782,13 +792,31 @@ def share_book(book_id):
     conn.close()
     return jsonify({"ok": True}), 201
 
+@app.route("/api/notifications/<int:share_id>/cover")
+@login_required
+def serve_share_cover(share_id):
+    conn = get_db()
+    share = get_owned_share(conn, share_id)
+    if not share:
+        conn.close(); abort(404)
+    book = conn.execute(
+        "SELECT id, has_cover FROM books WHERE id=? AND user_id=?", (share["book_id"], share["from_user_id"])
+    ).fetchone()
+    conn.close()
+    if not book or not book["has_cover"]:
+        abort(404)
+    cover_path = os.path.join(user_covers_dir(share["from_user_id"]), str(book["id"]) + ".jpg")
+    if os.path.exists(cover_path):
+        return send_file(cover_path, mimetype="image/jpeg")
+    abort(404)
+
 @app.route("/api/notifications")
 @login_required
 def list_notifications():
     conn = get_db()
     sweep_expired_shares(conn)
     rows = conn.execute("""
-        SELECT s.id, s.status, s.created_at, s.resolved_at,
+        SELECT s.id, s.status, s.seen, s.created_at, s.resolved_at,
                s.book_id, b.title as book_title, b.format as book_format, b.has_cover as book_has_cover,
                u.username as from_username
         FROM book_shares s
@@ -872,17 +900,16 @@ def accept_notification(share_id):
     conn.close()
     return jsonify({"ok": True})
 
-@app.route("/api/notifications/<int:share_id>/decline", methods=["POST"])
+@app.route("/api/notifications/<int:share_id>/seen", methods=["POST"])
 @login_required
-def decline_notification(share_id):
+def mark_notification_seen(share_id):
+    # Solo marca que ya se vio (para el contador de "nuevas") — sigue
+    # pudiendose aceptar despues, no es un rechazo.
     conn = get_db()
     share = get_owned_share(conn, share_id)
     if not share:
         conn.close(); abort(404)
-    if share["status"] != "pending":
-        conn.close()
-        return jsonify({"error": "Esta notificacion ya fue resuelta"}), 409
-    conn.execute("UPDATE book_shares SET status='declined', resolved_at=CURRENT_TIMESTAMP WHERE id=?", (share_id,))
+    conn.execute("UPDATE book_shares SET seen=1 WHERE id=?", (share_id,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
