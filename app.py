@@ -160,60 +160,13 @@ def init_db():
         except:
             pass
 
-    # Bootstrap: primera vez que corre esta version del proyecto.
-    # Una instalacion nueva (clonada desde cero) no tiene libros ni
-    # colecciones previos, asi que solo se crea el admin. La cuenta de
-    # migracion de mas abajo SOLO se crea si se detecta contenido real de
-    # una version anterior sin login (upgrade in-place).
+    # Bootstrap: primera vez que corre el proyecto, se crea la cuenta de
+    # administracion. El resto de los usuarios se crean desde /admin o manage.py.
     user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
     if user_count == 0:
         conn.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?,?,1)",
                      ("admin", generate_password_hash("admin123")))
         conn.commit()
-
-        has_legacy_data = conn.execute("""
-            SELECT (EXISTS(SELECT 1 FROM books WHERE user_id IS NULL)
-                 OR EXISTS(SELECT 1 FROM collections WHERE user_id IS NULL)) AS c
-        """).fetchone()["c"]
-
-        if has_legacy_data:
-            conn.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?,?,0)",
-                         ("usuario", generate_password_hash("cambiar123")))
-            conn.commit()
-
-            legacy_id = conn.execute("SELECT id FROM users WHERE username=?", ("usuario",)).fetchone()["id"]
-
-            # Primero se asignan las colecciones preexistentes (incluida la
-            # vieja "Sin coleccion" global) a esta cuenta, y recien despues se
-            # busca/crea el default — si ya existia, ensure_default_collection
-            # la reusa en vez de duplicarla (evitaria violar el
-            # UNIQUE(user_id, name)).
-            conn.execute("UPDATE collections SET user_id=? WHERE user_id IS NULL", (legacy_id,))
-            conn.commit()
-            default_col_id = ensure_default_collection(conn, legacy_id)
-            conn.commit()
-
-            conn.execute("UPDATE books SET user_id=?, collection_id=COALESCE(collection_id, ?) WHERE user_id IS NULL",
-                         (legacy_id, default_col_id))
-            conn.commit()
-
-            # Mover a disco los archivos que estaban sueltos en la raiz compartida
-            dest_upload = user_upload_dir(legacy_id)
-            for name in os.listdir(UPLOAD_FOLDER):
-                src = os.path.join(UPLOAD_FOLDER, name)
-                if os.path.isfile(src):
-                    shutil.move(src, os.path.join(dest_upload, name))
-
-            dest_covers = user_covers_dir(legacy_id)
-            for name in os.listdir(COVERS_FOLDER):
-                src = os.path.join(COVERS_FOLDER, name)
-                if os.path.isfile(src):
-                    shutil.move(src, os.path.join(dest_covers, name))
-
-            for b in conn.execute("SELECT id, filename FROM books WHERE user_id=?", (legacy_id,)).fetchall():
-                conn.execute("UPDATE books SET filepath=? WHERE id=?",
-                             (os.path.join(dest_upload, b["filename"]), b["id"]))
-            conn.commit()
 
     conn.close()
 
