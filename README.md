@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.3** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.4** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -51,6 +51,7 @@ Dos formas, usá la que te resulte más cómoda:
 
 ## Funcionalidades
 - 👤 Multiusuario, con bibliotecas completamente aisladas
+- 🔔 Enviar un libro a otro usuario, con notificación para aceptar o rechazar
 - 📁 Colecciones (crear, mover libros entre ellas)
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
 - 📖 Lector integrado para PDF y EPUB

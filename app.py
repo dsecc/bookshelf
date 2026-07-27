@@ -16,6 +16,7 @@ DB_PATH = "/app/data/bookshelf.db"
 SECRET_KEY_PATH = "/app/data/secret_key"
 ALLOWED_EXTENSIONS = {"pdf","epub","mobi","cbz","cbr","djvu","fb2","txt","doc","docx"}
 DEFAULT_COLLECTION_NAME = "Sin coleccion"
+SHARE_CLEANUP_DAYS = 7
 
 import time as _time
 STATIC_VER = str(int(_time.time()))
@@ -142,6 +143,15 @@ def init_db():
             cfi TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS book_shares (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id INTEGER NOT NULL,
+            from_user_id INTEGER NOT NULL,
+            to_user_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT "pending",
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        );
     """)
     conn.commit()
 
@@ -195,6 +205,16 @@ def current_user_id():
 
 def get_owned_book(conn, book_id):
     return conn.execute("SELECT * FROM books WHERE id=? AND user_id=?", (book_id, current_user_id())).fetchone()
+
+def get_owned_share(conn, share_id):
+    return conn.execute("SELECT * FROM book_shares WHERE id=? AND to_user_id=?", (share_id, current_user_id())).fetchone()
+
+def sweep_expired_shares(conn):
+    conn.execute(
+        "DELETE FROM book_shares WHERE status != 'pending' AND resolved_at < datetime('now', ?)",
+        (f"-{SHARE_CLEANUP_DAYS} days",)
+    )
+    conn.commit()
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -352,6 +372,7 @@ def admin_delete_user(user_id):
 
     conn.execute("DELETE FROM books WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM collections WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM book_shares WHERE from_user_id=? OR to_user_id=?", (user_id, user_id))
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
     conn.close()
@@ -593,6 +614,7 @@ def delete_book(book_id):
     conn.execute("DELETE FROM progress WHERE book_id=?", (book_id,))
     conn.execute("DELETE FROM bookmarks WHERE book_id=?", (book_id,))
     conn.execute("DELETE FROM highlights WHERE book_id=?", (book_id,))
+    conn.execute("DELETE FROM book_shares WHERE book_id=? AND status='pending'", (book_id,))
     conn.commit(); conn.close()
     return jsonify({"ok":True})
 
@@ -712,6 +734,157 @@ def delete_highlight(book_id, h_id):
         conn.close(); abort(404)
     conn.execute("DELETE FROM highlights WHERE id=? AND book_id=?", (h_id, book_id))
     conn.commit(); conn.close()
+    return jsonify({"ok": True})
+
+# ---------------------------------------------------------------------------
+# Envio de libros entre usuarios + notificaciones
+# ---------------------------------------------------------------------------
+
+@app.route("/api/users")
+@login_required
+def list_other_users():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, username FROM users WHERE is_admin=0 AND id != ? ORDER BY username",
+        (current_user_id(),)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/books/<int:book_id>/share", methods=["POST"])
+@login_required
+def share_book(book_id):
+    data = request.json or {}
+    to_user_id = data.get("to_user_id")
+    conn = get_db()
+    book = get_owned_book(conn, book_id)
+    if not book:
+        conn.close(); abort(404)
+    if not to_user_id or int(to_user_id) == current_user_id():
+        conn.close()
+        return jsonify({"error": "Destinatario invalido"}), 400
+    recipient = conn.execute("SELECT id FROM users WHERE id=? AND is_admin=0", (to_user_id,)).fetchone()
+    if not recipient:
+        conn.close()
+        return jsonify({"error": "Ese usuario no existe"}), 404
+    existing = conn.execute(
+        "SELECT id FROM book_shares WHERE book_id=? AND to_user_id=? AND status='pending'",
+        (book_id, to_user_id)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"error": "Ya le enviaste este libro, esta pendiente de que lo acepte"}), 409
+    conn.execute(
+        "INSERT INTO book_shares (book_id, from_user_id, to_user_id) VALUES (?,?,?)",
+        (book_id, current_user_id(), to_user_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True}), 201
+
+@app.route("/api/notifications")
+@login_required
+def list_notifications():
+    conn = get_db()
+    sweep_expired_shares(conn)
+    rows = conn.execute("""
+        SELECT s.id, s.status, s.created_at, s.resolved_at,
+               s.book_id, b.title as book_title, b.format as book_format, b.has_cover as book_has_cover,
+               u.username as from_username
+        FROM book_shares s
+        LEFT JOIN books b ON b.id = s.book_id
+        JOIN users u ON u.id = s.from_user_id
+        WHERE s.to_user_id = ?
+        ORDER BY s.created_at DESC
+    """, (current_user_id(),)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/notifications/<int:share_id>/accept", methods=["POST"])
+@login_required
+def accept_notification(share_id):
+    data = request.json or {}
+    conn = get_db()
+    share = get_owned_share(conn, share_id)
+    if not share:
+        conn.close(); abort(404)
+    if share["status"] != "pending":
+        conn.close()
+        return jsonify({"error": "Esta notificacion ya fue resuelta"}), 409
+
+    source = conn.execute(
+        "SELECT * FROM books WHERE id=? AND user_id=?", (share["book_id"], share["from_user_id"])
+    ).fetchone()
+    if not source or not os.path.exists(source["filepath"]):
+        conn.execute("UPDATE book_shares SET status='unavailable', resolved_at=CURRENT_TIMESTAMP WHERE id=?", (share_id,))
+        conn.commit(); conn.close()
+        return jsonify({"error": "Este libro ya no esta disponible"}), 410
+
+    uid = current_user_id()
+    collection_id = data.get("collection_id")
+    new_collection_name = (data.get("new_collection_name") or "").strip()
+    if new_collection_name:
+        try:
+            conn.execute("INSERT INTO collections (name, user_id) VALUES (?,?)", (new_collection_name, uid))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            pass
+        col = conn.execute("SELECT id FROM collections WHERE name=? AND user_id=?", (new_collection_name, uid)).fetchone()
+        collection_id = col["id"] if col else None
+    elif collection_id:
+        owned_col = conn.execute("SELECT id FROM collections WHERE id=? AND user_id=?", (collection_id, uid)).fetchone()
+        collection_id = owned_col["id"] if owned_col else None
+
+    if not collection_id:
+        conn.close()
+        return jsonify({"error": "Elegi una coleccion"}), 400
+
+    # Copiar el archivo a la carpeta del destinatario, evitando colisiones de nombre
+    upload_dir = user_upload_dir(uid)
+    filename = source["filename"]
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    final_path = os.path.join(upload_dir, filename)
+    while os.path.exists(final_path):
+        filename = base + "_" + str(counter) + ext
+        final_path = os.path.join(upload_dir, filename)
+        counter += 1
+    shutil.copy2(source["filepath"], final_path)
+
+    conn.execute(
+        "INSERT INTO books (title, filename, filepath, format, size, collection_id, cover_color, has_cover, page_count, view_mode, user_id) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (source["title"], filename, final_path, source["format"], source["size"], collection_id,
+         source["cover_color"], source["has_cover"], source["page_count"], source["view_mode"], uid)
+    )
+    conn.commit()
+    new_book = conn.execute("SELECT id FROM books WHERE filename=? AND user_id=?", (filename, uid)).fetchone()
+
+    if source["has_cover"]:
+        src_cover = os.path.join(user_covers_dir(share["from_user_id"]), str(source["id"]) + ".jpg")
+        if os.path.exists(src_cover):
+            dst_cover = os.path.join(user_covers_dir(uid), str(new_book["id"]) + ".jpg")
+            try: shutil.copy2(src_cover, dst_cover)
+            except: pass
+
+    conn.execute("UPDATE book_shares SET status='accepted', resolved_at=CURRENT_TIMESTAMP WHERE id=?", (share_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/notifications/<int:share_id>/decline", methods=["POST"])
+@login_required
+def decline_notification(share_id):
+    conn = get_db()
+    share = get_owned_share(conn, share_id)
+    if not share:
+        conn.close(); abort(404)
+    if share["status"] != "pending":
+        conn.close()
+        return jsonify({"error": "Esta notificacion ya fue resuelta"}), 409
+    conn.execute("UPDATE book_shares SET status='declined', resolved_at=CURRENT_TIMESTAMP WHERE id=?", (share_id,))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True})
 
 @app.route("/api/about")

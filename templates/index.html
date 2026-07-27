@@ -75,6 +75,10 @@
               <input type="text" id="searchInput" placeholder="Buscar libros..." autocomplete="off">
             </div>
           </div>
+          <button class="btn-icon btn-notif" id="btnNotif" title="Notificaciones">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+          </button>
           <button class="btn-upload" id="btnUpload">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span class="upload-label">Subir</span>
@@ -177,6 +181,51 @@
       <input type="text" id="renameColInput" placeholder="Nombre de la coleccion">
     </div>
     <button class="btn-primary full" id="btnConfirmRenameCol">Guardar</button>
+  </div>
+</div>
+
+<!-- Modal Notificaciones -->
+<div class="modal-overlay" id="modalNotif" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Notificaciones</h2>
+      <button class="btn-icon modal-close" data-modal="modalNotif">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="notif-list" id="notifList"></div>
+    <div class="empty-state" id="notifEmpty" style="display:none;padding:2rem 1rem">
+      <p>No tenes notificaciones</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal libro recibido: aceptar / rechazar -->
+<div class="modal-overlay" id="modalShareDetail" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Libro recibido</h2>
+      <button class="btn-icon modal-close" data-modal="modalShareDetail">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="share-detail">
+      <div class="share-cover" id="shareCoverWrap"></div>
+      <div class="share-info">
+        <div class="share-title" id="shareBookTitle"></div>
+        <div class="share-from" id="shareFromUser"></div>
+      </div>
+    </div>
+    <div id="shareUnavailableMsg" class="auth-error" style="display:none">Este libro ya no está disponible.</div>
+    <div class="form-group" id="shareColGroup">
+      <label>Coleccion</label>
+      <select id="shareCollectionSelect"></select>
+      <input type="text" id="shareNewColInput" placeholder="Nombre de la nueva coleccion" style="display:none;margin-top:.4rem">
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.5rem">
+      <button class="btn-secondary full" id="btnDeclineShare">Rechazar</button>
+      <button class="btn-primary full" id="btnAcceptShare">Aceptar</button>
+    </div>
   </div>
 </div>
 

@@ -687,6 +687,27 @@ function bindAll() {
   };
   document.getElementById("btnWhatsappPanel").onclick = () => window.open("https://wa.me/?text=" + encodeURIComponent(currentBook.title + " — " + pageUrl));
 
+  // Enviar a otro usuario
+  document.getElementById("btnSendToUser").onclick = async () => {
+    const sel = document.getElementById("sendUserSelect");
+    try {
+      const users = await (await fetch("/api/users")).json();
+      if (!users.length) { toast("No hay otros usuarios todavia"); return; }
+      sel.innerHTML = users.map(u => "<option value='" + u.id + "'>" + u.username + "</option>").join("");
+      openModal("modalSendUser");
+    } catch { toast("Error al cargar usuarios"); }
+  };
+  document.getElementById("btnConfirmSendUser").onclick = async () => {
+    const toUserId = document.getElementById("sendUserSelect").value;
+    if (!toUserId) return;
+    const res = await fetch("/api/books/" + bookId + "/share", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ to_user_id: toUserId })
+    });
+    const data = await res.json();
+    closeModal("modalSendUser");
+    toast(res.ok ? "Libro enviado" : (data.error || "Error"));
+  };
+
   // Eliminar
   document.getElementById("btnDeleteReader").onclick  = () => openModal("modalDelete");
   document.getElementById("btnCancelDelete").onclick  = () => closeModal("modalDelete");

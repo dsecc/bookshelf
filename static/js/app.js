@@ -17,6 +17,7 @@ const deviceId = localStorage.getItem("bs_device_id") || (() => {
 })();
 
 let collections = [], books = [], recentBooks = [], activeColId = null, pendingFiles = [];
+let notifications = [], activeShareId = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -26,6 +27,7 @@ async function init() {
     initColToggle();
     registerSW();
     initBottomNav();
+    loadNotifications();
   } catch(e) {
     console.error("init error:", e);
   }
@@ -460,6 +462,17 @@ function bindEvents() {
   document.getElementById("btnCreateCol").addEventListener("click", createCollection);
   document.getElementById("newColName").addEventListener("keydown", e => { if (e.key === "Enter") createCollection(); });
 
+  // Notificaciones
+  document.getElementById("btnNotif").addEventListener("click", () => {
+    loadNotifications();
+    openModal("modalNotif");
+  });
+  document.getElementById("shareCollectionSelect").addEventListener("change", e => {
+    document.getElementById("shareNewColInput").style.display = (e.target.value === "__new__") ? "" : "none";
+  });
+  document.getElementById("btnAcceptShare").addEventListener("click", acceptShare);
+  document.getElementById("btnDeclineShare").addEventListener("click", declineShare);
+
   document.querySelectorAll(".modal-close").forEach(btn =>
     btn.addEventListener("click", () => closeModal(btn.dataset.modal))
   );
@@ -526,6 +539,106 @@ function populateCollectionSelects() {
       "<option value='" + c.id + "'>" + c.name + "</option>"
     ).join("");
   });
+}
+
+// ── Notificaciones (libros recibidos de otros usuarios) ─────────────────────
+async function loadNotifications() {
+  try {
+    const res = await fetch("/api/notifications");
+    notifications = await res.json();
+  } catch (e) { return; }
+  const pendingCount = notifications.filter(n => n.status === "pending").length;
+  const badge = document.getElementById("notifBadge");
+  if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display = ""; }
+  else { badge.style.display = "none"; }
+  renderNotifList();
+}
+
+function renderNotifList() {
+  const list = document.getElementById("notifList");
+  const empty = document.getElementById("notifEmpty");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!notifications.length) { empty.style.display = ""; return; }
+  empty.style.display = "none";
+  const statusLabel = { accepted: "Aceptado", declined: "Rechazado", unavailable: "Ya no disponible" };
+  notifications.forEach(n => {
+    const row = document.createElement("div");
+    row.className = "notif-row" + (n.status === "pending" ? " unread" : "");
+    const title = n.book_title || "Libro eliminado";
+    row.innerHTML =
+      "<div class='notif-row-info'>" +
+        "<span class='notif-row-title'>" + title + "</span>" +
+        "<span class='notif-row-meta'>De " + n.from_username + "</span>" +
+      "</div>" +
+      (n.status === "pending"
+        ? "<span class='notif-row-badge'>Nuevo</span>"
+        : "<span class='notif-row-status'>" + (statusLabel[n.status] || n.status) + "</span>");
+    if (n.status === "pending") {
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => openShareDetail(n));
+    }
+    list.appendChild(row);
+  });
+}
+
+function openShareDetail(n) {
+  activeShareId = n.id;
+  const available = !!n.book_title;
+  document.getElementById("shareBookTitle").textContent = n.book_title || "Libro eliminado";
+  document.getElementById("shareFromUser").textContent = "Enviado por " + n.from_username;
+  document.getElementById("shareCoverWrap").innerHTML = (available && n.book_has_cover)
+    ? "<img src='/api/books/" + n.book_id + "/cover'>" : "";
+  document.getElementById("shareUnavailableMsg").style.display = available ? "none" : "";
+  document.getElementById("shareColGroup").style.display = available ? "" : "none";
+  document.getElementById("btnAcceptShare").style.display = available ? "" : "none";
+
+  const sel = document.getElementById("shareCollectionSelect");
+  const placeholder = "<option value='' disabled selected>Elegi una coleccion...</option>";
+  sel.innerHTML = placeholder + collections.map(c =>
+    "<option value='" + c.id + "'>" + c.name + "</option>"
+  ).join("") + "<option value='__new__'>+ Nueva coleccion</option>";
+  document.getElementById("shareNewColInput").style.display = "none";
+  document.getElementById("shareNewColInput").value = "";
+
+  closeModal("modalNotif");
+  openModal("modalShareDetail");
+}
+
+async function acceptShare() {
+  const sel = document.getElementById("shareCollectionSelect");
+  const newColInput = document.getElementById("shareNewColInput");
+  const body = {};
+  if (sel.value === "__new__") {
+    const name = newColInput.value.trim();
+    if (!name) { toast("Poné un nombre para la coleccion"); return; }
+    body.new_collection_name = name;
+  } else if (sel.value) {
+    body.collection_id = sel.value;
+  } else {
+    toast("Elegi una coleccion antes de aceptar");
+    return;
+  }
+  const res = await fetch("/api/notifications/" + activeShareId + "/accept", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    toast("Libro agregado a tu biblioteca");
+    closeModal("modalShareDetail");
+    await refresh();
+  } else {
+    toast(data.error || "Error");
+    if (res.status === 410) closeModal("modalShareDetail");
+  }
+  await loadNotifications();
+}
+
+async function declineShare() {
+  await fetch("/api/notifications/" + activeShareId + "/decline", { method: "POST" });
+  closeModal("modalShareDetail");
+  toast("Rechazado");
+  await loadNotifications();
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
