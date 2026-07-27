@@ -119,6 +119,10 @@ async function renderPageWithTextLayer(pageObj, canvas, containerW, containerH, 
   // Mismas dimensiones CSS que el canvas
   textLayerDiv.style.width  = canvas.style.width  || canvas.width  + "px";
   textLayerDiv.style.height = canvas.style.height || canvas.height + "px";
+  // pdf.js posiciona cada palabra con calc(var(--scale-factor) * ...) —
+  // sin esto, el text layer queda mal dimensionado (gigante) y tapa toda
+  // la pantalla, bloqueando los clics en la topbar y el resto de la UI.
+  textLayerDiv.style.setProperty("--scale-factor", scale);
   container.appendChild(textLayerDiv);
 
   // Renderizar texto
@@ -165,7 +169,10 @@ async function initPDFScroll() {
   wrap.innerHTML = "";
 
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  const availW = Math.max(wrap.clientWidth - 32, 200);
+  // Se limita a un ancho maximo de lectura: sin esto, en un monitor ancho
+  // la pagina se estira para llenar TODO el ancho de la ventana, quedando
+  // gigante y con muchisimo scroll vertical por pagina.
+  const availW = Math.min(Math.max(wrap.clientWidth - 32, 200), 900);
 
   const wrappers = [], canvases = [];
   const done = new Set();
@@ -196,8 +203,18 @@ async function initPDFScroll() {
 
   const startIdx = Math.max(0, pdfPage - 1);
   await renderOne(startIdx);
-  wrappers[startIdx].scrollIntoView({ block: "start" });
-  (async () => { for (let i = 0; i < pdfTotal; i++) await renderOne(i); })();
+  // scrollIntoView tambien puede scrollear la ventana/documento entero (no
+  // solo este contenedor), tapando la topbar arriba del viewport — se
+  // setea el scroll directo sobre "wrap" para que quede contenido ahi.
+  wrap.scrollTop = wrappers[startIdx].offsetTop;
+
+  // Renderizar de a poco: solo las paginas que se acercan al viewport, no
+  // el documento entero de una — con libros largos, renderizar todo al
+  // abrir congelaba la UI y saturaba memoria/CPU.
+  const renderObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) renderOne(parseInt(e.target.dataset.page) - 1); });
+  }, { root: wrap, rootMargin: "1200px 0px 1200px 0px" });
+  wrappers.forEach(w => renderObserver.observe(w));
 
   let saveTimer = null;
   const observer = new IntersectionObserver(entries => {
@@ -216,7 +233,8 @@ async function initPDFScroll() {
 
   function goPage(p) {
     if (p < 1 || p > pdfTotal) return;
-    wrappers[p - 1].scrollIntoView({ behavior: "smooth", block: "start" });
+    renderOne(p - 1);
+    wrap.scrollTo({ top: wrappers[p - 1].offsetTop, behavior: "smooth" });
   }
   document.getElementById("pdfScrollPrev").onclick = () => goPage(pdfPage - 1);
   document.getElementById("pdfScrollNext").onclick = () => goPage(pdfPage + 1);
@@ -224,7 +242,11 @@ async function initPDFScroll() {
   input.onkeydown = e => { if (e.key === "Enter") document.getElementById("pdfScrollGo").click(); };
   document.getElementById("pdfScrollZoom").onchange = async e => {
     currentZoom = e.target.value === "auto" ? "auto" : e.target.value;
-    done.clear(); for (let i = 0; i < pdfTotal; i++) await renderOne(i);
+    done.clear();
+    const center = pdfPage - 1;
+    for (let i = Math.max(0, center - 2); i <= Math.min(pdfTotal - 1, center + 2); i++) {
+      await renderOne(i);
+    }
   };
   window._scrollGoPage = goPage;
 }

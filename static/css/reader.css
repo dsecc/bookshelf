@@ -7,6 +7,8 @@
   --topbar-h: 48px;
 }
 
+html { height: 100%; overflow: hidden; }
+
 body {
   background: var(--bg); color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
@@ -22,7 +24,11 @@ body {
 @keyframes ripple  { to{transform:scale(3);opacity:0} }
 
 /* ── Topbar ── */
-.reader-topbar { background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* position+z-index explicitos: el text layer del PDF (con transforms y
+   posiciones en %) a veces termina pintando por encima de sus propios
+   limites y se roba los clics de la topbar/controles si estos quedan en
+   el mismo nivel de stacking (auto). Con esto siempre ganan. */
+.reader-topbar { background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; position: relative; z-index: 20; }
 .reader-topbar-inner { padding: 0 .75rem; height: var(--topbar-h); display: flex; align-items: center; gap: .4rem; }
 
 /* Mobile: topbar fixed para que al ocultarse no deje espacio */
@@ -139,6 +145,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   gap: .4rem; flex-wrap: wrap; font-size: .82rem; color: var(--text-dim);
   flex-shrink: 0; transition: opacity .3s ease, transform .3s ease;
+  position: relative; z-index: 20;
 }
 .page-footer-controls.hidden { opacity: 0; transform: translateY(6px); pointer-events: none; }
 
@@ -147,6 +154,7 @@ body {
   background: var(--surface); border-bottom: 1px solid var(--border);
   padding: .4rem .85rem; display: flex; align-items: center; gap: .4rem;
   flex-wrap: wrap; font-size: .82rem; flex-shrink: 0; color: var(--text-dim);
+  position: relative; z-index: 20;
 }
 .ctrl-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .25rem .6rem; border-radius: 5px; cursor: pointer; font-size: .8rem; transition: background .15s; }
 .ctrl-btn:hover { background: var(--surface3); }
