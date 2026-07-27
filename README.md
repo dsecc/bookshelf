@@ -44,6 +44,12 @@ Dos formas, usá la que te resulte más cómoda:
    ./manage.sh delete-user tino
    ```
 
+## Enviar libros entre usuarios
+
+Desde el lector (panel de info, botón "Enviar a otro usuario") podés mandarle cualquier libro a otra cuenta del servidor. Al destinatario le aparece una notificación — 🔔 en el topbar de la biblioteca, con contador de las que no vio — y al abrirla ve la portada, el título y quién se lo mandó, con la opción de aceptarlo eligiendo o creando una colección.
+
+El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca antes: si nunca lo acepta, no se duplicó nada en disco. Cerrar la notificación sin aceptar solo la marca como "vista" (deja de sumar al contador) — se puede volver a abrir y aceptar cuando quieras. Cualquier notificación, la hayas visto o no, aceptado o no, se borra sola a los 7 días de haberse recibido, para no acumular basura en el servidor.
+
 ## Formatos soportados
 - **PDF** — lector completo con zoom y navegación por páginas
 - **EPUB** — lector con fuente, tamaño y tema ajustable
@@ -51,7 +57,7 @@ Dos formas, usá la que te resulte más cómoda:
 
 ## Funcionalidades
 - 👤 Multiusuario, con bibliotecas completamente aisladas
-- 🔔 Enviar un libro a otro usuario, con notificación para aceptar o rechazar
+- 🔔 Enviar un libro a otro usuario, con notificación para aceptar
 - 📁 Colecciones (crear, mover libros entre ellas)
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
 - 📖 Lector integrado para PDF y EPUB
