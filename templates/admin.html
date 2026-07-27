@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookshelf — Admin</title>
+<link rel="stylesheet" href="/static/css/main.css?v={{ static_ver }}">
+<link rel="icon" type="image/png" href="/static/icons/favicon.png">
+<meta name="theme-color" content="#0d0d0d">
+</head>
+<body>
+
+<div class="admin-layout">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="topbar-title">Panel de administración</span>
+      <div class="topbar-actions">
+        <button class="btn-primary" id="btnNewUser" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:.3rem"><path d="M12 5v14M5 12h14"/></svg>
+          Nuevo usuario
+        </button>
+        <a class="btn-icon" href="/logout" title="Cerrar sesión">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    {% if error %}<div class="auth-error auth-error-inline">{{ error }}</div>{% endif %}
+    <div class="section-title">Usuarios ({{ users|length }})</div>
+    <div class="user-list">
+      {% for u in users %}
+      <div class="user-row">
+        <div class="user-row-top">
+          <div class="user-row-info">
+            <span class="user-name">{{ u.username }}</span>
+            {% if u.is_admin %}<span class="book-fmt-badge">admin</span>{% endif %}
+            <span class="user-row-meta">{{ u.book_count }} libro{{ '' if u.book_count == 1 else 's' }} · desde {{ u.created_at[:10] }}</span>
+          </div>
+          <div class="user-row-actions">
+            <button class="btn-icon btn-toggle-pw" type="button" title="Cambiar contraseña" onclick="togglePwRow(this)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5 18 5l2 2-2.5 2.5"/></svg>
+            </button>
+            {% if not u.is_admin %}
+            <form method="POST" action="/admin/users/{{ u.id }}/delete"
+                  onsubmit="return confirm('¿Borrar a {{ u.username }} y todos sus libros? Esta acción no se puede deshacer.');">
+              <button class="btn-icon" type="submit" title="Borrar usuario">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        <form method="POST" action="/admin/users/{{ u.id }}/reset-password" class="user-pw-row">
+          <input type="text" name="password" placeholder="Nueva contraseña para {{ u.username }}" autocomplete="off" required>
+          <button class="btn-secondary" type="submit">Guardar</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo usuario -->
+<div class="modal-overlay" id="modalNewUser" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nuevo usuario</h2>
+      <button class="btn-icon modal-close" id="btnCloseNewUser" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="/admin/users">
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" name="username" autocomplete="off" autofocus required>
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="text" name="password" autocomplete="off" required>
+      </div>
+      <button class="btn-primary full" type="submit">Crear</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  var modal = document.getElementById('modalNewUser');
+  document.getElementById('btnNewUser').addEventListener('click', function () { modal.style.display = 'flex'; });
+  document.getElementById('btnCloseNewUser').addEventListener('click', function () { modal.style.display = 'none'; });
+  modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+
+  function togglePwRow(btn) {
+    var row = btn.closest('.user-row').querySelector('.user-pw-row');
+    var opening = !row.classList.contains('open');
+    btn.classList.toggle('active', opening);
+    row.classList.toggle('open', opening);
+    if (opening) setTimeout(function () { row.querySelector('input').focus(); }, 220);
+  }
+
+  // Fade-out suave antes de cerrar sesion
+  document.querySelectorAll('a[href="/logout"]').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      document.body.classList.add('logging-out');
+      setTimeout(function () { window.location.href = link.href; }, 220);
+    });
+  });
+</script>
+</body>
+</html>

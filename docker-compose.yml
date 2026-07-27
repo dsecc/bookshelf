@@ -1,0 +1,13 @@
+services:
+  bookshelf:
+    build: .
+    image: bookshelf:1.3
+    container_name: bookshelf
+    restart: unless-stopped
+    ports:
+      - "8090:5000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - PYTHONUNBUFFERED=1

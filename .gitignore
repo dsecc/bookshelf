@@ -1,0 +1,32 @@
+# Datos reales de la biblioteca: base de datos, secret_key, portadas y
+# archivos subidos. Son datos personales / generados en runtime, nunca
+# se versionan. Docker los crea solos en el primer arranque.
+data/
+uploads/
+
+# Paquetes de despliegue (imagenes de Docker pesadas y configs atadas a
+# un servidor puntual) — no son codigo fuente del proyecto.
+deploy_server/
+*.tar.gz
+*.tar
+
+# Backups y variables de entorno locales
+*.bak
+*.bak.*
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Entornos virtuales / editores
+.venv/
+venv/
+.vscode/
+.idea/
+*.swp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
