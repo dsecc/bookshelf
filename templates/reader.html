@@ -2,9 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: sin esto iOS reserva las safe areas (notch / barra de
+     estado) y el contenido nunca puede llegar al borde de la pantalla. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>Lector</title>
 <link rel="stylesheet" href="/static/css/reader.css?v={{ static_ver }}">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/static/icons/favicon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bookshelf">
+<meta name="theme-color" content="#0d0d0d">
 </head>
 <body>
 
@@ -210,6 +219,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
       Enviar a otro usuario
     </button>
+    <button class="btn-share-wa" id="btnOffline" style="margin-top:.5rem">
+      <span id="btnOfflineIcon"></span>
+      <span id="btnOfflineLabel">Guardar sin conexion</span>
+    </button>
     <hr class="panel-divider">
     <button class="btn-danger-reader" id="btnDeleteReader">Eliminar libro</button>
   </div>
@@ -256,9 +269,12 @@
 <div id="magnifierLens"><canvas id="magnifierCanvas"></canvas></div>
 <div id="magnifierCursor"></div>
 <div id="toast" class="toast"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+<!-- Librerias servidas localmente: el lector tiene que funcionar sin internet
+     (modo offline) y en un servidor privado sin salida a la red. -->
+<script src="/static/js/vendor/pdf.min.js?v={{ static_ver }}"></script>
+<script src="/static/js/vendor/jszip.min.js?v={{ static_ver }}"></script>
+<script src="/static/js/vendor/page-flip.browser.js?v={{ static_ver }}"></script>
+<script src="/static/js/vendor/epub.min.js?v={{ static_ver }}"></script>
 <script src="/static/js/reader.js?v={{ static_ver }}"></script>
 </body>
 </html>

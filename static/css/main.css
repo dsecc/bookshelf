@@ -466,7 +466,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .sidebar { display: none !important; } /* reemplazado por bottom nav */
 
   /* ── Topbar ── */
-  .topbar { height: 52px; }
+  /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar
+     tiene que bajar para no quedar debajo del notch / barra de estado. */
+  .topbar { height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
   .topbar-inner { padding: 0 .75rem; }
   .topbar-title { font-size: .85rem; }
   .search-expand.open { width: 160px; }
@@ -682,3 +684,13 @@ body.logging-out {
 .share-info { display: flex; flex-direction: column; gap: .4rem; padding-top: .2rem; }
 .share-title { font-size: .95rem; font-weight: 600; color: var(--text); }
 .share-from { font-size: .8rem; color: var(--text-muted); }
+
+/* ── Indicador de libro disponible sin conexion ── */
+.offline-badge {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(13,13,13,.75); color: var(--accent);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,.12);
+}

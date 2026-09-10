@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.4** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.5** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -50,6 +50,16 @@ Desde el lector (panel de info, botón "Enviar a otro usuario") podés mandarle 
 
 El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca antes: si nunca lo acepta, no se duplicó nada en disco. Cerrar la notificación sin aceptar solo la marca como "vista" (deja de sumar al contador) — se puede volver a abrir y aceptar cuando quieras. Cualquier notificación, la hayas visto o no, aceptado o no, se borra sola a los 7 días de haberse recibido, para no acumular basura en el servidor.
 
+## Leer sin conexión
+
+Bookshelf es una PWA: se puede instalar en el teléfono ("Agregar a inicio" en iOS, "Instalar app" en Android) y abre como una app nativa.
+
+Dentro del lector, el botón **"Guardar sin conexión"** descarga ese libro al dispositivo. Los libros guardados quedan listados en la sección **"Sin conexión"** de la biblioteca y se marcan con un ícono en la portada. Solo se guarda lo que elegís: nada se descarga solo, para no llenarte el teléfono.
+
+La app en sí (la biblioteca, las portadas y el lector) queda cacheada después de la primera visita con conexión, así que abre igual sin internet — lo único que necesita estar guardado explícitamente es el archivo de cada libro.
+
+> En iPhone, para que la hoja aproveche toda la pantalla (incluso por debajo de la hora y la batería, como en los PDF nativos) hay que abrirla **instalada desde la pantalla de inicio**: Safari siempre muestra su propia barra. Si ya la tenías instalada de antes, borrá el ícono y volvé a agregarla para que tome la configuración nueva.
+
 ## Formatos soportados
 - **PDF** — lector completo con zoom y navegación por páginas
 - **EPUB** — lector con fuente, tamaño y tema ajustable
@@ -58,6 +68,7 @@ El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca a
 ## Funcionalidades
 - 👤 Multiusuario, con bibliotecas completamente aisladas
 - 🔔 Enviar un libro a otro usuario, con notificación para aceptar
+- 📴 Lectura sin conexión: guardás los libros que quieras y se leen sin internet
 - 📁 Colecciones (crear, mover libros entre ellas)
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
 - 📖 Lector integrado para PDF y EPUB

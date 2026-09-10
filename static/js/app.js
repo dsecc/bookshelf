@@ -18,11 +18,16 @@ const deviceId = localStorage.getItem("bs_device_id") || (() => {
 
 let collections = [], books = [], recentBooks = [], activeColId = null, pendingFiles = [];
 let notifications = [], activeShareId = null;
+// Vista "Sin conexion": el cache del service worker es la fuente de verdad de
+// que libros estan guardados (no se duplica el estado en ningun lado).
+let offlineView = false, offlineIds = new Set();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  // refresh() va aparte: sin conexion sus fetch pueden fallar, y si eso corta
+  // el init la UI queda sin ningun handler enganchado (nada clickeable).
+  try { await refresh(); } catch (e) { console.error("refresh error:", e); }
   try {
-    await refresh();
     bindEvents();
     initColToggle();
     registerSW();
@@ -33,16 +38,32 @@ async function init() {
   }
 }
 
+// GET de JSON que no explota sin conexion: devuelve el fallback.
+async function fetchJSON(url, fallback) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return fallback;
+    return await res.json();
+  } catch (e) {
+    return fallback;
+  }
+}
+
 // Carga colecciones + libros juntos, luego renderiza todo
 async function refresh() {
-  const [colRes, bookRes, recentRes] = await Promise.all([
-    fetch("/api/collections"),
-    fetch("/api/books" + (activeColId != null ? "?collection_id=" + activeColId : "")),
-    fetch("/api/books/recent?limit=10")
+  offlineView = false;
+  await loadOfflineIds(); // para el indicador de "guardado" en las tarjetas
+  // Sin conexion cada fetch puede fallar: se resuelve con lo que haya (el
+  // service worker devuelve la ultima copia cacheada si la tiene) en vez de
+  // tirar abajo todo el render.
+  const [cols, bks, recent] = await Promise.all([
+    fetchJSON("/api/collections", collections),
+    fetchJSON("/api/books" + (activeColId != null ? "?collection_id=" + activeColId : ""), books),
+    fetchJSON("/api/books/recent?limit=10", recentBooks)
   ]);
-  collections = await colRes.json();
-  books = await bookRes.json();
-  recentBooks = await recentRes.json();
+  collections = cols;
+  books = bks;
+  recentBooks = recent;
   renderSidebar();
   renderBooks();
   populateCollectionSelects();
@@ -79,6 +100,7 @@ function renderSidebar() {
     li.appendChild(editBtn);
 
     li.addEventListener("click", async () => {
+      offlineView = false;
       activeColId = c.id;
       document.getElementById("topbarTitle").textContent = c.name;
       document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
@@ -104,6 +126,34 @@ function initColToggle() {
   });
 }
 
+// ── Libros guardados sin conexion ────────────────────────────────────────────
+// Se leen directo del cache que llena el lector con "Guardar sin conexion".
+async function loadOfflineIds() {
+  offlineIds = new Set();
+  if (!("caches" in window)) return offlineIds;
+  try {
+    const cache = await caches.open("bookshelf-books-v1");
+    const keys = await cache.keys();
+    keys.forEach(req => {
+      const m = req.url.match(/\/api\/books\/(\d+)\/file/);
+      if (m) offlineIds.add(parseInt(m[1], 10));
+    });
+  } catch (e) { /* sin soporte de cache: queda vacio */ }
+  return offlineIds;
+}
+
+async function showOfflineView() {
+  offlineView = true;
+  activeColId = null;
+  setNavActive("navOffline");
+  setView("biblioteca");
+  document.getElementById("topbarTitle").textContent = "Sin conexion";
+  await loadOfflineIds();
+  // Si no hay red, books puede venir del cache del service worker.
+  books = await fetchJSON("/api/books", books);
+  renderBooks();
+}
+
 // ── Books ─────────────────────────────────────────────────────────────────────
 function renderBooks(filter) {
   filter = (filter || "").toLowerCase();
@@ -112,10 +162,17 @@ function renderBooks(filter) {
 
   if (!container) { console.error("booksContainer no encontrado"); return; }
 
-  const filtered = books.filter(b => b.title.toLowerCase().includes(filter));
+  const source = offlineView ? books.filter(b => offlineIds.has(b.id)) : books;
+  const filtered = source.filter(b => b.title.toLowerCase().includes(filter));
 
   if (!filtered.length) {
     animateOut(container, () => { container.innerHTML = ""; });
+    const txt = document.getElementById("emptyStateText");
+    const btn = document.getElementById("btnUploadEmpty");
+    if (txt) txt.textContent = offlineView
+      ? "No guardaste ningun libro para leer sin conexion"
+      : "No hay libros todavia";
+    if (btn) btn.style.display = offlineView ? "none" : "";
     empty.style.display = "flex";
     return;
   }
@@ -125,7 +182,7 @@ function renderBooks(filter) {
   function doPopulate() {
     container.innerHTML = "";
 
-  if (activeColId == null) {
+  if (activeColId == null && !offlineView) {
     // Seccion Ultimos leidos
     if (recentBooks.length > 0 && !filter) {
       const rh = document.createElement("p");
@@ -209,6 +266,15 @@ function makeCard(book) {
   } else {
     coverDiv.style.background = book.cover_color;
     coverDiv.appendChild(makePlaceholder(book.format));
+  }
+
+  // Indicador de "disponible sin conexion"
+  if (offlineIds.has(book.id)) {
+    const badge = document.createElement("div");
+    badge.className = "offline-badge";
+    badge.title = "Disponible sin conexion";
+    badge.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 14.9A5 5 0 0 1 7 6a6 6 0 0 1 11.6 2A4.5 4.5 0 0 1 20 15"/><polyline points="9 15 11 17 15 12"/></svg>';
+    coverDiv.appendChild(badge);
   }
 
   coverDiv.appendChild(makeOverlay(book));
@@ -391,6 +457,7 @@ function bindEvents() {
     activeColId = null;
     await refresh();
   });
+  document.getElementById("navOffline").addEventListener("click", showOfflineView);
   document.getElementById("navAbout").addEventListener("click", () => {
     setNavActive("navAbout");
     setView("about");
@@ -675,8 +742,14 @@ function toast(msg) {
 }
 
 function registerSW() {
-  if ("serviceWorker" in navigator)
-    navigator.serviceWorker.register("/static/js/sw.js").catch(() => {});
+  if (!("serviceWorker" in navigator)) return;
+  // Desde /sw.js (raiz) el alcance es toda la app; desde /static/js/ solo
+  // podria controlar esa carpeta y el modo sin conexion no funcionaria.
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  // Limpiar registros viejos con alcance /static/js/ (version anterior).
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => { if (r.scope.indexOf("/static/js/") !== -1) r.unregister(); });
+  }).catch(() => {});
 }
 
 // ── Bottom nav mobile ─────────────────────────────────────────────────────────
@@ -776,6 +849,7 @@ function openMobileColSheet() {
   allLi.innerHTML = "<span>Todos los libros</span>";
   allLi.onclick = async () => {
     sheet.remove();
+    offlineView = false;
     activeColId = null;
     document.getElementById("topbarTitle").textContent = "Biblioteca";
     setNavActive("navBiblioteca");
@@ -787,6 +861,17 @@ function openMobileColSheet() {
   };
   list.appendChild(allLi);
 
+  // Entrada "Sin conexion" (en mobile no entra en la bottom nav, va aca)
+  const offLi = document.createElement("li");
+  offLi.style.cssText = "padding:.65rem .75rem;border-radius:8px;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;";
+  offLi.innerHTML = "<span>Sin conexion</span>";
+  offLi.onclick = async () => {
+    sheet.remove();
+    document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+    await showOfflineView();
+  };
+  list.appendChild(offLi);
+
   collections.forEach(c => {
     const li = document.createElement("li");
     li.style.cssText = "padding:.65rem .75rem;border-radius:8px;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;color:var(--text);";
@@ -795,6 +880,7 @@ function openMobileColSheet() {
     li.innerHTML = "<span>" + c.name + "</span><span style='font-size:.75rem;color:var(--text-muted)'>" + (c.book_count||0) + "</span>";
     li.onclick = async () => {
       sheet.remove();
+      offlineView = false;
       activeColId = c.id;
       document.getElementById("topbarTitle").textContent = c.name;
       setView("biblioteca");

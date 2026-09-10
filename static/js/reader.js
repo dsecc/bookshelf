@@ -24,45 +24,73 @@ let isFullscreen = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  const [bookRes, colRes] = await Promise.all([
-    fetch("/api/books/" + bookId),
-    fetch("/api/collections")
-  ]);
-  currentBook = await bookRes.json();
-  collections = await colRes.json();
-  viewMode = currentBook.view_mode || "scroll";
+  try {
+    const [bookRes, colRes] = await Promise.all([
+      fetch("/api/books/" + bookId),
+      fetch("/api/collections")
+    ]);
+    currentBook = await bookRes.json();
+    collections = await colRes.json();
+    viewMode = currentBook.view_mode || "scroll";
 
-  document.getElementById("readerTitle").textContent = currentBook.title;
-  document.title = currentBook.title;
-  document.getElementById("infoTitleInput").value = currentBook.title;
-  document.getElementById("infoCollection").innerHTML = collections.map(c =>
-    "<option value='" + c.id + "'" + (c.id === currentBook.collection_id ? " selected" : "") + ">" + c.name + "</option>"
-  ).join("");
+    document.getElementById("readerTitle").textContent = currentBook.title;
+    document.title = currentBook.title;
+    document.getElementById("infoTitleInput").value = currentBook.title;
+    document.getElementById("infoCollection").innerHTML = collections.map(c =>
+      "<option value='" + c.id + "'" + (c.id === currentBook.collection_id ? " selected" : "") + ">" + c.name + "</option>"
+    ).join("");
 
-  updateViewModeButtons();
-  const fmt = currentBook.format.toUpperCase();
-  if (fmt === "PDF") await initPDF();
-  else if (fmt === "EPUB") initEPUB();
-  else initUnsupported();
-
+    updateViewModeButtons();
+    const fmt = currentBook.format.toUpperCase();
+    if (fmt === "PDF") await initPDF();
+    else if (fmt === "EPUB") initEPUB();
+    else initUnsupported();
+  } catch (e) {
+    // Tipicamente: sin conexion y este libro no se guardo para offline.
+    console.error("No se pudo abrir el libro:", e);
+    showLoadError();
+  }
+  // Siempre se enganchan los handlers, aunque el libro no haya cargado: si no,
+  // ni el boton de volver funciona.
   bindAll();
   loadBookmarks();
   initTopbarBehavior();
   initPinchZoom();
 }
 
+// Pantalla de error legible en vez de un lector en blanco.
+function showLoadError() {
+  ["pdfScrollViewer","pdfPageViewer","pdfBookViewer","pdfSpreadViewer","epubViewer"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+  const v = document.getElementById("unsupportedViewer");
+  if (!v) return;
+  const msg = v.querySelector("p");
+  if (msg) msg.textContent = navigator.onLine
+    ? "No se pudo abrir este libro."
+    : "Este libro no esta guardado para leer sin conexion.";
+  const btn = document.getElementById("btnDownloadUnsupported");
+  if (btn) { btn.textContent = "Volver a la biblioteca"; btn.onclick = () => { window.location.href = "/"; }; }
+  v.style.display = "flex";
+  const title = document.getElementById("readerTitle");
+  if (title && title.textContent === "Cargando...") title.textContent = "No disponible";
+}
+
 // ── DPR-aware render ──────────────────────────────────────────────────────────
-async function renderPageToCanvas(pageObj, canvas, containerW, containerH, forceScale) {
+// "margin" es el margen visual que se le descuenta al contenedor. El modo
+// scroll ya calcula su ancho exacto (computeAvailW descuenta el padding real)
+// y pasa 0; los otros modos pasan el ancho crudo y usan el default de 32.
+async function renderPageToCanvas(pageObj, canvas, containerW, containerH, forceScale, margin) {
   const vp0 = pageObj.getViewport({ scale: 1 });
+  const m = (margin == null) ? 32 : margin;
   let scale;
   if (forceScale) {
     scale = forceScale;
   } else if (currentZoom !== "auto") {
     scale = parseFloat(currentZoom);
   } else {
-    const availW = Math.max(containerW - 32, 100);
+    const availW = Math.max(containerW - m, 100);
     if (containerH && containerH > 100) {
-      scale = Math.min(availW / vp0.width, (containerH - 32) / vp0.height);
+      scale = Math.min(availW / vp0.width, (containerH - m) / vp0.height);
     } else {
       scale = availW / vp0.width;
     }
@@ -101,9 +129,9 @@ async function setViewMode(mode) {
 
 
 // ── Render PDF page con text layer (permite seleccion de texto) ───────────────
-async function renderPageWithTextLayer(pageObj, canvas, containerW, containerH, forceScale) {
+async function renderPageWithTextLayer(pageObj, canvas, containerW, containerH, forceScale, margin) {
   // Renderizar canvas normalmente
-  const scale = await renderPageToCanvas(pageObj, canvas, containerW, containerH, forceScale);
+  const scale = await renderPageToCanvas(pageObj, canvas, containerW, containerH, forceScale, margin);
 
   // Agregar text layer si el canvas tiene un contenedor .pdf-page-container
   const container = canvas.parentElement;
@@ -144,14 +172,18 @@ async function renderPageWithTextLayer(pageObj, canvas, containerW, containerH, 
 
 // ── PDF init ──────────────────────────────────────────────────────────────────
 async function initPDF() {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  // Worker local (misma version 3.11.174 que vendor/pdf.min.js) — asi el
+  // lector funciona sin internet y sin depender de un CDN externo.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/static/js/pdf.worker.min.js";
   if (!pdfDoc) {
     pdfDoc = await pdfjsLib.getDocument("/api/books/" + bookId + "/file").promise;
     pdfTotal = pdfDoc.numPages;
   }
   const prog = await fetchProgress();
   pdfPage = prog.page || 1;
+  // Solo el modo scroll re-escala al cambiar el ancho; si se cambia a otro
+  // modo hay que soltar el handler viejo para no redibujar un viewer oculto.
+  _scrollRerender = null;
   if (viewMode === "scroll")  await initPDFScroll();
   else if (viewMode === "page")   await initPDFPage();
   else if (viewMode === "book")   await initPDFBook();
@@ -159,6 +191,35 @@ async function initPDF() {
 }
 
 // ── SCROLL MODE ───────────────────────────────────────────────────────────────
+
+// Ancho real disponible para dibujar la hoja, descontando el padding del
+// contenedor. En mobile se usa todo (la hoja va de borde a borde, que es el
+// punto de leer en un telefono chico); en desktop se acota a un ancho de
+// lectura, porque llenar un monitor ancho deja la pagina gigante y con
+// muchisimo scroll por hoja.
+function computeAvailW(wrap) {
+  const cs = getComputedStyle(wrap);
+  const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  const inner = Math.max(wrap.clientWidth - pad, 200);
+  return window.innerWidth <= 640 ? inner : Math.min(inner, 900);
+}
+
+// Lo setea initPDFScroll; lo usan el resize y el toggle de fullscreen para
+// re-escalar las paginas ya dibujadas. Antes availW se calculaba una unica
+// vez y rotar el telefono o entrar a fullscreen no cambiaba nada.
+let _scrollRerender = null;
+let _scrollResizeTimer = null;
+
+function scheduleScrollRerender(delay) {
+  clearTimeout(_scrollResizeTimer);
+  _scrollResizeTimer = setTimeout(() => {
+    if (_scrollRerender) _scrollRerender();
+  }, delay == null ? 200 : delay);
+}
+
+window.addEventListener("resize", () => scheduleScrollRerender());
+window.addEventListener("orientationchange", () => scheduleScrollRerender(350));
+
 async function initPDFScroll() {
   const viewer = document.getElementById("pdfScrollViewer");
   viewer.style.display = "flex";
@@ -169,10 +230,7 @@ async function initPDFScroll() {
   wrap.innerHTML = "";
 
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  // Se limita a un ancho maximo de lectura: sin esto, en un monitor ancho
-  // la pagina se estira para llenar TODO el ancho de la ventana, quedando
-  // gigante y con muchisimo scroll vertical por pagina.
-  const availW = Math.min(Math.max(wrap.clientWidth - 32, 200), 900);
+  let availW = computeAvailW(wrap);
 
   const wrappers = [], canvases = [];
   const done = new Set();
@@ -182,7 +240,9 @@ async function initPDFScroll() {
     w.style.cssText = "display:flex;justify-content:center;width:100%;flex-shrink:0;";
     w.dataset.page = i + 1;
     const c = document.createElement("canvas");
-    c.style.cssText = "display:block;box-shadow:0 4px 20px rgba(0,0,0,.5);";
+    // La sombra la pone el CSS (#pdfScrollWrap canvas): inline le ganaria a la
+    // regla que la saca en fullscreen.
+    c.style.cssText = "display:block;";
     w.appendChild(c);
     wrap.appendChild(w);
     wrappers.push(w);
@@ -198,7 +258,7 @@ async function initPDFScroll() {
     if (!wrappers[i].classList.contains("pdf-page-container")) {
       wrappers[i].classList.add("pdf-page-container");
     }
-    await renderPageWithTextLayer(page, c, availW, 0);
+    await renderPageWithTextLayer(page, c, availW, 0, null, 0);
   }
 
   const startIdx = Math.max(0, pdfPage - 1);
@@ -215,6 +275,20 @@ async function initPDFScroll() {
     entries.forEach(e => { if (e.isIntersecting) renderOne(parseInt(e.target.dataset.page) - 1); });
   }, { root: wrap, rootMargin: "1200px 0px 1200px 0px" });
   wrappers.forEach(w => renderObserver.observe(w));
+
+  // Re-escalar cuando cambia el ancho disponible: rotar el telefono, entrar
+  // o salir de fullscreen, o redimensionar la ventana.
+  _scrollRerender = async () => {
+    const newW = computeAvailW(wrap);
+    if (Math.abs(newW - availW) < 2) return;
+    availW = newW;
+    done.clear();
+    const center = Math.max(0, pdfPage - 1);
+    for (let i = Math.max(0, center - 1); i <= Math.min(pdfTotal - 1, center + 1); i++) {
+      await renderOne(i);
+    }
+    wrap.scrollTop = wrappers[center].offsetTop;
+  };
 
   let saveTimer = null;
   const observer = new IntersectionObserver(entries => {
@@ -730,6 +804,10 @@ function bindAll() {
     toast(res.ok ? "Libro enviado" : (data.error || "Error"));
   };
 
+  // Guardar sin conexion
+  document.getElementById("btnOffline").onclick = toggleOffline;
+  refreshOfflineBtn();
+
   // Eliminar
   document.getElementById("btnDeleteReader").onclick  = () => openModal("modalDelete");
   document.getElementById("btnCancelDelete").onclick  = () => closeModal("modalDelete");
@@ -912,9 +990,14 @@ function enterFullscreen() {
   isFullscreen = true;
   updateFullscreenBtn();
   if (window.innerWidth <= 640) {
-    // En fullscreen scroll: el usuario controla con doble tap
-    // No auto-ocultar aqui — initTopbarBehavior ya maneja el doble tap
+    // En iOS requestFullscreen no existe (solo aplica a <video>), asi que en
+    // mobile "fullscreen" es puramente CSS: para ganar de verdad la pantalla
+    // hay que ocultar la topbar ya. Doble tap la vuelve a mostrar.
+    _hideTopbar();
   }
+  // La hoja ahora tiene mas ancho disponible: re-escalar (esperar a que el
+  // CSS de fullscreen aplique antes de medir).
+  scheduleScrollRerender(320);
 }
 
 function exitFullscreen() {
@@ -923,10 +1006,13 @@ function exitFullscreen() {
   document.body.classList.remove("reader-fullscreen");
   isFullscreen = false;
   clearTimeout(_fsTimer);
-  // Siempre restaurar topbar al salir
+  // _showTopbar deshace tambien los margenes negativos que deja _hideTopbar
+  // en el viewer; sin esto quedaba el contenido corrido hacia arriba.
+  _showTopbar();
   const tb = document.getElementById("readerTopbar");
   if (tb) { tb.style.transform = ""; tb.style.opacity = ""; tb.style.transition = ""; }
   updateFullscreenBtn();
+  scheduleScrollRerender(320);
 }
 
 function toggleFullscreen() {
@@ -974,6 +1060,69 @@ function toast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg; t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2800);
+}
+
+// ── Guardar libro sin conexion ───────────────────────────────────────────────
+// El archivo del libro se guarda en un cache aparte (nunca automatico: pesan
+// demasiado como para bajarlos solos). El service worker sirve desde ahi
+// cuando no hay red. El cache es la unica fuente de verdad del estado.
+const OFFLINE_CACHE = "bookshelf-books-v1";
+const BOOK_FILE_URL  = "/api/books/" + bookId + "/file";
+const BOOK_COVER_URL = "/api/books/" + bookId + "/cover";
+
+const ICON_SAVE  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 13v8"/><path d="M4 14.9A5 5 0 0 1 7 6a6 6 0 0 1 11.6 2A4.5 4.5 0 0 1 20 15"/><polyline points="8 17 12 21 16 17"/></svg>';
+const ICON_SAVED = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14.9A5 5 0 0 1 7 6a6 6 0 0 1 11.6 2A4.5 4.5 0 0 1 20 15"/><polyline points="9 15 11 17 15 12"/></svg>';
+
+async function isBookOffline() {
+  if (!("caches" in window)) return false;
+  try {
+    const cache = await caches.open(OFFLINE_CACHE);
+    return !!(await cache.match(BOOK_FILE_URL, { ignoreSearch: true }));
+  } catch { return false; }
+}
+
+async function refreshOfflineBtn() {
+  const btn = document.getElementById("btnOffline");
+  if (!btn) return;
+  if (!("caches" in window)) { btn.style.display = "none"; return; }
+  const saved = await isBookOffline();
+  btn.dataset.saved = saved ? "1" : "0";
+  document.getElementById("btnOfflineIcon").innerHTML = saved ? ICON_SAVED : ICON_SAVE;
+  document.getElementById("btnOfflineLabel").textContent =
+    saved ? "Disponible sin conexion" : "Guardar sin conexion";
+}
+
+async function toggleOffline() {
+  const btn = document.getElementById("btnOffline");
+  if (!btn || btn.disabled) return;
+  const saved = btn.dataset.saved === "1";
+  btn.disabled = true;
+  try {
+    const cache = await caches.open(OFFLINE_CACHE);
+    if (saved) {
+      await cache.delete(BOOK_FILE_URL, { ignoreSearch: true });
+      await cache.delete(BOOK_COVER_URL, { ignoreSearch: true });
+      toast("Quitado de sin conexion");
+    } else {
+      // Pedirle al navegador que no evicte el cache (iOS lo respeta cuando la
+      // app esta instalada en la pantalla de inicio).
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(() => {});
+      }
+      document.getElementById("btnOfflineLabel").textContent = "Guardando...";
+      await cache.add(BOOK_FILE_URL);
+      await cache.add(BOOK_COVER_URL).catch(() => {}); // sin portada no es grave
+      toast("Guardado para leer sin conexion");
+    }
+  } catch (err) {
+    const full = err && (err.name === "QuotaExceededError" ||
+                         String(err).indexOf("quota") !== -1);
+    toast(full ? "No hay espacio suficiente en el dispositivo"
+               : "No se pudo guardar (necesitas conexion)");
+  } finally {
+    btn.disabled = false;
+    refreshOfflineBtn();
+  }
 }
 
 init();

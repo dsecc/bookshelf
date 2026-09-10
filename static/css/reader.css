@@ -28,7 +28,13 @@ body {
    posiciones en %) a veces termina pintando por encima de sus propios
    limites y se roba los clics de la topbar/controles si estos quedan en
    el mismo nivel de stacking (auto). Con esto siempre ganan. */
-.reader-topbar { background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; position: relative; z-index: 20; }
+.reader-topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; position: relative; z-index: 20;
+  /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar
+     tiene que bajar los iconos para que no queden debajo del notch. */
+  padding-top: env(safe-area-inset-top);
+}
 .reader-topbar-inner { padding: 0 .75rem; height: var(--topbar-h); display: flex; align-items: center; gap: .4rem; }
 
 /* Mobile: topbar fixed para que al ocultarse no deje espacio */
@@ -242,6 +248,17 @@ body.reader-fullscreen .page-footer-controls {
 }
 body.reader-fullscreen .page-arrow-btn { display: none; }
 
+/* ── Fullscreen en mobile: hoja de borde a borde ──
+   En iOS no existe fullscreen nativo para HTML (solo <video>), asi que el
+   maximo aprovechamiento sale de combinar viewport-fit=cover (deja pasar el
+   contenido por debajo de la hora/bateria, como los PDF nativos) con sacar
+   todo el padding, el gap y las sombras. */
+@media (max-width: 640px) {
+  body.reader-fullscreen #pdfScrollWrap { padding: 0; gap: 2px; }
+  body.reader-fullscreen #pdfScrollWrap canvas { box-shadow: none; border-radius: 0; }
+  body.reader-fullscreen #pdfScrollViewer .pdf-controls { display: none; }
+}
+
 /* ── Toast ── */
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: .5rem 1.1rem; border-radius: 99px; font-size: .82rem; opacity: 0; transition: all .25s; z-index: 999; pointer-events: none; white-space: nowrap; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -262,7 +279,8 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
   }
 
   /* Scroll */
-  #pdfScrollWrap { padding: .75rem .5rem; gap: 10px; }
+  /* En una pantalla chica cada px de ancho cuenta: padding minimo. */
+  #pdfScrollWrap { padding: .35rem .25rem; gap: 8px; }
 
   /* Page mode flechas abajo */
   .page-arrow-btn {

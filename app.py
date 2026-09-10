@@ -395,6 +395,17 @@ def admin_delete_user(user_id):
 # Biblioteca (por usuario)
 # ---------------------------------------------------------------------------
 
+@app.route("/sw.js")
+def service_worker():
+    # El alcance de un service worker es la carpeta donde vive el script: desde
+    # /static/js/ solo podria controlar /static/js/. Servido desde la raiz
+    # controla toda la app (biblioteca y lector), que es lo que necesita el
+    # modo sin conexion. Sin login: es solo el script, no expone datos.
+    return send_from_directory(
+        os.path.join(app.root_path, "static", "js"), "sw.js",
+        mimetype="application/javascript"
+    )
+
 @app.route("/")
 @login_required
 def index():
