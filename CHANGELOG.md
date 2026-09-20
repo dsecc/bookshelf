@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.6.5 — La busqueda queda pegada a la navbar
+
+### Cambiado
+- **La barra de busqueda se rediseno siguiendo el patron de una barra de chat con una barra secundaria encima.** Antes salia de atras de la pildora pero con el mismo ancho, asi que se leia como dos barras apiladas. Ahora forma una sola pieza con ella:
+  - **Mas angosta**: 16px por lado respecto de la pildora, la proporcion medida sobre la referencia (886px contra 919px).
+  - **Mas oscura**: se aleja en vez de competir con la barra principal, igual que en la referencia (31,31,31 contra 53,53,53).
+  - **Esquinas de arriba redondeadas y base recta**, porque la base **queda tapada** por la pildora: se mete 26px por detras, con el `z-index` por debajo.
+- Los controles de la busqueda (anterior, siguiente, cerrar y el contador) se achicaron para no competir con la barra.
+
+### Notas
+- `VERSION` del service worker: `v14` → `v15`.
+- Verificado con navegador real: 326px de ancho contra 358 de la pildora (16px por lado exactos), 26px de solapamiento, radio 22px arriba y 0 abajo, `z-index` 140 contra 150, y fondo mas oscuro (0.063 contra 0.078). La animacion recorre el camino en vez de saltar (768 → 740 → 724), se puede escribir, cierra y se esconde, y con el teclado sube manteniendo exactamente la misma separacion de 44px respecto de la barra.
+
 ## v1.6.4 — Correcciones del panel del lector
 
 ### Corregido

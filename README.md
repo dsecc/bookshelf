@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.6.4** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.6.5** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 

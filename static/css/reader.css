@@ -284,44 +284,49 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
     pointer-events: none;
   }
   .reader-topbar-inner { display: none; }
-  /* La busqueda sale de DETRAS de la pildora, no de una barra arriba: mismo
-     ancho, mismo lenguaje, y un z-index menor para que se vea asomar. Cuando
-     el teclado aparece, --kb-offset la sube junto con la barra (lo mide
-     reader.js con visualViewport). */
+  /* ── Busqueda: sale de atras de la pildora y queda pegada a ella ─────────
+     Portado de la barra de chat que paso el usuario: la barra secundaria es
+     mas ANGOSTA que la principal (16px por lado, medido sobre la referencia),
+     mas OSCURA (se aleja en vez de competir), con las esquinas de arriba
+     redondeadas, y su base TAPADA por la principal. Con el z-index por debajo,
+     las dos se leen como una sola pieza y no como dos barras apiladas.
+
+     --search-tuck es cuanto se mete por detras: cuenta en el alto pero no se
+     ve, asi que el alto util es (altura - tuck). */
   .search-bar-reader {
-    pointer-events: auto;
+    --search-tuck: 26px;
+    pointer-events: none;
     position: fixed; z-index: 140;
-    left: var(--nav-bar-side); right: var(--nav-bar-side);
-    bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px));
+    left:  calc(var(--nav-bar-side) + 16px);
+    right: calc(var(--nav-bar-side) + 16px);
+    bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px) + var(--nav-bar-height) - var(--search-tuck));
     margin: 0;
+    height: calc(44px + var(--search-tuck));
     display: flex; align-items: center; gap: .4rem;
-    height: 48px;
-    padding: 0 .4rem 0 1rem;
-    background: color-mix(in srgb, var(--surface2) 96%, transparent);
-    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-    border-radius: 999px;
+    padding: 0 .45rem var(--search-tuck) 1rem;
+    background: color-mix(in srgb, var(--surface) 45%, var(--bg));
+    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+    border-bottom: none;
+    border-radius: 22px 22px 0 0;
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
     backdrop-filter: blur(20px) saturate(1.4);
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
-    /* Arranca escondida justo detras de la barra; al abrirse sube su propio
-       alto mas un respiro. */
-    transform: translateY(0);
+    /* Cerrada: escondida detras de la pildora. */
+    transform: translateY(44px);
     opacity: 0;
-    /* Siempre montada: si pasara de display:none a visible en el mismo frame,
-       la primera apertura no animaria. Invisible y sin capturar toques. */
-    pointer-events: none;
     transition: transform .32s var(--nav-ease), opacity .2s var(--nav-ease);
   }
-  .search-bar-reader.open { pointer-events: auto; }
   .search-bar-reader.open {
-    transform: translateY(calc(-1 * (var(--nav-bar-height) + 8px)));
+    transform: translateY(0);
     opacity: 1;
+    pointer-events: auto;
   }
   .search-bar-reader input {
     flex: 1; min-width: 0;
     background: none; border: none; outline: none;
-    color: var(--text); font-size: .9rem; font-family: inherit;
+    color: var(--text); font-size: 16px; font-family: inherit;
   }
+  .search-bar-reader .r-btn { width: 30px; height: 30px; flex-shrink: 0; }
+  .search-results-count { font-size: .75rem; color: var(--text-muted); flex-shrink: 0; }
 
   /* La barra sube con el teclado para no quedar tapada. */
   .bottom-nav { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
@@ -331,9 +336,6 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
      libro, doble) estan pensados para pantalla grande y en un telefono solo
      agregan una decision que nadie quiere tomar. El selector se va. */
   #viewModeSelector { display: none; }
-
-  /* La busqueda tambien a 16px, por lo mismo que los campos del panel. */
-  .search-bar-reader input { font-size: 16px; }
 
   /* El final del contenido tiene que poder despejar la pildora: se superpone
      a proposito (se ve pasar por detras), pero sin esto los ultimos ~88px
