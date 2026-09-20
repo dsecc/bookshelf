@@ -257,26 +257,41 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
    contenido por debajo de la hora/bateria, como los PDF nativos) con sacar
    todo el padding, el gap y las sombras. */
 @media (max-width: 640px) {
-  /* El viewer de scroll se clava a los cuatro bordes del viewport en vez
-     de heredar el alto del body (100dvh). En una PWA standalone de iOS ese
-     alto no siempre coincide con la pantalla fisica, y la diferencia se veia
-     como una franja del fondo (--bg) asomando abajo del libro. Clavandolo,
-     que el libro ocupe la pantalla entera deja de ser un resultado del
-     calculo de flex y pasa a estar garantizado. */
-  /* bottom negativo por --ios-gap: en una PWA standalone de iOS con
-     status-bar black-translucent, la webview ocupa la pantalla entera pero
-     window.innerHeight reporta la altura SIN la franja del status bar. El
-     viewport queda mas corto que la pantalla y esa diferencia se ve como una
-     banda del fondo del body abajo. reader.js mide la diferencia real y la
-     publica en --ios-gap; aca la compensamos. Sin iOS de por medio vale 0. */
-  #pdfScrollViewer {
-    position: fixed; top: 0; right: 0; left: 0;
-    bottom: calc(-1 * var(--ios-gap, 0px));
-  }
-
   body.reader-fullscreen #pdfScrollWrap { padding: 0; gap: 2px; }
   body.reader-fullscreen #pdfScrollWrap canvas { box-shadow: none; border-radius: 0; }
   body.reader-fullscreen #pdfScrollViewer .pdf-controls { display: none; }
+}
+
+/* ── Scroll del documento en mobile (modo scroll de PDF) ───────────────────
+   iOS recorta el pintado de un contenedor con overflow propio al viewport,
+   que en una PWA standalone es mas corto que la pantalla fisica: quedaba una
+   franja del fondo abajo que ningun elemento podia cubrir (probado: ni
+   position:fixed con bottom negativo llega). El scroller RAIZ, en cambio, se
+   pinta de borde a borde.
+
+   Asi que en mobile el modo scroll deja de usar un div con overflow-y:auto y
+   pasa a scrolear el documento, que es como lo resuelve asmodeloscentral.
+   Va scopeado bajo .doc-scroll (lo pone reader.js solo en mobile + modo
+   scroll) para no tocar los modos pagina/EPUB, que si dependen del shell de
+   alto fijo. */
+@media (max-width: 640px) {
+  html.doc-scroll, html.doc-scroll body {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  html.doc-scroll body { display: block; }
+  html.doc-scroll #pdfScrollViewer {
+    display: block;
+    flex: none;
+    overflow: visible;
+    min-height: 100%;
+  }
+  html.doc-scroll #pdfScrollWrap {
+    flex: none;
+    overflow: visible;
+    min-height: 100%;
+  }
 }
 
 /* ── Toast ── */

@@ -123,6 +123,9 @@ async function setViewMode(mode) {
   if (pageFlipInstance) { try { pageFlipInstance.destroy(); } catch(e){} pageFlipInstance = null; }
   ["pdfScrollViewer","pdfPageViewer","pdfBookViewer","pdfSpreadViewer","epubViewer","unsupportedViewer"]
     .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+  // Solo el modo scroll usa el documento como scroller; pagina y EPUB dependen
+  // del shell de alto fijo. initPDFScroll la vuelve a poner si corresponde.
+  document.documentElement.classList.remove("doc-scroll");
   if (currentBook.format.toUpperCase() === "PDF") await initPDF();
   toast("Modo: " + mode);
 }
@@ -229,6 +232,33 @@ async function initPDFScroll() {
   input.max = pdfTotal;
   wrap.innerHTML = "";
 
+  // ── Que scrollea: el documento o el contenedor ──────────────────────────
+  // En mobile scrollea el DOCUMENTO. iOS recorta el pintado de un contenedor
+  // con overflow propio al viewport, que en una PWA standalone es mas corto
+  // que la pantalla fisica y dejaba una franja negra abajo imposible de
+  // cubrir. El scroller raiz se pinta de borde a borde. En desktop se sigue
+  // usando el contenedor, que es lo que quiere el layout de dos columnas.
+  const docScroll = window.matchMedia("(max-width: 640px)").matches;
+  document.documentElement.classList.toggle("doc-scroll", docScroll);
+  const S = {
+    get top() { return docScroll ? window.scrollY : wrap.scrollTop; },
+    set top(v) { if (docScroll) window.scrollTo(0, v); else wrap.scrollTop = v; },
+    to(v, smooth) {
+      const o = { top: v, behavior: smooth ? "smooth" : "auto" };
+      if (docScroll) window.scrollTo(o); else wrap.scrollTo(o);
+    },
+    // root:null hace que el observer mida contra el viewport.
+    get root() { return docScroll ? null : wrap; },
+    // offsetTop es relativo al offsetParent; con el documento scrolleando ese
+    // ancestro puede no ser el wrap, asi que se mide contra el viewport.
+    offsetOf(el) {
+      return docScroll
+        ? el.getBoundingClientRect().top + window.scrollY
+        : el.offsetTop;
+    },
+    get viewportH() { return docScroll ? window.innerHeight : wrap.clientHeight; },
+  };
+
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   let availW = computeAvailW(wrap);
 
@@ -266,14 +296,14 @@ async function initPDFScroll() {
   // scrollIntoView tambien puede scrollear la ventana/documento entero (no
   // solo este contenedor), tapando la topbar arriba del viewport — se
   // setea el scroll directo sobre "wrap" para que quede contenido ahi.
-  wrap.scrollTop = wrappers[startIdx].offsetTop;
+  S.top = S.offsetOf(wrappers[startIdx]);
 
   // Renderizar de a poco: solo las paginas que se acercan al viewport, no
   // el documento entero de una — con libros largos, renderizar todo al
   // abrir congelaba la UI y saturaba memoria/CPU.
   const renderObserver = new IntersectionObserver(entries => {
     entries.forEach(e => { if (e.isIntersecting) renderOne(parseInt(e.target.dataset.page) - 1); });
-  }, { root: wrap, rootMargin: "1200px 0px 1200px 0px" });
+  }, { root: S.root, rootMargin: "1200px 0px 1200px 0px" });
   wrappers.forEach(w => renderObserver.observe(w));
 
   // Re-escalar cuando cambia el ancho disponible: rotar el telefono, entrar
@@ -287,7 +317,7 @@ async function initPDFScroll() {
     for (let i = Math.max(0, center - 1); i <= Math.min(pdfTotal - 1, center + 1); i++) {
       await renderOne(i);
     }
-    wrap.scrollTop = wrappers[center].offsetTop;
+    S.top = S.offsetOf(wrappers[center]);
   };
 
   let saveTimer = null;
@@ -302,13 +332,13 @@ async function initPDFScroll() {
         saveTimer = setTimeout(() => saveProgress({ page: p, total: pdfTotal }), 1200);
       }
     }
-  }, { root: wrap, threshold: [0.2, 0.5, 0.8] });
+  }, { root: S.root, threshold: [0.2, 0.5, 0.8] });
   wrappers.forEach(w => observer.observe(w));
 
   function goPage(p) {
     if (p < 1 || p > pdfTotal) return;
     renderOne(p - 1);
-    wrap.scrollTo({ top: wrappers[p - 1].offsetTop, behavior: "smooth" });
+    S.to(S.offsetOf(wrappers[p - 1]), true);
   }
   document.getElementById("pdfScrollPrev").onclick = () => goPage(pdfPage - 1);
   document.getElementById("pdfScrollNext").onclick = () => goPage(pdfPage + 1);
@@ -346,7 +376,7 @@ async function initPDFPage() {
     if (!wrap.classList.contains("pdf-page-container")) {
       wrap.classList.add("pdf-page-container");
     }
-    await renderPageWithTextLayer(page, canvas, wrap.clientWidth, wrap.clientHeight);
+    await renderPageWithTextLayer(page, canvas, wrap.clientWidth, S.viewportH);
     info.textContent = pdfPage + " / " + pdfTotal;
     input.value = pdfPage;
     saveProgress({ page: pdfPage, total: pdfTotal });
@@ -587,6 +617,7 @@ async function initPDFSpread() {
 
 // ── EPUB ──────────────────────────────────────────────────────────────────────
 function initEPUB() {
+  document.documentElement.classList.remove("doc-scroll");
   document.getElementById("epubViewer").style.display = "flex";
   const book = ePub("/api/books/" + bookId + "/file");
   epubRendition = book.renderTo(document.getElementById("epubArea"), { width: "100%", height: "100%", spread: "none" });
@@ -603,6 +634,7 @@ function initEPUB() {
 }
 
 function initUnsupported() {
+  document.documentElement.classList.remove("doc-scroll");
   document.getElementById("unsupportedViewer").style.display = "flex";
   document.getElementById("btnDownloadUnsupported").onclick = () => window.open("/api/books/" + bookId + "/file?download=1");
 }
@@ -878,7 +910,7 @@ function initTouch() {
       // dy < 0 = dedo sube = scroll abajo = scrollTop crece
       velY = (dy / dt) * 10;
       function animate() {
-        wrap.scrollTop -= velY;
+        S.top = S.top - velY;
         velY *= 0.88;
         if (Math.abs(velY) > 0.2) rafId = requestAnimationFrame(animate);
         else rafId = null;
@@ -942,34 +974,6 @@ function initTopbarBehavior() {
 // ── Fullscreen ────────────────────────────────────────────────────────────────
 let _fsTimer = null;
 let _lastTap = 0;
-
-// ── Compensacion del viewport recortado de iOS ──
-// En una PWA instalada con apple-mobile-web-app-status-bar-style =
-// black-translucent, la webview ocupa la pantalla fisica entera, pero
-// window.innerHeight reporta la altura SIN la franja del status bar. El
-// viewport queda mas corto que la pantalla y esa diferencia aparece como una
-// banda del fondo del body al pie del libro, que ninguna regla de CSS puede
-// tapar: bottom:0 obedece a un viewport que ya viene corto.
-// Medimos la diferencia real y la publicamos como --ios-gap.
-function updateIosGap() {
-  let gap = 0;
-  if (navigator.standalone === true && window.screen) {
-    // screen.width/height no rotan de forma confiable en iOS: elegimos el
-    // lado que corresponde segun la orientacion en vez de confiar en screen.height.
-    const apaisado = Math.abs(window.orientation || 0) === 90;
-    const pantallaH = apaisado
-      ? Math.min(screen.width, screen.height)
-      : Math.max(screen.width, screen.height);
-    const d = pantallaH - window.innerHeight;
-    // Acotado: si la diferencia no es la franja del status bar (por un teclado
-    // abierto, una medicion rara o un iOS que ya lo arreglo), no tocamos nada.
-    if (d > 0 && d <= 120) gap = d;
-  }
-  document.documentElement.style.setProperty("--ios-gap", gap + "px");
-}
-updateIosGap();
-window.addEventListener("resize", updateIosGap);
-window.addEventListener("orientationchange", () => setTimeout(updateIosGap, 300));
 
 function _showTopbar() {
   const tb = document.getElementById("readerTopbar");

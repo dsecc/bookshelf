@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.6 — El modo scroll del lector usa el documento como scroller
+
+### Corregido
+- **La franja del fondo al pie del libro en iOS.** En una PWA standalone, iOS le da a la webview un viewport mas corto que la pantalla fisica (medido en un iPhone 12 mini: 762px contra 812px) y **recorta el pintado de cualquier contenedor con overflow propio a ese viewport**. Los ultimos ~50px de pantalla quedaban fuera del alcance del contenedor de scroll y mostraban el fondo del body. Se intentaron tres arreglos que no podian funcionar, porque todos operaban dentro de esa caja: `bottom: 0`, `position: fixed; inset: 0`, y extender el elemento por debajo del viewport con un `bottom` negativo (`--ios-gap`) — este ultimo llego a calcular bien los 50px y aun asi no se vio, lo que confirmo el recorte.
+
+  El scroller **raiz** no tiene esa limitacion: se pinta de borde a borde. Asi que en mobile el modo scroll deja de usar un `div` con `overflow-y: auto` y pasa a scrollear el documento, que es como lo resuelve asmodeloscentral (`html, body { height: 100% }` con el fondo en la raiz, que se propaga al canvas y cubre toda la webview).
+
+  El cambio va scopeado bajo la clase `doc-scroll`, que `reader.js` pone solo en mobile y solo en modo scroll: los modos pagina y EPUB siguen con el shell de alto fijo, y en desktop no cambia nada. La logica de scroll quedo detras de una pequena abstraccion (`S`) que resuelve contra el documento o contra el contenedor segun corresponda, para no duplicar los observers ni el manejo de `scrollTop`.
+- Se saco `user-scalable=no` del viewport del lector. Ademas de no usarse en la app de referencia, impedia hacer zoom en un lector de PDF.
+
+### Notas
+- `--ios-gap` y su medicion en `reader.js` se eliminaron: eran un parche para el enfoque anterior.
+- `VERSION` del service worker: `v7` → `v8`.
+- Verificado con navegador real en los dos anchos: en mobile scrollea el documento (3335px de contenido contra 844px de viewport) y en desktop sigue scrolleando el contenedor (7766px contra 810px), con las paginas renderizando y el contador avanzando en ambos. El modo sin conexion se reproba completo, sin regresiones.
+- Lo que **no** se puede verificar desde una computadora: `env(safe-area-inset-*)` vale 0 en el navegador de escritorio y el viewport recortado de iOS no se reproduce. Se calibra en un telefono real — la misma advertencia que deja anotada asmodeloscentral.
+
 ## v1.5.5 — Safe areas de iOS y el requisito de HTTPS para el modo offline
 
 ### Corregido
