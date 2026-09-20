@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.7 — El doble tap vuelve a esconder la navbar
+
+### Corregido
+- **El doble tap no escondia ni traia la barra.** La reescritura del panel en v1.6.4 abarco un rango de lineas que se llevo puesta la definicion de `_toggleReaderNav`, pero no su llamada: el handler seguia invocando una funcion que ya no existia y tiraba `ReferenceError` en silencio, sin ninguna senal visible. Repuesta, y de paso ahora tambien cierra la busqueda al esconderse, para que no quede flotando sin su barra.
+
+### Notas
+- `VERSION` del service worker: `v16` → `v17`.
+- Se agrego un control que compara las funciones internas llamadas contra las definidas. Es exactamente el tipo de error que un `node --check` no ve (la sintaxis era valida) y que solo aparece al tocar la pantalla.
+- Verificado: el doble tap la esconde (opacidad 0, se va hacia abajo) y la trae de vuelta a su posicion exacta, sin mover el punto de lectura.
+
 ## v1.6.6 — Ajustes de la barra de busqueda
 
 ### Cambiado

@@ -230,6 +230,24 @@ function initKeyboardOffset() {
   sync();
 }
 
+// Doble tap: esconde la pildora para leer sin nada encima, y la trae de vuelta.
+// Misma animacion de salida que usa la referencia para su barra: se va hacia
+// abajo por su propio alto mas la separacion, con la opacidad acompanando.
+let _rnHidden = false;
+function _toggleReaderNav() {
+  const nav = document.getElementById("readerNav");
+  if (!nav) return;
+  closeNavSheet();
+  toggleSearchBar(false);
+  _rnHidden = !_rnHidden;
+  nav.style.transition = "transform .32s cubic-bezier(.4,0,.2,1), opacity .24s cubic-bezier(.4,0,.2,1)";
+  nav.style.transform = _rnHidden
+    ? "translateY(calc(100% + var(--nav-bar-bottom) + 16px))"
+    : "translateY(0)";
+  nav.style.opacity = _rnHidden ? "0" : "1";
+  nav.style.pointerEvents = _rnHidden ? "none" : "auto";
+}
+
 function initReaderNav() {
   const nav = document.getElementById("readerNav");
   if (!nav) return;
