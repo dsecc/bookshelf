@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.7.1** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.8** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -52,6 +52,10 @@ En una instalación nueva (clonada desde cero, sin datos previos) solo se crea a
 - `admin` / `admin123` — cuenta de administración, sin biblioteca propia.
 
 **Cambiá esta contraseña apenas levantes el proyecto**, y creá desde `/admin` las cuentas reales de cada persona.
+
+### Cambiar la contrasena propia
+
+Cada usuario la cambia desde **Ajustes**, sin depender del admin. Se pide la actual ademas de la nueva: sin eso, cualquiera con la sesion abierta en un telefono desbloqueado podria dejar al dueno afuera de su cuenta. El reseteo del admin (`/admin` o `./manage.sh reset-password`) sigue sin pedirla, porque existe para cuando el usuario ya no la sabe.
 
 ### Crear usuarios
 

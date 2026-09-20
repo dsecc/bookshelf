@@ -540,7 +540,8 @@ function bindEvents() {
   // Notificaciones
   document.getElementById("btnNotif").addEventListener("click", () => {
     loadNotifications();
-    openModal("modalNotif");
+    if (window.innerWidth <= 640) openNotifSheet();
+    else openModal("modalNotif");
   });
   document.getElementById("shareCollectionSelect").addEventListener("change", e => {
     document.getElementById("shareNewColInput").style.display = (e.target.value === "__new__") ? "" : "none";
@@ -789,6 +790,7 @@ function initBottomNav() {
   }
 
   initHeroFade();
+  initPasswordForm();
 
   const nav = document.getElementById("bottomNav");
   if (nav) {
@@ -916,6 +918,74 @@ function openMoreSheet() {
       label: "Cerrar sesion", icon: ICO.out,
       onClick: () => { window.location.href = "/logout"; },
     }));
+  });
+}
+
+// ── Notificaciones en panel ──────────────────────────────────────────────────
+// Mismo criterio que el resto en mobile: crece desde la pildora en vez de
+// aparecer como una hoja desde abajo. Se mueven los nodos del modal adentro y
+// se devuelven al cerrar, asi loadNotifications() sigue pintando sobre los
+// mismos elementos y los handlers de cada notificacion no se tocan.
+function openNotifSheet() {
+  const inner  = document.querySelector("#modalNotif .modal");
+  const header = inner.querySelector(".modal-header");
+  const movidos = [...inner.children].filter(el => el !== header);
+
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Notificaciones</span>";
+    body.appendChild(head);
+    movidos.forEach(el => body.appendChild(el));
+  }, () => {
+    movidos.forEach(el => inner.appendChild(el));
+  });
+}
+
+// ── Cambio de contrasena ─────────────────────────────────────────────────────
+function initPasswordForm() {
+  const form = document.getElementById("formPassword");
+  if (!form) return;
+  const err = document.getElementById("pwError");
+  const btn = document.getElementById("btnCambiarPw");
+
+  const mostrar = (msg, ok) => {
+    err.textContent = msg;
+    err.className = ok ? "ajuste-ok" : "ajuste-error";
+    err.style.display = msg ? "" : "none";
+  };
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const actual  = document.getElementById("pwActual").value;
+    const nueva   = document.getElementById("pwNueva").value;
+    const repetir = document.getElementById("pwRepetir").value;
+
+    // Se valida aca lo que se puede para no ir al servidor al pedo; el resto
+    // (que la actual sea correcta) solo lo puede decir el servidor.
+    if (nueva !== repetir)  return mostrar("Las dos contrasenas nuevas no coinciden");
+    if (nueva.length < 6)   return mostrar("La contrasena nueva debe tener al menos 6 caracteres");
+
+    btn.disabled = true;
+    mostrar("");
+    try {
+      const res = await fetch("/api/me/password", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current: actual, new: nueva }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        form.reset();
+        mostrar("Contrasena actualizada", true);
+        toast("Contrasena actualizada");
+      } else {
+        mostrar(data.error || "No se pudo cambiar la contrasena");
+      }
+    } catch {
+      mostrar("Sin conexion: no se pudo cambiar la contrasena");
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 

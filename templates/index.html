@@ -130,7 +130,17 @@
       <div id="viewSettings" style="display:none">
         <div class="info-page">
           <h2>Ajustes</h2>
-          <p style="color:var(--text-muted);font-size:.88rem;margin-top:.5rem">Proximamente.</p>
+          <div class="ajuste-bloque">
+            <h3>Cambiar contrasena</h3>
+            <p class="ajuste-nota">Se pide la actual: sin eso, cualquiera con tu sesion abierta podria dejarte afuera de tu propia cuenta.</p>
+            <form id="formPassword" autocomplete="off">
+              <input type="password" id="pwActual" class="ajuste-input" placeholder="Contrasena actual" autocomplete="current-password" required>
+              <input type="password" id="pwNueva"  class="ajuste-input" placeholder="Contrasena nueva" autocomplete="new-password" required>
+              <input type="password" id="pwRepetir" class="ajuste-input" placeholder="Repetir la nueva" autocomplete="new-password" required>
+              <p class="ajuste-error" id="pwError" style="display:none"></p>
+              <button type="submit" class="btn-primary full" id="btnCambiarPw">Cambiar contrasena</button>
+            </form>
+          </div>
         </div>
       </div>
 

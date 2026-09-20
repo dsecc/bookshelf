@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.8 — Notificaciones en el panel y cambio de contrasena
+
+### Agregado
+- **Cada usuario puede cambiar su propia contrasena** desde Ajustes, que hasta ahora decia "Proximamente". Antes solo existia el reseteo del admin, asi que para cambiarla habia que pedirsela a otro.
+- Nueva ruta `POST /api/me/password`. **Pide la contrasena actual ademas de la nueva**: sin eso, cualquiera que agarre el telefono desbloqueado con la sesion abierta podria dejar al dueno afuera de su propia cuenta. El reseteo del admin sigue sin pedirla, porque existe justamente para cuando el usuario ya no la sabe.
+- El formulario valida del lado del cliente lo que puede (que las dos nuevas coincidan, el minimo de 6 caracteres) para no ir al servidor al pedo, y deja para el servidor lo unico que solo el puede saber: si la actual es correcta.
+
+### Cambiado
+- **Las notificaciones crecen desde la pildora** en mobile, en vez de aparecer como una hoja desde abajo. Mismo criterio que Colecciones, Subir y los paneles del lector. En desktop siguen siendo un modal.
+
+### Notas
+- `VERSION` del service worker: `v19` → `v20`.
+- Los campos de contrasena van a 16px, por lo mismo que el resto: por debajo de eso Safari hace zoom al enfocar.
+- Como el resto de los paneles, las notificaciones **mueven los nodos del modal adentro** y los devuelven al cerrar, asi `loadNotifications()` sigue pintando sobre los mismos elementos y los handlers de cada notificacion no se tocan.
+- Verificado contra la API: actual incorrecta da 403, nueva corta 400, nueva igual a la actual 400, y el caso bueno 200. Despues del cambio, **el login con la vieja rebota a /login y con la nueva entra** — el primer control que escribi miraba el codigo HTTP y no servia, porque el login redirige con 302 en los dos casos; hubo que mirar a donde redirige. Y por UI: el panel sale de la posicion exacta de la pildora con la lista real adentro y la devuelve al cerrar; el formulario avisa si las nuevas no coinciden, si la actual es incorrecta, y confirma al cambiarla. Desktop intacto.
+
 ## v1.7.1 — Ajustes del buscador y del titulo
 
 ### Corregido

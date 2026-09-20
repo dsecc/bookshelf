@@ -761,6 +761,41 @@ def delete_highlight(book_id, h_id):
 # Envio de libros entre usuarios + notificaciones
 # ---------------------------------------------------------------------------
 
+@app.route("/api/me/password", methods=["POST"])
+@login_required
+def change_own_password():
+    """Cambio de contraseña del usuario en sesión.
+
+    Pide la actual además de la nueva: sin eso, cualquiera que agarre el
+    teléfono desbloqueado con la sesión abierta podría dejar al dueño afuera
+    de su propia cuenta. El admin sigue teniendo su reseteo aparte, que no la
+    pide, porque justamente existe para cuando el usuario ya no la sabe.
+    """
+    data = request.get_json(silent=True) or {}
+    actual = data.get("current", "")
+    nueva  = data.get("new", "")
+
+    if len(nueva) < 6:
+        return jsonify({"error": "La contraseña nueva debe tener al menos 6 caracteres"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (current_user_id(),)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    if not check_password_hash(user["password_hash"], actual):
+        conn.close()
+        return jsonify({"error": "La contraseña actual no es correcta"}), 403
+    if actual == nueva:
+        conn.close()
+        return jsonify({"error": "La contraseña nueva es igual a la actual"}), 400
+
+    conn.execute("UPDATE users SET password_hash=? WHERE id=?",
+                 (generate_password_hash(nueva), user["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
 @app.route("/api/users")
 @login_required
 def list_other_users():

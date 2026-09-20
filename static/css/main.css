@@ -147,6 +147,28 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: .5rem 1.1rem; border-radius: 99px; font-size: .82rem; opacity: 0; transition: all .25s; z-index: 999; white-space: nowrap; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Ajustes ─────────────────────────────────────────────────────────────── */
+.ajuste-bloque {
+  margin-top: 1.25rem; padding: 1.1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; max-width: 420px;
+}
+.ajuste-bloque h3 { font-size: .95rem; font-weight: 600; }
+.ajuste-nota { font-size: .78rem; color: var(--text-muted); margin: .35rem 0 .9rem; line-height: 1.45; }
+.ajuste-input {
+  width: 100%; margin-bottom: .55rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: .6rem .95rem;
+  /* 16px: por debajo de eso Safari hace zoom al enfocar. */
+  font-size: 16px; font-family: inherit;
+}
+.ajuste-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.ajuste-error { font-size: .8rem; color: var(--danger); margin: .1rem 0 .6rem; }
+.ajuste-ok    { font-size: .8rem; color: var(--accent); margin: .1rem 0 .6rem; }
+
 /* El titulo de marca es solo de mobile: en desktop estan la topbar y el sidebar. */
 .lib-hero { display: none; }
 
