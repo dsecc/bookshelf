@@ -16,11 +16,33 @@ docker compose up -d --build
 
 Abrí `http://localhost:8090` (o `http://IP-DEL-SERVIDOR:8090` si es un servidor remoto) y entrá con `admin` / `admin123`. `data/` y `uploads/` se crean solos en el primer arranque — ahí vive todo lo tuyo, y nunca se suben a git.
 
-Si preferís copiar la carpeta a mano en vez de usar git (por ejemplo a un servidor sin acceso a internet):
+> Si el Docker del servidor es viejo (20.10 o anterior) no trae el plugin v2 y `docker compose` no existe: usá `docker-compose` con guion, el binario standalone.
+
+## Desplegar y actualizar
+
+El servidor es **un clon del repo**: se actualiza con `git pull` y se reconstruye en el lugar. No se copian imágenes ni archivos a mano.
+
 ```bash
-scp -r ./bookshelf usuario@tu-servidor:~/
-ssh usuario@tu-servidor "cd ~/bookshelf && docker compose up -d --build"
+cd /opt/bookshelf && git pull && docker-compose up -d --build
 ```
+
+Como el repo es público, el servidor **no necesita credenciales de git** para pullear. Solo hace falta autenticarse para pushear, y eso ocurre desde la máquina de desarrollo.
+
+Los datos viven en `./data` y `./uploads` **dentro del checkout**, montados como bind mounts por el `docker-compose.yml`. Están en `.gitignore`, así que `git pull` nunca los toca y reconstruir la imagen no los borra.
+
+### Migrar una instalación que usaba volúmenes con nombre
+
+Si el servidor ya venía corriendo con volúmenes de Docker (`docker volume`) en vez de bind mounts, **hay que mover los datos antes de switchear**: con los directorios vacíos, el primer arranque crea una biblioteca en blanco y una `secret_key` nueva que desloguea a todos. Nada se pierde (los volúmenes siguen ahí), pero el susto es real.
+
+```bash
+# con el contenedor PARADO, para no copiar la base a medio escribir
+docker rm -f bookshelf
+mkdir -p /opt/bookshelf/data /opt/bookshelf/uploads
+docker run --rm -v <volumen_data>:/src -v /opt/bookshelf/data:/dst alpine sh -c 'cp -a /src/. /dst/'
+docker run --rm -v <volumen_uploads>:/src -v /opt/bookshelf/uploads:/dst alpine sh -c 'cp -a /src/. /dst/'
+```
+
+Antes de levantar, verificá que estén las tres cosas que importan: `data/secret_key` (sin ella se deslogean todos los usuarios), `data/bookshelf.db` con sus filas, y que la cantidad de archivos en `uploads/` coincida con la cantidad de libros de la base. Los volúmenes viejos no se borran hasta confirmar que todo anda: son el rollback.
 
 ## Usuarios y login
 

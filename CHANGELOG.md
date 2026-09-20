@@ -13,6 +13,10 @@
 - **El modo sin conexión necesita HTTPS, y sin eso no funciona nada.** Los navegadores solo habilitan service workers en contextos seguros: entrando por `http://IP:8090`, `navigator.serviceWorker` ni siquiera existe, no se cachea nada, la app no abre sin internet y el botón "Guardar sin conexión" se oculta solo (el código lo esconde cuando no hay `caches`). La capacidad offline que anunciaba v1.5 era, en la práctica, inalcanzable en una instalación servida por HTTP plano. El README ahora explica el requisito y documenta cómo resolverlo con `tailscale serve`, que da un certificado de Let's Encrypt sin exponer el servidor a internet.
 - El README detalla además cómo se guarda cada cosa: los tres caches, por qué el de los libros no lleva versión (sobreviven las actualizaciones) y el uso de `navigator.storage.persist()`.
 
+### Despliegue
+- **El servidor pasa a ser un clon del repo.** Antes se construía la imagen en la máquina de desarrollo, se empaquetaba con `docker save | gzip` (214MB) y se copiaba por `scp` a cada actualización. Ahora se actualiza con `git pull && docker-compose up -d --build` en el propio servidor. Como el repo es público, no necesita credenciales de git.
+- **Los datos pasan de volúmenes con nombre a bind mounts** dentro del checkout (`./data`, `./uploads`), que es lo que ya declaraba el `docker-compose.yml` del repo. Hasta ahora el servidor corría con un compose propio que apuntaba a `bookshelf-v12_*`, así que el compose versionado y el real no coincidían — un `git pull` seguido de `up` habría arrancado con la biblioteca vacía. El README documenta la migración.
+
 ### Notas de despliegue
 - `VERSION` del service worker: `v1` → `v7`. Los archivos del shell se sirven cache-first, así que sin subirla los dispositivos que ya visitaron la app se quedarían con las versiones viejas para siempre; además el navegador solo detecta un service worker nuevo si el archivo cambió. `BOOKS_CACHE` sigue sin versión a propósito: los libros guardados no se borran.
 
