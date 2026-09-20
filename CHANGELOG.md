@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.6.4 — Correcciones del panel del lector
+
+### Corregido
+- **Guardar sin conexion no decia si el libro estaba guardado.** La unica senal era el indicador de descarga del navegador, que no es nuestro y desaparece. Ahora la fila **no cierra el panel** al tocarla —es la unica herramienta con estado, y cerrando no habria forma de ver el resultado— y se repinta sola: el icono pasa a un tilde, aparece "Guardado" a la derecha y la fila queda marcada. Se entera por un `MutationObserver` sobre el boton original, asi el estado no se puede desincronizar.
+- **Los botones de tilde eran un paso de mas.** El de renombrar se fue: el titulo se guarda al salir del campo o con Enter, que es lo que uno hace igual. El de coleccion tambien.
+- **La coleccion ya no abre el selector nativo de iOS**, que saca al usuario del panel para mostrarle una rueda. Ahora la fila muestra la coleccion actual y al tocarla despliega las opciones ahi mismo, como sub-filas, con la actual marcada.
+- **Zoom de iOS al enfocar un campo.** Safari hace zoom automatico cuando un input tiene fuente menor a 16px, y despues hay que deshacerlo a mano. Los campos del panel y el de busqueda pasan a 16px exactos. No se uso `maximum-scale`, que lo evita pero rompe el zoom manual en toda la app.
+
+### Cambiado
+- **En mobile se lee siempre en scroll continuo.** Los modos pagina, libro y doble estan pensados para pantalla grande; en un telefono solo agregan una decision que nadie quiere tomar. El selector se oculta y el modo se fuerza a scroll al abrir, **sin persistirlo**, para que en desktop el libro siga abriendo como lo dejaste.
+
+### Notas
+- `VERSION` del service worker: `v13` → `v14`.
+- Verificado con navegador real: guardar y desguardar actualizando la fila sin cerrar el panel; cero botones de confirmar y cero selects nativos; la coleccion desplegando sus opciones y marcando la elegida; el selector de modo oculto; los dos campos a 16px. Ademas el titulo se guarda de verdad (comprobado contra la API) y en desktop sigue todo como estaba: selector de modo visible, tilde de renombrar, select de coleccion y pildora oculta.
+
 ## v1.6.3 — Un solo panel en el lector, y la busqueda sale de la barra
 
 ### Cambiado

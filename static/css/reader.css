@@ -327,6 +327,14 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
   .bottom-nav { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
   .nav-sheet  { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
 
+  /* En mobile se lee siempre en scroll continuo: los otros modos (pagina,
+     libro, doble) estan pensados para pantalla grande y en un telefono solo
+     agregan una decision que nadie quiere tomar. El selector se va. */
+  #viewModeSelector { display: none; }
+
+  /* La busqueda tambien a 16px, por lo mismo que los campos del panel. */
+  .search-bar-reader input { font-size: 16px; }
+
   /* El final del contenido tiene que poder despejar la pildora: se superpone
      a proposito (se ve pasar por detras), pero sin esto los ultimos ~88px
      quedan atrapados abajo, imposibles de scrollear. */

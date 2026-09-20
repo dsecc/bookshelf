@@ -38,7 +38,8 @@ const RN_ICO = {
   "send": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><line x1=\"19\" y1=\"8\" x2=\"19\" y2=\"14\"/><line x1=\"16\" y1=\"11\" x2=\"22\" y2=\"11\"/></svg>",
   "off": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/><line x1=\"3\" y1=\"21\" x2=\"21\" y2=\"21\"/></svg>",
   "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><polyline points=\"3 6 5 6 21 6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/></svg>",
-  "tag": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z\"/><line x1=\"7\" y1=\"7\" x2=\"7.01\" y2=\"7\"/></svg>"
+  "tag": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z\"/><line x1=\"7\" y1=\"7\" x2=\"7.01\" y2=\"7\"/></svg>",
+  "check": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\"><polyline points=\"20 6 9 17 4 12\"/></svg>"
 };
 
 function _rnClick(id) {
@@ -47,22 +48,16 @@ function _rnClick(id) {
 }
 
 // Panel unico del lector. Todo lo que se puede hacer con el libro abierto
-// entra aca: primero las herramientas, que son todas del mismo tipo y por eso
-// se ven iguales (una fila con icono y etiqueta, no botones de estilos
-// distintos), y despues los campos del libro, restilados como pildoras para
-// que el panel se lea como una sola pieza.
+// entra aca: primero las herramientas, todas del mismo tipo y por eso con la
+// misma pinta, y despues los campos del libro con la estetica del panel.
 //
-// Las herramientas NO reimplementan nada: hacen click() sobre los botones
-// originales, que siguen en el DOM con sus handlers. Los campos, en cambio, se
-// mueven adentro y se devuelven al cerrar, porque hay que poder escribirlos.
+// Las herramientas hacen click() sobre los botones originales, que siguen en
+// el DOM con sus handlers: no hay logica duplicada.
 function openReaderSheet() {
   const panelBody = document.querySelector("#infoPanel .panel-body");
-  const rename = panelBody.querySelector(".panel-rename");
-  const modos  = document.getElementById("viewModeSelector");
+  const titulo = document.getElementById("infoTitleInput");
   const colSel = document.getElementById("infoCollection");
-  const colBtn = document.getElementById("btnMoveCollection");
-  const movidos = [rename, modos, colSel, colBtn].filter(Boolean);
-  const devolver = movidos.map(el => [el, el.parentNode, el.nextSibling]);
+  const devolver = titulo ? [[titulo, titulo.parentNode, titulo.nextSibling]] : [];
 
   const delegar = fn => () => { closeNavSheet(); setTimeout(fn, NAV_SHEET_CLOSE_MS); };
 
@@ -89,7 +84,6 @@ function openReaderSheet() {
       ["Compartir por WhatsApp", RN_ICO.wa, "btnWhatsappPanel"],
       ["Enviar a otro usuario", RN_ICO.send, "btnSendToUser"],
     ];
-    // La lupa solo existe en modo Doble.
     const lupa = document.getElementById("btnMagnifier");
     if (lupa && lupa.style.display !== "none") {
       herramientas.splice(1, 0, ["Lupa", RN_ICO.lupa, "btnMagnifier"]);
@@ -100,40 +94,88 @@ function openReaderSheet() {
       }));
     });
 
-    // Guardar sin conexion es una herramienta mas, pero con estado: la etiqueta
-    // del boton original ya dice si el libro esta guardado.
-    const offLabel = document.getElementById("btnOfflineLabel");
-    const guardado = offLabel && offLabel.textContent.trim().toLowerCase().startsWith("disponible");
+    // Guardar sin conexion NO cierra el panel: es lo unico que tiene estado, y
+    // cerrando no habria forma de ver si quedo guardado o no. Se queda abierto
+    // y la fila se repinta sola cuando el boton original cambia de estado.
+    const btnOff = document.getElementById("btnOffline");
     const filaOff = navSheetRow({
-      label: "Guardar sin conexion", icon: RN_ICO.off,
-      detail: guardado ? "Guardado" : null,
-      active: !!guardado,
-      onClick: delegar(() => _rnClick("btnOffline")),
+      label: "Guardar sin conexion", icon: RN_ICO.off, detail: "",
+      onClick: () => { if (btnOff) btnOff.click(); },
     });
     const est = filaOff.querySelector(".row-count");
     if (est) est.className = "row-state";
     body.appendChild(filaOff);
 
+    if (btnOff) {
+      const pintar = () => {
+        const guardado = btnOff.dataset.saved === "1";
+        filaOff.classList.toggle("active", guardado);
+        const icoEl = filaOff.querySelector("svg");
+        if (icoEl) icoEl.outerHTML = guardado ? RN_ICO.check : RN_ICO.off;
+        const e = filaOff.querySelector(".row-state");
+        if (e) e.textContent = guardado ? "Guardado" : "";
+      };
+      new MutationObserver(pintar)
+        .observe(btnOff, { attributes: true, attributeFilter: ["data-saved"] });
+      pintar();
+    }
+
     sep();
     seccion("Libro");
-    if (rename) {
-      rename.className = "nav-sheet-field";
-      body.appendChild(rename);
-    }
-    if (modos) {
-      modos.className = "nav-sheet-seg";
-      body.appendChild(modos);
-    }
-    if (colSel) {
+
+    // Nombre: sin boton de confirmar. Se guarda al salir del campo o con Enter,
+    // que es lo que uno hace igual; el tilde era un paso de mas.
+    if (titulo) {
       const campo = document.createElement("div");
       campo.className = "nav-sheet-field";
-      campo.appendChild(colSel);
-      if (colBtn) {
-        colBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-        colBtn.removeAttribute("style");
-        campo.appendChild(colBtn);
-      }
+      titulo.className = "";
+      titulo.placeholder = "Nombre del libro";
+      titulo.onblur = () => { if (titulo.value.trim()) renameBook(); };
+      campo.appendChild(titulo);
       body.appendChild(campo);
+    }
+
+    // Coleccion: lista propia desplegable en el panel, no el selector nativo de
+    // iOS (que abre su propia rueda y saca al usuario del panel).
+    if (colSel) {
+      const opciones = [...colSel.options].map(o => ({ id: parseInt(o.value), name: o.text }));
+      const actual = () => {
+        const o = opciones.find(x => x.id === currentBook.collection_id);
+        return o ? o.name : "Sin coleccion";
+      };
+      let abierta = false;
+      const filas = [];
+      const fila = navSheetRow({
+        label: "Coleccion", icon: RN_ICO.tag, detail: actual(),
+        onClick: () => {
+          abierta = !abierta;
+          filas.forEach(f => { f.style.display = abierta ? "" : "none"; });
+        },
+      });
+      body.appendChild(fila);
+
+      opciones.forEach(op => {
+        const f = navSheetRow({
+          label: op.name,
+          active: op.id === currentBook.collection_id,
+          onClick: async () => {
+            await fetch("/api/books/" + bookId, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ collection_id: op.id }),
+            });
+            currentBook.collection_id = op.id;
+            colSel.value = String(op.id);
+            filas.forEach(x => x.classList.toggle("active", x === f));
+            const d = fila.querySelector(".row-count");
+            if (d) d.textContent = actual();
+            toast("Coleccion actualizada");
+          },
+        });
+        f.classList.add("nav-sheet-suboption");
+        f.style.display = "none";
+        filas.push(f);
+        body.appendChild(f);
+      });
     }
 
     sep();
@@ -143,9 +185,7 @@ function openReaderSheet() {
     }));
     body.lastChild.classList.add("danger");
   }, () => {
-    // Devolver cada nodo a su lugar exacto, con las clases originales.
-    if (rename) rename.className = "panel-rename";
-    if (modos)  modos.className  = "view-mode-selector";
+    if (titulo) { titulo.className = "panel-input"; titulo.onblur = null; }
     devolver.forEach(([el, padre, siguiente]) => padre.insertBefore(el, siguiente));
   });
 }
@@ -210,6 +250,10 @@ async function init() {
     currentBook = await bookRes.json();
     collections = await colRes.json();
     viewMode = currentBook.view_mode || "scroll";
+    // En mobile se lee siempre en scroll. Si el libro quedo guardado en otro
+    // modo desde la compu, aca se ignora: sin selector no habria como salir.
+    // No se persiste, para que en desktop siga abriendo como lo dejaste.
+    if (window.innerWidth <= 640) viewMode = "scroll";
 
     document.getElementById("readerTitle").textContent = currentBook.title;
     document.title = currentBook.title;

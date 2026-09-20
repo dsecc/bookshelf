@@ -164,7 +164,10 @@
     color: var(--text);
     border-radius: 999px;
     padding: .55rem .9rem;
-    font-size: .85rem;
+    /* 16px exactos y no menos: por debajo de eso Safari en iOS hace zoom al
+       enfocar el campo, y despues hay que deshacerlo a mano con los dedos.
+       No se arregla con maximum-scale (rompe el zoom manual en toda la app). */
+    font-size: 16px;
     font-family: inherit;
     -webkit-appearance: none; appearance: none;
   }
@@ -208,4 +211,10 @@
     -webkit-tap-highlight-color: transparent;
   }
   .nav-sheet-seg .vm-btn.active { background: var(--nav-active-bg); color: var(--text); }
+
+  /* Sub-opciones desplegadas dentro de una fila (p. ej. las colecciones). */
+  .nav-sheet-suboption {
+    padding-left: 2.6rem;
+    font-size: .84rem;
+  }
 }
