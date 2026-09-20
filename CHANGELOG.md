@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.6.6 — Ajustes de la barra de busqueda
+
+### Cambiado
+- **La barra de busqueda va al mismo ancho que la pildora**, alineada a sus bordes, en vez de retraida 16px por lado como en la referencia. Lo que sigue haciendo que las dos se lean como una sola pieza es lo demas: el fondo mas oscuro, las esquinas de arriba redondeadas con la base recta, y esa base tapada por la pildora.
+- **Barra mas alta**: 52px utiles (antes 44), con las esquinas a 24px acompanando.
+- **Botones mas grandes**: las flechas y la cruz pasan de 30px a 38px, con el icono a 18px y realce al tocar. Entran comodos en los 52px y llegan a un tamano razonable para el dedo.
+
+### Notas
+- `VERSION` del service worker: `v15` → `v16`.
+- Verificado: 358px de ancho, identico al de la pildora y alineado a los mismos bordes; 52px utiles; los tres botones a 38px; la base sigue tapada 26px. Sigue animando al abrir (768 → 734 → 716), la cruz cierra, y con el teclado sube manteniendo la separacion exacta.
+
 ## v1.6.5 — La busqueda queda pegada a la navbar
 
 ### Cambiado
