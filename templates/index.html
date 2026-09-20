@@ -96,10 +96,14 @@
       </div>
     </header>
 
-    <!-- Titulo de marca: solo mobile. Se desvanece al scrollear (ver app.js);
-         es puramente estetico, para ver el nombre al entrar y despues dejar la
-         pantalla entera para los libros. -->
-    <div class="lib-hero" id="libHero">Bookshelf</div>
+    <!-- Titulo de marca: solo mobile. Queda por delante (sticky) y el contenido
+         pasa por detras; se mantiene un tramo del scroll y recien despues se
+         desvanece (ver initHeroFade en app.js). Es fila flexible a proposito:
+         cuando haya logo va al lado del texto sin tocar el layout. -->
+    <div class="lib-hero" id="libHero">
+      <span class="lib-hero-logo" id="libHeroLogo"></span>
+      <span class="lib-hero-name">Bookshelf</span>
+    </div>
 
     <!-- Content -->
     <div class="content" id="content">
@@ -264,12 +268,10 @@
 
 <!-- Buscador mobile: sale de atras de la pildora (ver .nav-search en nav.css).
      El input real se mueve aca desde la topbar al abrirlo, para no duplicar
-     handlers, y vuelve a su lugar al cerrar. -->
+     handlers, y vuelve a su lugar al cerrar. Sin boton de cerrar: se cierra
+     tocando la misma lupa que lo abrio. -->
 <div class="nav-search" id="libSearchBar">
   <span id="libSearchSlot"></span>
-  <button class="r-btn" id="libSearchClose" aria-label="Cerrar busqueda">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-  </button>
 </div>
 
 <div id="toast" class="toast"></div>

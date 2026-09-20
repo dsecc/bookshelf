@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.7.1 — Ajustes del buscador y del titulo
+
+### Corregido
+- **Cerrar el buscador vacio repintaba toda la grilla**, lo que se veia como una recarga de los libros sin motivo. Ahora solo se vuelve a renderizar si habia algo escrito.
+- **Se saco la cruz del buscador.** Se cierra tocando la misma lupa que lo abrio, que es lo que uno hace igual.
+
+### Cambiado
+- **El titulo "Bookshelf" pasa a quedar por delante** (`position: sticky`): el contenido scrollea por detras en vez de llevarselo puesto.
+- **Se mantiene un tramo antes de irse**: queda entero los primeros 90px de scroll y recien despues se desvanece a lo largo de 120px, subiendo 10px mientras se apaga. Apagarlo de entrada se sentia como que se escapaba; asi acompana un tramo y se va cuando el contenido ya tomo la pantalla.
+- Lleva un degradado de fondo que se va con el: sin el, el texto quedaria ilegible cuando pasa por detras la tapa clara de un libro.
+- El titulo es una **fila flexible con un hueco para el logo** al lado del nombre, asi sumarlo mas adelante no toca el layout.
+
+### Notas
+- `VERSION` del service worker: `v18` → `v19`.
+- Verificado: la lupa abre y cierra, y cerrar vacio deja las 4 tarjetas **intactas** (se marcaron antes para detectar el repintado); con texto escrito si restaura todo. La curva del titulo medida a 0/60/150/230px de scroll da 1.00 / 1.00 / 0.50 / 0.00. Y lo que mas importaba: el titulo **no intercepta el toque** (`elementFromPoint` sobre el devuelve el contenido de atras), se puede abrir un libro y volver. Desktop intacto.
+
 ## v1.7 — La biblioteca se queda sin topbar
 
 En mobile la topbar desaparece y todo lo que tenia pasa a la pildora. La pantalla queda para los libros.

@@ -487,17 +487,26 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
      app.js le baja la opacidad con el scroll. El padding-top deja pasar la
      safe area para que no quede debajo de la hora. */
   .lib-hero {
-    display: block;
-    text-align: center;
+    /* sticky: se queda por delante mientras el contenido pasa por detras, en
+       vez de irse con el scroll. app.js lo mantiene un tramo y despues lo
+       desvanece. */
+    position: sticky; top: 0; z-index: 90;
+    display: flex; align-items: center; justify-content: center; gap: .5rem;
     font-size: 1.35rem;
     font-weight: 600;
     letter-spacing: -.01em;
     color: var(--text);
-    padding: calc(env(safe-area-inset-top, 0px) + 1.1rem) 1rem .35rem;
-    /* pointer-events:none para que no tape el scroll ni robe toques. */
+    padding: calc(env(safe-area-inset-top, 0px) + 1.1rem) 1rem .9rem;
+    /* El degradado lo separa de las portadas que pasan por detras: sin el, el
+       texto quedaria ilegible encima de una tapa clara. Se va junto con el
+       titulo, porque es el fondo del mismo elemento. */
+    background: linear-gradient(to bottom,
+      var(--bg) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 60%, transparent) 80%, transparent 100%);
+    /* Nunca roba toques: el dedo siempre llega al libro que hay detras. */
     pointer-events: none;
-    will-change: opacity;
+    will-change: opacity, transform;
   }
+  .lib-hero-logo:empty { display: none; }
 
   /* ── Topbar ── */
   /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar

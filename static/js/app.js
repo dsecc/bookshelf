@@ -788,8 +788,6 @@ function initBottomNav() {
     ind.style.width = "calc(" + 100 / items.length + "% - 12px)";
   }
 
-  const cerrar = document.getElementById("libSearchClose");
-  if (cerrar) cerrar.onclick = () => toggleLibSearch(false);
   initHeroFade();
 
   const nav = document.getElementById("bottomNav");
@@ -855,8 +853,11 @@ function toggleLibSearch(forzar) {
     setTimeout(() => input.focus(), 120);
   } else {
     bar.classList.remove("open");
+    // Solo re-renderizar si habia algo escrito: cerrar el buscador vacio no
+    // tiene por que repintar la grilla entera, que se veia como una recarga.
+    const habia = input.value.trim() !== "";
     input.value = "";
-    renderBooks("");
+    if (habia) renderBooks("");
     input.blur();
     // Devolverlo a la topbar recien cuando termino de salir, para que no se
     // vea desaparecer del medio de la barra.
@@ -918,9 +919,14 @@ function openMoreSheet() {
   });
 }
 
-// ── Titulo de marca que se desvanece ─────────────────────────────────────────
-// Puro adorno: al entrar se ve "Bookshelf" y al empezar a bajar se va, dejando
-// la pantalla para los libros. Se apaga en los primeros 70px de scroll.
+// ── Titulo de marca ──────────────────────────────────────────────────────────
+// Se MANTIENE los primeros HOLD px de scroll y recien despues se desvanece a lo
+// largo de FADE. Apagarlo de entrada se sentia como que se escapaba; con la
+// permanencia acompana un tramo y se va cuando el contenido ya tomo la
+// pantalla. Sube un poco mientras se apaga, para que no se quede clavado.
+const HERO_HOLD = 90;
+const HERO_FADE = 120;
+
 function initHeroFade() {
   const hero = document.getElementById("libHero");
   if (!hero) return;
@@ -928,7 +934,9 @@ function initHeroFade() {
   const pintar = () => {
     pedido = false;
     const y = window.scrollY || document.documentElement.scrollTop || 0;
-    hero.style.opacity = String(Math.max(0, 1 - y / 70));
+    const t = Math.min(1, Math.max(0, (y - HERO_HOLD) / HERO_FADE));
+    hero.style.opacity = String(1 - t);
+    hero.style.transform = "translateY(" + (-10 * t).toFixed(1) + "px)";
   };
   // rAF: el scroll dispara muchisimo y esto solo toca una propiedad.
   window.addEventListener("scroll", () => {
