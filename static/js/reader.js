@@ -41,6 +41,18 @@ async function init() {
     ).join("");
 
     updateViewModeButtons();
+
+    // En mobile el lector arranca SIEMPRE a pantalla completa. Ademas de ser
+    // lo que uno quiere al abrir un libro, evita el problema de fondo: entrar
+    // o salir de fullscreen cambia el padding del contenedor (8px), y ese
+    // cambio de ancho disparaba un re-render de todas las paginas que te movia
+    // del punto donde estabas leyendo. Aplicandolo antes de medir, el ancho se
+    // calcula una sola vez con el layout definitivo y no hay re-render nunca.
+    if (window.innerWidth <= 640) {
+      document.body.classList.add("reader-fullscreen");
+      isFullscreen = true;
+    }
+
     const fmt = currentBook.format.toUpperCase();
     if (fmt === "PDF") await initPDF();
     else if (fmt === "EPUB") initEPUB();
@@ -884,11 +896,15 @@ function initTouch() {
   let tx0 = 0, ty0 = 0, tt0 = 0, velY = 0, rafId = null;
 
   document.addEventListener("touchstart", e => {
+    if (!e.touches || !e.touches[0]) return;
     tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY; tt0 = Date.now();
     velY = 0; if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }, { passive: true });
 
   document.addEventListener("touchend", e => {
+    // Un touchend puede llegar sin changedTouches (eventos sinteticos, o gestos
+    // cancelados): sin el guard, el handler tira y ensucia la consola.
+    if (!e.changedTouches || !e.changedTouches[0]) return;
     const dx = e.changedTouches[0].clientX - tx0;
     const dy = e.changedTouches[0].clientY - ty0;
     const dt = Math.max(1, Date.now() - tt0);
@@ -975,6 +991,8 @@ function initTopbarBehavior() {
 let _fsTimer = null;
 let _lastTap = 0;
 
+let _topbarHidden = false;
+
 function _showTopbar() {
   const tb = document.getElementById("readerTopbar");
   if (!tb) return;
@@ -986,10 +1004,15 @@ function _showTopbar() {
       if (el) { el.style.marginTop = ""; el.style.transition = ""; }
     });
   }
+  _topbarHidden = false;
   clearTimeout(_fsTimer);
-  if (isFullscreen && window.innerWidth <= 640) {
-    _fsTimer = setTimeout(_hideTopbar, 3000);
-  }
+}
+
+// La topbar se queda como la dejaste: el doble tap la alterna y no hay
+// auto-ocultado por tiempo. Antes se escondia sola a los 3 segundos, lo que
+// hacia impredecible si un doble tap la iba a mostrar o a esconder.
+function _toggleTopbar() {
+  if (_topbarHidden) _showTopbar(); else _hideTopbar();
 }
 
 function _hideTopbar() {
@@ -998,6 +1021,7 @@ function _hideTopbar() {
   const h = tb.offsetHeight || 52;
   tb.style.transition = "transform .25s ease";
   tb.style.transform  = "translateY(-" + h + "px)";
+  _topbarHidden = true;
   // Nada de margenes negativos sobre el viewer: en mobile la topbar es
   // position:fixed, o sea que ya esta fuera del flujo y el viewer siempre
   // ocupo la pantalla entera. Subirlo "para llenar el hueco" solo lograba
@@ -1052,11 +1076,11 @@ function updateFullscreenBtn() {
 
 // Doble tap para mostrar topbar en fullscreen mobile
 document.addEventListener("touchend", function(e) {
-  if (!isFullscreen || window.innerWidth > 640) return;
+  if (window.innerWidth > 640) return;
   if (e.target.closest(".side-panel, .modal-overlay, #readerTopbar")) return;
   const now = Date.now();
   if (now - _lastTap < 300) {
-    _showTopbar();
+    _toggleTopbar();
     _lastTap = 0;
   } else {
     _lastTap = now;

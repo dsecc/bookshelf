@@ -262,6 +262,13 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
   body.reader-fullscreen #pdfScrollViewer .pdf-controls { display: none; }
 }
 
+/* En mobile el lector ya arranca a pantalla completa (ver init() en
+   reader.js), asi que el boton de fullscreen no tiene nada que alternar:
+   se oculta. La topbar se muestra y se esconde con doble tap. */
+@media (max-width: 640px) {
+  #btnFullscreen { display: none; }
+}
+
 /* ── Scroll del documento en mobile (modo scroll de PDF) ───────────────────
    iOS recorta el pintado de un contenedor con overflow propio al viewport,
    que en una PWA standalone es mas corto que la pantalla fisica: quedaba una

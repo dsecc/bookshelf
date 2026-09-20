@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.7 — El lector abre a pantalla completa en mobile, sin perder el punto de lectura
+
+### Corregido
+- **Entrar o salir de pantalla completa te movia del lugar donde estabas leyendo.** No era una recarga: en mobile el contenedor de scroll tiene `padding: .25rem` a los lados y en fullscreen pasa a `0`. Esos **8px de diferencia de ancho** superaban el umbral de 2px de `_scrollRerender`, que entonces descartaba todas las paginas dibujadas y las volvia a renderizar, dejando el scroll al **inicio** de la pagina actual en vez de donde estabas. El parpadeo era el re-render.
+
+### Cambiado
+- **En mobile el lector abre directamente a pantalla completa.** Ademas de ser lo que uno quiere al abrir un libro, resuelve la causa de raiz: el ancho disponible se calcula una sola vez, con el layout definitivo, y ya no hay ningun re-render que pueda moverte.
+- **El doble tap alterna la topbar** y la deja como la dejaste. Antes se escondia sola a los 3 segundos, lo que hacia impredecible si el proximo doble tap la iba a mostrar o a esconder; ese auto-ocultado se elimino.
+- El boton de pantalla completa se oculta en mobile: no tiene nada que alternar. En desktop sigue igual.
+- `touchstart`/`touchend` ahora verifican que el evento traiga `touches`/`changedTouches` antes de leerlos. En un telefono real siempre vienen, pero sin el guard un evento sin ellos hacia tirar el handler.
+
+### Notas
+- `VERSION` del service worker: `v8` → `v9`.
+- Verificado con navegador real: al abrir entra en fullscreen con el contenedor sin padding lateral y la topbar visible; tras scrollear a la pagina 5/6, dos dobles taps seguidos (ocultar y mostrar) dejan `scrollY` **identico** y ningun canvas se vuelve a renderizar. Desktop sin cambios (no entra solo en fullscreen, el boton sigue visible, el contenedor sigue siendo el scroller) y el modo sin conexion sin regresiones.
+
 ## v1.5.6 — El modo scroll del lector usa el documento como scroller
 
 ### Corregido
