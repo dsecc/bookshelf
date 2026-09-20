@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.6.1 — Colecciones y Subir crecen desde la pildora
+
+### Cambiado
+- **Colecciones y Subir libro dejan de ser una hoja y un modal**: ahora son la misma pildora estirandose hacia arriba, con el `clip-path` de asmodeloscentral — arranca revelando solo los 60px de abajo con radio completo (exactamente la barra) y se abre a la tarjeta con radio 28. Mismo `left`/`right`/`bottom`, mismo fondo y borde, asi que se lee como la barra creciendo y no como un panel nuevo que aparece.
+- El panel no tiene alto fijo: crece a lo que pida el contenido, con un `max-height` de resguardo para no tapar nunca el status bar. Su franja inferior reserva el alto de la barra, porque esa franja *es* la pildora que se acaba de tocar.
+- Las filas son pildoras, no rectangulos: mismo lenguaje que la barra de la que salen.
+
+### Notas de implementacion
+- El panel se abre con `openNavSheet(build, onClose)`, reutilizable. Dos fases (montar / `.open`) porque un `clip-path` solo anima si el elemento ya estuvo en el DOM con el valor inicial aplicado.
+- **Subir no duplica el formulario**: se mueven los nodos del modal adentro del panel y se devuelven al cerrar. Los handlers enganchados por id (`dropZone`, `fileInput`, `btnDoUpload`, el progreso) siguen funcionando tal cual, y en desktop el modal queda intacto.
+- La limpieza cuelga del panel y no de quien lo cierra, porque hay varios caminos de cierre: el fondo, una fila que navega, o codigo ajeno — `doUpload` llama `closeModal` al terminar. Colgarla de uno solo dejaba el panel de Subir sin sus nodos y sin poder reabrirse.
+
+### Notas
+- `VERSION` del service worker: `v10` → `v11`.
+- Verificado con navegador real: los dos paneles salen de la posicion exacta de la barra (16/374/828), arrancan clipeados y abren a `inset(0px round 28px)` con radio 28. Subida completa de punta a punta desde el panel (archivo, coleccion, progreso, cierre automatico y libro en la grilla), reapertura y segundo cierre sin perder nodos. Navegar desde Colecciones cierra el panel y cambia de seccion. En desktop el modal sigue abriendo como modal.
+
 ## v1.6 — Navbar flotante en la biblioteca
 
 Se reemplaza la barra inferior de ancho completo por una **pildora flotante**, portando el patron de asmodeloscentral con la paleta de Bookshelf.

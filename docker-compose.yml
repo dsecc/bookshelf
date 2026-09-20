@@ -1,7 +1,7 @@
 services:
   bookshelf:
     build: .
-    image: bookshelf:1.6
+    image: bookshelf:1.6.1
     container_name: bookshelf
     restart: unless-stopped
     ports:

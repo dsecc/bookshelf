@@ -733,7 +733,13 @@ function openModal(id) {
     if (sel) sel.value = "";
   }
 }
-function closeModal(id) { document.getElementById(id).style.display = "none"; }
+function closeModal(id) {
+  document.getElementById(id).style.display = "none";
+  // En mobile el contenido de "Subir" vive dentro del panel que crece desde la
+  // pildora, no del modal: doUpload cierra por aca al terminar, asi que el
+  // panel tiene que enterarse. Devolver los nodos lo hace el onClose del panel.
+  if (id === "modalUpload" && document.getElementById("navSheet")) closeNavSheet();
+}
 
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -812,7 +818,7 @@ function initBottomNav() {
   });
 
   bnUp.addEventListener("click", () => {
-    openModal("modalUpload");
+    openUploadSheet();
   });
 
   bnAb.addEventListener("click", () => {
@@ -831,99 +837,178 @@ function initBottomNav() {
   });
 }
 
-// Sheet de colecciones para mobile
-function openMobileColSheet() {
-  // Remover sheet previo
-  let old = document.getElementById("mobileColSheet");
-  if (old) old.remove();
+// ── Panel que crece desde la pildora ─────────────────────────────────────────
+// Portado de asmodeloscentral: el panel no es una hoja aparte sino la barra
+// misma estirandose. Dos fases (montar / .open) porque un clip-path solo anima
+// si el elemento ya estuvo en el DOM con el valor inicial aplicado; con una
+// sola pasada el navegador colapsa ambos estados y no se ve la transicion.
+const NAV_SHEET_CLOSE_MS = 220;
+let _navSheetClosing = null;
+// El callback de limpieza vive aca y no en el que cierra, porque el panel se
+// puede cerrar por varios caminos: el fondo, una fila que navega, o codigo
+// ajeno (doUpload llama closeModal al terminar). Si la limpieza colgara de uno
+// solo de esos, cerrar por otro dejaria el panel de "Subir" sin sus nodos.
+let _navSheetOnClose = null;
+
+function _navSheetCleanup() {
+  const fn = _navSheetOnClose;
+  _navSheetOnClose = null;
+  if (fn) fn();
+}
+
+function closeNavSheet(inmediato) {
+  const sheet = document.getElementById("navSheet");
+  const back  = document.getElementById("navSheetBackdrop");
+  if (!sheet && !back) return;
+  clearTimeout(_navSheetClosing);
+  if (inmediato) {
+    if (sheet) sheet.remove();
+    if (back) back.remove();
+    _navSheetCleanup();
+    return;
+  }
+  if (sheet) sheet.classList.remove("open");
+  if (back)  back.classList.remove("open");
+  _navSheetClosing = setTimeout(() => {
+    if (sheet) sheet.remove();
+    if (back) back.remove();
+    _navSheetCleanup();
+  }, NAV_SHEET_CLOSE_MS);
+}
+
+// build(body) llena el contenido. onClose corre despues de sacarlo del DOM.
+function openNavSheet(build, onClose) {
+  closeNavSheet(true);
+
+  _navSheetOnClose = onClose || null;
+
+  const back = document.createElement("div");
+  back.id = "navSheetBackdrop";
+  back.className = "nav-sheet-backdrop";
+  back.onclick = () => closeNavSheet();
 
   const sheet = document.createElement("div");
-  sheet.id = "mobileColSheet";
-  sheet.style.cssText = [
-    "position:fixed;inset:0;z-index:200;",
-    "display:flex;flex-direction:column;justify-content:flex-end;"
-  ].join("");
+  sheet.id = "navSheet";
+  sheet.className = "nav-sheet";
+  const body = document.createElement("div");
+  body.className = "nav-sheet-body";
+  sheet.appendChild(body);
 
-  const backdrop = document.createElement("div");
-  backdrop.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.6);";
-  backdrop.onclick = () => sheet.remove();
-
-  const panel = document.createElement("div");
-  panel.style.cssText = [
-    "position:relative;background:var(--surface);",
-    "border-radius:16px 16px 0 0;",
-    "padding:1rem 0 calc(1rem + env(safe-area-inset-bottom));",
-    "max-height:75vh;display:flex;flex-direction:column;",
-    "animation:slideUpSheet .25s cubic-bezier(.4,0,.2,1) both;"
-  ].join("");
-
-  const header = document.createElement("div");
-  header.style.cssText = "padding:.25rem 1.25rem .85rem;display:flex;justify-content:space-between;align-items:center;";
-  header.innerHTML = "<span style='font-size:.9rem;font-weight:600'>Colecciones</span>";
-  const newColBtn = document.createElement('button');
-  newColBtn.textContent = '+ Nueva';
-  newColBtn.style.cssText = 'background:var(--accent);color:#fff;border:none;border-radius:6px;padding:.35rem .7rem;font-size:.8rem;cursor:pointer';
-  newColBtn.onclick = () => { document.getElementById('mobileColSheet').remove(); openModal('modalNewCol'); };
-  header.appendChild(newColBtn);
-
-  const list = document.createElement("ul");
-  list.style.cssText = "list-style:none;overflow-y:auto;flex:1;padding:0 .5rem;";
-
-  // Entrada "Todos"
-  const allLi = document.createElement("li");
-  allLi.style.cssText = "padding:.65rem .75rem;border-radius:8px;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;";
-  allLi.innerHTML = "<span>Todos los libros</span>";
-  allLi.onclick = async () => {
-    sheet.remove();
-    offlineView = false;
-    activeColId = null;
-    document.getElementById("topbarTitle").textContent = "Biblioteca";
-    setNavActive("navBiblioteca");
-    setView("biblioteca");
-    document.getElementById("bnBiblioteca") && document.getElementById("bnBiblioteca").click();
-    const res = await fetch("/api/books");
-    books = await res.json();
-    renderBooks();
-  };
-  list.appendChild(allLi);
-
-  // Entrada "Sin conexion" (en mobile no entra en la bottom nav, va aca)
-  const offLi = document.createElement("li");
-  offLi.style.cssText = "padding:.65rem .75rem;border-radius:8px;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;";
-  offLi.innerHTML = "<span>Sin conexion</span>";
-  offLi.onclick = async () => {
-    sheet.remove();
-    document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-    await showOfflineView();
-  };
-  list.appendChild(offLi);
-
-  collections.forEach(c => {
-    const li = document.createElement("li");
-    li.style.cssText = "padding:.65rem .75rem;border-radius:8px;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;color:var(--text);";
-    const isActive = activeColId === c.id;
-    if (isActive) li.style.color = "var(--accent)";
-    li.innerHTML = "<span>" + c.name + "</span><span style='font-size:.75rem;color:var(--text-muted)'>" + (c.book_count||0) + "</span>";
-    li.onclick = async () => {
-      sheet.remove();
-      offlineView = false;
-      activeColId = c.id;
-      document.getElementById("topbarTitle").textContent = c.name;
-      setView("biblioteca");
-      document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-      const res = await fetch("/api/books?collection_id=" + c.id);
-      books = await res.json();
-      renderSidebar();
-      renderBooks();
-    };
-    list.appendChild(li);
-  });
-
-  panel.appendChild(header);
-  panel.appendChild(list);
-  sheet.appendChild(backdrop);
-  sheet.appendChild(panel);
+  document.body.appendChild(back);
   document.body.appendChild(sheet);
+  build(body);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    sheet.classList.add("open");
+    back.classList.add("open");
+  }));
+  return { sheet, body, close: () => closeNavSheet() };
+}
+
+// Fila de panel: pildora con icono opcional, etiqueta y detalle a la derecha.
+function navSheetRow({ label, icon, detail, active, onClick }) {
+  const row = document.createElement("button");
+  row.className = "nav-sheet-row" + (active ? " active" : "");
+  if (icon) row.innerHTML = icon;
+  const sp = document.createElement("span");
+  sp.className = "row-label"; sp.textContent = label;
+  row.appendChild(sp);
+  if (detail != null) {
+    const d = document.createElement("span");
+    d.className = "row-count"; d.textContent = detail;
+    row.appendChild(d);
+  }
+  if (onClick) row.onclick = onClick;
+  return row;
+}
+
+// Subir: mismo panel. En vez de duplicar el formulario, se MUEVEN los nodos
+// del modal adentro y se devuelven al cerrar — asi los handlers enganchados por
+// id (dropZone, fileInput, btnDoUpload, el progreso) siguen funcionando tal
+// cual, y en desktop el modal queda intacto.
+function openUploadSheet() {
+  const inner  = document.querySelector("#modalUpload .modal");
+  const header = inner.querySelector(".modal-header");
+  const movidos = [...inner.children].filter(el => el !== header);
+  const sel = document.getElementById("uploadCollection");
+  if (sel) sel.value = "";
+
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Subir libro</span>";
+    body.appendChild(head);
+    movidos.forEach(el => body.appendChild(el));
+  }, () => {
+    // Siguen referenciados aunque el panel ya no este en el DOM.
+    movidos.forEach(el => inner.appendChild(el));
+  });
+}
+
+// Colecciones: panel que crece desde la pildora (ver openNavSheet).
+function openMobileColSheet() {
+  const ICO_ALL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>';
+  const ICO_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
+  const ICO_COL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+
+  const s = openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Colecciones</span>";
+    const nueva = document.createElement("button");
+    nueva.textContent = "+ Nueva";
+    nueva.style.cssText = "background:var(--accent);color:#fff;border:none;border-radius:999px;padding:.35rem .8rem;font-size:.78rem;cursor:pointer";
+    nueva.onclick = () => { closeNavSheet(); setTimeout(() => openModal("modalNewCol"), NAV_SHEET_CLOSE_MS); };
+    head.appendChild(nueva);
+    body.appendChild(head);
+
+    body.appendChild(navSheetRow({
+      label: "Todos los libros", icon: ICO_ALL,
+      active: !offlineView && activeColId === null,
+      onClick: async () => {
+        s.close();
+        offlineView = false; activeColId = null;
+        document.getElementById("topbarTitle").textContent = "Biblioteca";
+        setNavActive("navBiblioteca");
+        setView("biblioteca");
+        const bib = document.getElementById("bnBiblioteca");
+        if (bib) bib.click();
+        const res = await fetch("/api/books");
+        books = await res.json();
+        renderBooks();
+      },
+    }));
+
+    // "Sin conexion" no entra en los 5 slots de la barra, asi que vive aca.
+    body.appendChild(navSheetRow({
+      label: "Sin conexion", icon: ICO_OFF, active: offlineView,
+      onClick: async () => {
+        s.close();
+        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+        await showOfflineView();
+      },
+    }));
+
+    if (collections.length) body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+
+    collections.forEach(c => {
+      body.appendChild(navSheetRow({
+        label: c.name, icon: ICO_COL, detail: String(c.book_count || 0),
+        active: !offlineView && activeColId === c.id,
+        onClick: async () => {
+          s.close();
+          offlineView = false; activeColId = c.id;
+          document.getElementById("topbarTitle").textContent = c.name;
+          setView("biblioteca");
+          document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+          const res = await fetch("/api/books?collection_id=" + c.id);
+          books = await res.json();
+          renderSidebar();
+          renderBooks();
+        },
+      }));
+    });
+  });
 }
 
 
