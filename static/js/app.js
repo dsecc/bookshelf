@@ -421,6 +421,14 @@ function updateBookCount() {
   el.textContent = total;
 }
 
+// Que vista se esta mostrando. No habia forma de preguntarlo: setView solo
+// cambiaba displays. El panel "Mas" lo necesita para marcar la fila activa.
+function vistaActual() {
+  if (document.getElementById("viewAbout").style.display === "none" &&
+      document.getElementById("viewSettings").style.display === "none") return "biblioteca";
+  return document.getElementById("viewAbout").style.display !== "none" ? "about" : "settings";
+}
+
 function setView(view) {
   document.getElementById("viewBiblioteca").style.display = view === "biblioteca" ? "" : "none";
   document.getElementById("viewAbout").style.display     = view === "about"       ? "" : "none";
@@ -780,6 +788,10 @@ function initBottomNav() {
     ind.style.width = "calc(" + 100 / items.length + "% - 12px)";
   }
 
+  const cerrar = document.getElementById("libSearchClose");
+  if (cerrar) cerrar.onclick = () => toggleLibSearch(false);
+  initHeroFade();
+
   const nav = document.getElementById("bottomNav");
   if (nav) {
     new MutationObserver(syncNavIndicator)
@@ -797,8 +809,8 @@ function initBottomNav() {
   const bnBib = document.getElementById("bnBiblioteca");
   const bnCol = document.getElementById("bnColecciones");
   const bnUp  = document.getElementById("bnUploadMobile");
-  const bnAb  = document.getElementById("bnAbout");
-  const bnSet = document.getElementById("bnSettings");
+  const bnBus = document.getElementById("bnSearchMobile");
+  const bnMas = document.getElementById("bnMore");
 
   if (!bnBib) return;
 
@@ -821,20 +833,108 @@ function initBottomNav() {
     openUploadSheet();
   });
 
-  bnAb.addEventListener("click", () => {
-    setActive("bnAbout");
-    setNavActive("navAbout");
-    setView("about");
-    document.getElementById("topbarTitle").textContent = "About";
-    loadAbout();
-  });
+  bnBus.addEventListener("click", () => toggleLibSearch());
+  bnMas.addEventListener("click", () => openMoreSheet());
+}
 
-  bnSet.addEventListener("click", () => {
-    setActive("bnSettings");
-    setNavActive("navSettings");
-    setView("settings");
-    document.getElementById("topbarTitle").textContent = "Ajustes";
+// ── Buscador de la biblioteca ────────────────────────────────────────────────
+// Misma barra que el lector (.nav-search): sale de atras de la pildora. El
+// input real se MUEVE aca desde la topbar y vuelve al cerrar, asi el handler
+// de "input" que filtra los libros sigue siendo el mismo.
+function toggleLibSearch(forzar) {
+  const bar = document.getElementById("libSearchBar");
+  const slot = document.getElementById("libSearchSlot");
+  const input = document.getElementById("searchInput");
+  if (!bar || !slot || !input) return;
+  const abrir = forzar === undefined ? !bar.classList.contains("open") : forzar;
+
+  if (abrir) {
+    closeNavSheet();
+    slot.appendChild(input);
+    bar.classList.add("open");
+    setTimeout(() => input.focus(), 120);
+  } else {
+    bar.classList.remove("open");
+    input.value = "";
+    renderBooks("");
+    input.blur();
+    // Devolverlo a la topbar recien cuando termino de salir, para que no se
+    // vea desaparecer del medio de la barra.
+    setTimeout(() => {
+      const wrap = document.getElementById("searchExpand");
+      if (wrap && input.parentNode === slot) wrap.appendChild(input);
+    }, 340);
+  }
+}
+
+// ── Panel "Mas" de la biblioteca ─────────────────────────────────────────────
+// Recibe lo que dejo de tener la topbar (notificaciones, cerrar sesion) y lo
+// que salio de la barra (About, Ajustes): son consultas ocasionales, no algo
+// que uno haga a cada rato.
+function openMoreSheet() {
+  const ICO = {
+    notif: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+    info:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    set:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V12z"/></svg>',
+    out:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  };
+  const s = openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Mas</span>";
+    body.appendChild(head);
+
+    // Notificaciones: el contador del boton original se replica como detalle.
+    const badge = document.getElementById("notifBadge");
+    const sinVer = badge && badge.style.display !== "none" ? badge.textContent.trim() : null;
+    body.appendChild(navSheetRow({
+      label: "Notificaciones", icon: ICO.notif, detail: sinVer, active: !!sinVer,
+      onClick: () => { s.close(); setTimeout(() => document.getElementById("btnNotif").click(), NAV_SHEET_CLOSE_MS); },
+    }));
+
+    body.appendChild(navSheetRow({
+      label: "Informacion", icon: ICO.info, active: vistaActual() === "about",
+      onClick: () => {
+        s.close();
+        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+        setNavActive("navAbout"); setView("about"); loadAbout();
+      },
+    }));
+
+    body.appendChild(navSheetRow({
+      label: "Ajustes", icon: ICO.set, active: vistaActual() === "settings",
+      onClick: () => {
+        s.close();
+        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+        setNavActive("navSettings"); setView("settings");
+      },
+    }));
+
+    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+    body.appendChild(navSheetRow({
+      label: "Cerrar sesion", icon: ICO.out,
+      onClick: () => { window.location.href = "/logout"; },
+    }));
   });
+}
+
+// ── Titulo de marca que se desvanece ─────────────────────────────────────────
+// Puro adorno: al entrar se ve "Bookshelf" y al empezar a bajar se va, dejando
+// la pantalla para los libros. Se apaga en los primeros 70px de scroll.
+function initHeroFade() {
+  const hero = document.getElementById("libHero");
+  if (!hero) return;
+  let pedido = false;
+  const pintar = () => {
+    pedido = false;
+    const y = window.scrollY || document.documentElement.scrollTop || 0;
+    hero.style.opacity = String(Math.max(0, 1 - y / 70));
+  };
+  // rAF: el scroll dispara muchisimo y esto solo toca una propiedad.
+  window.addEventListener("scroll", () => {
+    if (!pedido) { pedido = true; requestAnimationFrame(pintar); }
+  }, { passive: true });
+  pintar();
 }
 
 // Subir: mismo panel. En vez de duplicar el formulario, se MUEVEN los nodos

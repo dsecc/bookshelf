@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.7 — La biblioteca se queda sin topbar
+
+En mobile la topbar desaparece y todo lo que tenia pasa a la pildora. La pantalla queda para los libros.
+
+### Cambiado
+- **La topbar ya no se muestra en mobile.** No se saca del DOM: el input de busqueda y los handlers de notificaciones cuelgan de ahi, y en desktop sigue siendo la unica navegacion.
+- **La barra se reordeno** segun que se usa seguido y que se consulta de vez en cuando:
+
+  | Antes | Ahora |
+  |---|---|
+  | About | **Buscar** |
+  | Ajustes | **Subir libro** |
+  | Subir | **Mas** |
+
+  Queda: Colecciones · Buscar · Biblioteca · Subir · **Mas**.
+- **El panel "Mas"** recibe lo que salio de los dos lados: Notificaciones (con su contador de no vistas), Informacion, Ajustes y Cerrar sesion.
+- **El buscador de libros usa la misma barra que el del lector**: sale de atras de la pildora. El input real se mueve ahi al abrirlo y vuelve a la topbar al cerrar, asi el handler que filtra los libros sigue siendo el mismo.
+- **"Bookshelf" centrado arriba, que se desvanece al scrollear.** Es puramente estetico: se ve el nombre al entrar y se va en los primeros 70px de scroll, dejando la pantalla para los libros. Vuelve al subir.
+
+### Notas
+- El titulo decia "Biblioteca" porque **lo escribia nuestro propio codigo**, no por una traduccion del telefono: `topbarTitle` se cambiaba a "Biblioteca", "About", "Ajustes" o el nombre de la coleccion desde siete lugares distintos. El titulo de marca dice siempre "Bookshelf".
+- Como efecto de eso, **el nombre de la coleccion abierta ya no se muestra en mobile**. La coleccion activa sigue marcandose dentro del panel de Colecciones.
+- El desvanecido corre dentro de un `requestAnimationFrame`: el scroll dispara muchisimo y esto solo toca una propiedad.
+- `VERSION` del service worker: `v17` → `v18`.
+- Verificado: topbar oculta, el orden de los cinco slots, el titulo apareciendo y desvaneciendose (y volviendo), las cuatro filas del panel, y el buscador abriendo desde atras de la pildora, filtrando de verdad, y devolviendo el input a su lugar al cerrar. El panel navega a Ajustes e Informacion y marca la activa. Desktop intacto: topbar con su buscador, notificaciones y subir, sin titulo de marca y sin pildora.
+
 ## v1.6.7 — El doble tap vuelve a esconder la navbar
 
 ### Corregido

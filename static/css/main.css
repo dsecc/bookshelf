@@ -147,6 +147,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: .5rem 1.1rem; border-radius: 99px; font-size: .82rem; opacity: 0; transition: all .25s; z-index: 999; white-space: nowrap; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* El titulo de marca es solo de mobile: en desktop estan la topbar y el sidebar. */
+.lib-hero { display: none; }
+
 @media (max-width: 640px) {
   .sidebar { display: none; }
   .content { padding: 1rem; }
@@ -472,8 +475,29 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .main-area { flex: 1; overflow: visible; display: flex; flex-direction: column; }
   .sidebar { display: none !important; } /* reemplazado por bottom nav */
 
-  /* La topbar se queda arriba mientras scrollea el documento. */
-  .topbar { position: sticky; top: 0; z-index: 100; }
+  /* ── Sin topbar en mobile ────────────────────────────────────────────────
+     Todo lo que tenia paso a la pildora: buscar y subir tienen slot propio, y
+     notificaciones, About, Ajustes y cerrar sesion viven en el panel "Mas".
+     No se saca del DOM porque el input de busqueda y los handlers de
+     notificaciones cuelgan de ahi, y en desktop la topbar sigue siendo la
+     unica navegacion. */
+  .topbar { display: none; }
+
+  /* Titulo de marca: aparece al entrar y se va al scrollear. Puro adorno —
+     app.js le baja la opacidad con el scroll. El padding-top deja pasar la
+     safe area para que no quede debajo de la hora. */
+  .lib-hero {
+    display: block;
+    text-align: center;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    color: var(--text);
+    padding: calc(env(safe-area-inset-top, 0px) + 1.1rem) 1rem .35rem;
+    /* pointer-events:none para que no tape el scroll ni robe toques. */
+    pointer-events: none;
+    will-change: opacity;
+  }
 
   /* ── Topbar ── */
   /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar

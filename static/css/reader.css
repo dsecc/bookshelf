@@ -284,59 +284,6 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
     pointer-events: none;
   }
   .reader-topbar-inner { display: none; }
-  /* ── Busqueda: sale de atras de la pildora y queda pegada a ella ─────────
-     Basado en la barra de chat que paso el usuario, con una diferencia
-     pedida: va al MISMO ancho que la pildora, alineada a sus bordes, no
-     retraida hacia adentro como en la referencia. Lo que hace que las dos se
-     lean como una sola pieza es lo otro: es mas OSCURA (se aleja en vez de
-     competir), tiene las esquinas de arriba redondeadas y la base recta, y esa
-     base queda TAPADA por la principal gracias al z-index por debajo.
-
-     --search-tuck es cuanto se mete por detras: cuenta en el alto pero no se
-     ve, asi que el alto util es (altura - tuck). */
-  .search-bar-reader {
-    --search-tuck: 26px;
-    pointer-events: none;
-    position: fixed; z-index: 140;
-    left:  var(--nav-bar-side);
-    right: var(--nav-bar-side);
-    bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px) + var(--nav-bar-height) - var(--search-tuck));
-    margin: 0;
-    height: calc(52px + var(--search-tuck));
-    display: flex; align-items: center; gap: .4rem;
-    padding: 0 .5rem var(--search-tuck) 1.1rem;
-    background: color-mix(in srgb, var(--surface) 45%, var(--bg));
-    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-    border-bottom: none;
-    border-radius: 24px 24px 0 0;
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    backdrop-filter: blur(20px) saturate(1.4);
-    /* Cerrada: escondida detras de la pildora. */
-    transform: translateY(52px);
-    opacity: 0;
-    transition: transform .32s var(--nav-ease), opacity .2s var(--nav-ease);
-  }
-  .search-bar-reader.open {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .search-bar-reader input {
-    flex: 1; min-width: 0;
-    background: none; border: none; outline: none;
-    color: var(--text); font-size: 16px; font-family: inherit;
-  }
-  /* Botones cómodos de tocar: 38px entra bien en los 52px utiles y llega al
-     minimo razonable para el dedo. */
-  .search-bar-reader .r-btn {
-    width: 38px; height: 38px; flex-shrink: 0;
-    border-radius: 999px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .search-bar-reader .r-btn svg { width: 18px; height: 18px; }
-  .search-bar-reader .r-btn:active { background: var(--nav-active-bg); }
-  .search-results-count { font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
-
   /* La barra sube con el teclado para no quedar tapada. */
   .bottom-nav { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
   .nav-sheet  { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
