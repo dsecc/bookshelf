@@ -943,6 +943,34 @@ function initTopbarBehavior() {
 let _fsTimer = null;
 let _lastTap = 0;
 
+// ── Compensacion del viewport recortado de iOS ──
+// En una PWA instalada con apple-mobile-web-app-status-bar-style =
+// black-translucent, la webview ocupa la pantalla fisica entera, pero
+// window.innerHeight reporta la altura SIN la franja del status bar. El
+// viewport queda mas corto que la pantalla y esa diferencia aparece como una
+// banda del fondo del body al pie del libro, que ninguna regla de CSS puede
+// tapar: bottom:0 obedece a un viewport que ya viene corto.
+// Medimos la diferencia real y la publicamos como --ios-gap.
+function updateIosGap() {
+  let gap = 0;
+  if (navigator.standalone === true && window.screen) {
+    // screen.width/height no rotan de forma confiable en iOS: elegimos el
+    // lado que corresponde segun la orientacion en vez de confiar en screen.height.
+    const apaisado = Math.abs(window.orientation || 0) === 90;
+    const pantallaH = apaisado
+      ? Math.min(screen.width, screen.height)
+      : Math.max(screen.width, screen.height);
+    const d = pantallaH - window.innerHeight;
+    // Acotado: si la diferencia no es la franja del status bar (por un teclado
+    // abierto, una medicion rara o un iOS que ya lo arreglo), no tocamos nada.
+    if (d > 0 && d <= 120) gap = d;
+  }
+  document.documentElement.style.setProperty("--ios-gap", gap + "px");
+}
+updateIosGap();
+window.addEventListener("resize", updateIosGap);
+window.addEventListener("orientationchange", () => setTimeout(updateIosGap, 300));
+
 function _showTopbar() {
   const tb = document.getElementById("readerTopbar");
   if (!tb) return;
@@ -966,20 +994,11 @@ function _hideTopbar() {
   const h = tb.offsetHeight || 52;
   tb.style.transition = "transform .25s ease";
   tb.style.transform  = "translateY(-" + h + "px)";
-  if (window.innerWidth <= 640) {
-    // Agrandar body para llenar el hueco — sin recuadro negro
-    document.documentElement.style.transition = "padding-top .25s ease";
-    document.documentElement.style.paddingTop = "0";
-    // Agrandar el viewer activo
-    const vIds = ["pdfScrollViewer","pdfPageViewer","pdfBookViewer","epubViewer","pdfSpreadViewer"];
-    vIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && el.style.display !== "none") {
-        el.style.transition = "margin-top .25s ease";
-        el.style.marginTop = "-" + h + "px";
-      }
-    });
-  }
+  // Nada de margenes negativos sobre el viewer: en mobile la topbar es
+  // position:fixed, o sea que ya esta fuera del flujo y el viewer siempre
+  // ocupo la pantalla entera. Subirlo "para llenar el hueco" solo lograba
+  // destapar la misma cantidad de pixeles ABAJO, donde se veia el fondo
+  // del body (--bg) como una banda negra sobre el libro.
 }
 
 function enterFullscreen() {
@@ -1006,8 +1025,8 @@ function exitFullscreen() {
   document.body.classList.remove("reader-fullscreen");
   isFullscreen = false;
   clearTimeout(_fsTimer);
-  // _showTopbar deshace tambien los margenes negativos que deja _hideTopbar
-  // en el viewer; sin esto quedaba el contenido corrido hacia arriba.
+  // _showTopbar limpia cualquier margen inline que haya quedado de una
+  // sesion vieja (antes _hideTopbar los aplicaba).
   _showTopbar();
   const tb = document.getElementById("readerTopbar");
   if (tb) { tb.style.transform = ""; tb.style.opacity = ""; tb.style.transition = ""; }

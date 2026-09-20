@@ -477,7 +477,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .content {
     flex: 1; overflow-y: auto; overflow-x: hidden;
     padding: .85rem .75rem;
-    padding-bottom: calc(64px + .85rem); /* espacio para bottom nav */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + .85rem); /* espacio para bottom nav */
   }
 
   /* ── Libros: grilla mas compacta ── */
@@ -536,11 +536,15 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .bottom-nav {
     display: flex;
     position: fixed; bottom: 0; left: 0; right: 0;
-    height: 64px;
+    /* 64px es el alto util (iconos + label). La safe area del home
+       indicator se SUMA: con box-sizing:border-box, si la metieramos
+       dentro de los 64px el contenido se quedaria sin lugar y quedaria
+       pegado arriba en vez de centrado. */
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
     background: var(--surface);
     border-top: 1px solid var(--border);
     z-index: 150;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     align-items: stretch;
   }
   .bn-item {

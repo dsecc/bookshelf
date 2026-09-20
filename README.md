@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.5** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.5.5** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -54,9 +54,31 @@ El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca a
 
 Bookshelf es una PWA: se puede instalar en el teléfono ("Agregar a inicio" en iOS, "Instalar app" en Android) y abre como una app nativa.
 
+> ⚠️ **Hace falta servir la app por HTTPS.** Esto no es opcional ni una recomendación de seguridad: los navegadores solo habilitan los *service workers* en contextos seguros, y el service worker es lo que hace todo el trabajo de caché. Entrando por `http://IP:8090` el navegador **ni siquiera expone la API** (`navigator.serviceWorker` no existe), así que no hay nada cacheado, la app no abre sin internet y el botón "Guardar sin conexión" **se oculta solo** — el código lo esconde cuando detecta que `caches` no está disponible. La única excepción que hacen los navegadores es `localhost`, que desde el teléfono no sirve.
+>
+> Todo lo demás (subir, leer, colecciones, envíos entre usuarios) anda perfecto por HTTP. Lo único que se pierde es el modo sin conexión.
+
+### Servir por HTTPS con Tailscale
+
+La forma más simple de conseguir un certificado válido sin exponer nada a internet ni comprar un dominio. Requiere Tailscale instalado en el servidor y en el teléfono, los dos en la misma tailnet.
+
+1. Activá **HTTPS Certificates** en [login.tailscale.com/admin/dns](https://login.tailscale.com/admin/dns) (viene apagado por defecto).
+2. En el servidor, poné Tailscale al frente del puerto de Bookshelf:
+   ```bash
+   sudo tailscale set --operator=$USER   # opcional: evita sudo a futuro
+   sudo tailscale serve --bg --https=8443 http://127.0.0.1:8090
+   ```
+3. Abrí `https://<tu-servidor>.<tu-tailnet>.ts.net:8443` **en Safari/Chrome del teléfono** y agregala a la pantalla de inicio desde ahí.
+
+El certificado es de Let's Encrypt, así que iOS y Android lo confían sin instalar nada. `serve` publica el servicio **solo dentro de tu tailnet** — no es `funnel`, que sí lo expondría a internet. Como Tailscale es una VPN, además la app te funciona desde cualquier lado, no solo en tu red local. Para desactivarlo: `sudo tailscale serve --https=8443 off`.
+
+Si ya tenías la app instalada apuntando a la IP por HTTP, **borrá el ícono viejo y volvé a agregarla desde la dirección HTTPS**: es otro origen, con otro almacén de caché, así que la instalación vieja no sirve.
+
 Dentro del lector, el botón **"Guardar sin conexión"** descarga ese libro al dispositivo. Los libros guardados quedan listados en la sección **"Sin conexión"** de la biblioteca y se marcan con un ícono en la portada. Solo se guarda lo que elegís: nada se descarga solo, para no llenarte el teléfono.
 
 La app en sí (la biblioteca, las portadas y el lector) queda cacheada después de la primera visita con conexión, así que abre igual sin internet — lo único que necesita estar guardado explícitamente es el archivo de cada libro.
+
+Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se indexa por URL: al abrir un libro sin conexión el lector pide `/api/books/<id>/file` como siempre y el service worker le devuelve la copia local, de forma indistinguible del servidor. El caché de los libros no lleva número de versión (a diferencia del de la app), así que **los libros guardados sobreviven las actualizaciones**. Al guardar el primero se llama a `navigator.storage.persist()` para que iOS no borre nada — solo lo respeta si la app está instalada en la pantalla de inicio.
 
 > En iPhone, para que la hoja aproveche toda la pantalla (incluso por debajo de la hora y la batería, como en los PDF nativos) hay que abrirla **instalada desde la pantalla de inicio**: Safari siempre muestra su propia barra. Si ya la tenías instalada de antes, borrá el ícono y volvé a agregarla para que tome la configuración nueva.
 

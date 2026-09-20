@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.5 — Safe areas de iOS y el requisito de HTTPS para el modo offline
+
+### Corregido
+- **La barra inferior de la biblioteca quedaba aplastada contra el borde de arriba.** `.bottom-nav` declaraba `height: 64px` con `padding-bottom: env(safe-area-inset-bottom)` adentro; como el proyecto usa `box-sizing: border-box`, en un iPhone la zona útil pasaba de 64px a 30px y los iconos con sus labels no entraban (el activo, que escala a 1.15, directamente se desbordaba). Lo rompió v1.5 al agregar `viewport-fit=cover`: hasta entonces `env(safe-area-inset-bottom)` valía 0 y el problema no se veía. Ahora la safe area se suma en vez de descontarse, y el `padding-bottom` del `.content` la acompaña para que la barra no tape la última fila de libros.
+- **La topbar del lector tenía el mismo bug** (`height: 52px` con la safe area del notch adentro): pintaba una banda opaca sobre el libro y al ocultarse en pantalla completa se iba solo a medias, porque se trasladaba 52px cuando su alto visual era mayor.
+- **Al ocultar la topbar quedaba una franja del fondo al pie del libro.** `_hideTopbar` le aplicaba `margin-top: -52px` al viewer "para llenar el hueco", pero en mobile la topbar es `position: fixed` y nunca ocupó espacio en el flujo: el margen solo subía el contenido y destapaba esa misma cantidad de píxeles abajo.
+- **`reader.css` tenía una llave de cierre de más**, que dejaba el archivo desbalanceado.
+- **Compensación del viewport recortado de iOS.** En una PWA instalada con `apple-mobile-web-app-status-bar-style: black-translucent`, iOS estira la webview hasta cubrir la pantalla pero reporta en `window.innerHeight` la altura *sin* la franja del status bar (medido en un iPhone 12 mini: pantalla 812px, viewport 762px). Esa diferencia aparece como una banda del fondo del body que ninguna regla de CSS puede tapar, porque `bottom: 0` obedece a un viewport que ya viene corto. `reader.js` mide la diferencia real contra la pantalla y la publica como `--ios-gap`; el viewer se extiende esos píxeles. Acotado a 120px, solo activo en modo standalone y recalculado al rotar. Nota: el disparador real de ese desajuste suele ser que iOS cachea la configuración de la web app al momento de agregarla a la pantalla de inicio — reinstalar el ícono después de cambiar las meta tags es parte del arreglo.
+
+### Documentado
+- **El modo sin conexión necesita HTTPS, y sin eso no funciona nada.** Los navegadores solo habilitan service workers en contextos seguros: entrando por `http://IP:8090`, `navigator.serviceWorker` ni siquiera existe, no se cachea nada, la app no abre sin internet y el botón "Guardar sin conexión" se oculta solo (el código lo esconde cuando no hay `caches`). La capacidad offline que anunciaba v1.5 era, en la práctica, inalcanzable en una instalación servida por HTTP plano. El README ahora explica el requisito y documenta cómo resolverlo con `tailscale serve`, que da un certificado de Let's Encrypt sin exponer el servidor a internet.
+- El README detalla además cómo se guarda cada cosa: los tres caches, por qué el de los libros no lleva versión (sobreviven las actualizaciones) y el uso de `navigator.storage.persist()`.
+
+### Notas de despliegue
+- `VERSION` del service worker: `v1` → `v7`. Los archivos del shell se sirven cache-first, así que sin subirla los dispositivos que ya visitaron la app se quedarían con las versiones viejas para siempre; además el navegador solo detecta un service worker nuevo si el archivo cambió. `BOOKS_CACHE` sigue sin versión a propósito: los libros guardados no se borran.
+
 ## v1.5 — Lectura sin conexión y pantalla completa real en mobile
 
 ### Agregado
