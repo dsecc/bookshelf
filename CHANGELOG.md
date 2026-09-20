@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.6 — Navbar flotante en la biblioteca
+
+Se reemplaza la barra inferior de ancho completo por una **pildora flotante**, portando el patron de asmodeloscentral con la paleta de Bookshelf.
+
+### Cambiado
+- **La barra inferior ahora es una pildora**: separada 16px de los tres bordes, 60px de alto, radio completo, fondo `--surface` al 78% con `backdrop-filter: blur(20px) saturate(1.4)`. Al ser translucida y flotante, el contenido se ve y scrollea por detras.
+- **Solo iconos, sin etiquetas** (23px). Cual seccion esta activa lo marca un **resaltado deslizante** que se mueve con una transicion de .28s, en vez del cambio de color del texto. Reemplaza al subrayado porque una pildora flotante no tiene un "pie" recto donde apoyarlo.
+- Los 16px inferiores se miden contra el borde **fisico** de la pantalla, **no** contra `env(safe-area-inset-bottom)`. Apoyar la pildora entera por encima del indicador de inicio deja ~34px de aire muerto y se siente mas alta de lo que corresponde. Las barras de ancho completo (la anterior) si meten su fondo en esa zona; una pildora flotante no. No volver a sumar la safe area ahi.
+- **La biblioteca pasa a scrollear el documento** en mobile, como ya hacia el lector desde v1.5.6. No es cosmetico: la pildora es `position: fixed`, y en una PWA standalone de iOS el viewport es ~50px mas corto que la pantalla fisica, asi que con un contenedor de scroll interno la pildora habria quedado flotando a ~66px del borde real en vez de a 16px. La topbar pasa a `position: sticky` para seguir quedando arriba.
+- El colchon inferior del contenido pasa a derivar de las variables (`--nav-space`) en vez de repetir el numero a mano.
+
+### Notas
+- `VERSION` del service worker: `v9` → `v10`.
+- Medido con navegador real contra la referencia: margenes 16/16/16, alto 60px, radio 999px, `blur(20px) saturate(1.4)`, 5 slots sin etiquetas, iconos de 23px. El resaltado se desliza al cambiar de seccion y vuelve a su lugar. Con contenido forzado a 2000px el documento scrollea y la pildora se mantiene clavada a 16px del borde. Desktop sin cambios (sidebar visible, pildora oculta, sin scroll de documento) y el lector sin regresiones.
+- Lo que solo se calibra en un telefono real: `env(safe-area-inset-*)` vale 0 en el navegador de escritorio.
+
 ## v1.5.7 — El lector abre a pantalla completa en mobile, sin perder el punto de lectura
 
 ### Corregido

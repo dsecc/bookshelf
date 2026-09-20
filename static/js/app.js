@@ -756,6 +756,32 @@ function registerSW() {
 function initBottomNav() {
   const isMobile = () => window.innerWidth <= 640;
 
+  // ── Resaltado deslizante ────────────────────────────────────────────────
+  // Se posiciona leyendo cual .bn-item tiene .active, en vez de que cada lugar
+  // que cambia de seccion tenga que acordarse de moverlo tambien: la clase se
+  // pone y se saca desde media docena de sitios distintos. Un MutationObserver
+  // sobre la barra los cubre a todos, incluidos los que aun no existen.
+  function syncNavIndicator() {
+    const ind = document.getElementById("bnIndicator");
+    if (!ind) return;
+    const items = [...document.querySelectorAll(".bn-item")];
+    const i = items.findIndex(b => b.classList.contains("active"));
+    // Sin seccion activa (p. ej. al abrir una coleccion suelta) el resaltado se
+    // esconde en vez de quedar apuntando a cualquier lado.
+    ind.style.opacity = i < 0 ? "0" : "1";
+    if (i < 0 || !items.length) return;
+    ind.style.left = "calc(" + (i / items.length) * 100 + "% + 6px)";
+    ind.style.width = "calc(" + 100 / items.length + "% - 12px)";
+  }
+
+  const nav = document.getElementById("bottomNav");
+  if (nav) {
+    new MutationObserver(syncNavIndicator)
+      .observe(nav, { attributes: true, attributeFilter: ["class"], subtree: true });
+    syncNavIndicator();
+    window.addEventListener("resize", syncNavIndicator);
+  }
+
   function setActive(id) {
     document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
     const el = document.getElementById(id);

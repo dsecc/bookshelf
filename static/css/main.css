@@ -461,9 +461,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 @media (max-width: 640px) {
 
   /* ── Layout ── */
-  .layout { flex-direction: column; height: 100dvh; }
-  .main-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  /* Scrollea el DOCUMENTO, no un contenedor interno. En una PWA standalone de
+     iOS el viewport es mas corto que la pantalla fisica y el pintado de un
+     contenedor con overflow propio queda recortado a ese viewport: la pildora
+     flotante, que es fixed, quedaria ~50px mas arriba del borde real. El
+     scroller raiz no tiene esa limitacion. Mismo cambio que ya se hizo en el
+     lector (ver .doc-scroll en reader.css). */
+  html, body { height: auto; min-height: 100%; overflow: visible; }
+  .layout { flex-direction: column; height: auto; min-height: 100dvh; }
+  .main-area { flex: 1; overflow: visible; display: flex; flex-direction: column; }
   .sidebar { display: none !important; } /* reemplazado por bottom nav */
+
+  /* La topbar se queda arriba mientras scrollea el documento. */
+  .topbar { position: sticky; top: 0; z-index: 100; }
 
   /* ── Topbar ── */
   /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar
@@ -475,9 +485,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
   /* ── Content ── */
   .content {
-    flex: 1; overflow-y: auto; overflow-x: hidden;
+    flex: 1 0 auto; overflow: visible;
     padding: .85rem .75rem;
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + .85rem); /* espacio para bottom nav */
+    padding-bottom: calc(var(--nav-space) + .85rem); /* despeja la pildora flotante */
   }
 
   /* ── Libros: grilla mas compacta ── */
@@ -527,43 +537,72 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 }
 
-/* Bottom nav — solo mobile */
-.bottom-nav {
-  display: none;
+/* ── Bottom nav: pildora flotante (solo mobile) ────────────────────────────
+   Portada del patron de asmodeloscentral: una pildora angosta separada de los
+   tres bordes, no una franja edge-to-edge. Al ser fixed y translucida, el
+   contenido sigue viendose y scrolleando por detras.
+
+   --nav-bar-bottom es distancia al borde FISICO de la pantalla, no al
+   safe-area. Apoyar la pildora entera por encima del indicador de inicio deja
+   ~34px de aire muerto y se siente mas alta de lo que corresponde: las barras
+   de ancho completo (la anterior, o la de WhatsApp) si meten su fondo en esa
+   zona, pero una pildora flotante no. NO sumarle env(safe-area-inset-bottom).
+
+   Ojo: esto solo se calibra en un telefono real. En el navegador de escritorio
+   env(safe-area-inset-*) vale 0 y el caso no se reproduce. */
+:root {
+  --nav-bar-height: 60px;
+  --nav-bar-bottom: 16px;
+  --nav-bar-side: 16px;
+  /* Colchon para que el final del contenido pueda despejar la pildora. */
+  --nav-space: calc(var(--nav-bar-height) + var(--nav-bar-bottom) + 12px);
+  --nav-active-bg: rgba(255,255,255,.07);
+  --nav-ease: cubic-bezier(.4,0,.2,1);
 }
+
+.bottom-nav { display: none; }
 
 @media (max-width: 640px) {
   .bottom-nav {
     display: flex;
-    position: fixed; bottom: 0; left: 0; right: 0;
-    /* 64px es el alto util (iconos + label). La safe area del home
-       indicator se SUMA: con box-sizing:border-box, si la metieramos
-       dentro de los 64px el contenido se quedaria sin lugar y quedaria
-       pegado arriba en vez de centrado. */
-    height: calc(64px + env(safe-area-inset-bottom, 0px));
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    z-index: 150;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    position: fixed; z-index: 150;
+    left: var(--nav-bar-side); right: var(--nav-bar-side);
+    bottom: var(--nav-bar-bottom);
+    height: var(--nav-bar-height);
+    border-radius: 999px;
     align-items: stretch;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
   }
+
+  /* Resaltado deslizante detras del item activo. Reemplaza al subrayado: una
+     pildora flotante no tiene "pie" recto donde apoyarlo. Lo posiciona
+     syncNavIndicator() en app.js segun cual item tenga .active. */
+  .bn-indicator {
+    position: absolute; top: 6px; bottom: 6px;
+    width: calc(100% / 5 - 12px);
+    left: 6px;
+    border-radius: 999px;
+    background: var(--nav-active-bg);
+    pointer-events: none;
+    transition: left .28s var(--nav-ease);
+  }
+
   .bn-item {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: .2rem; cursor: pointer;
-    color: var(--text-muted); font-size: .62rem; font-weight: 500;
-    transition: color .15s, background .15s;
-    border: none; background: none;
+    position: relative; flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: none; background: none;
+    color: var(--text-dim);
+    transition: color .15s;
     -webkit-tap-highlight-color: transparent;
   }
-  .bn-item:active { background: var(--surface2); }
-  .bn-item.active { color: var(--accent); }
-  .bn-item svg { transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
-  .bn-item.active svg { transform: scale(1.15); }
-
-  /* Boton subir */
+  .bn-item.active { color: var(--text); }
+  /* Subir mantiene el acento: es la accion principal, no una seccion mas. */
   .bn-item#bnUploadMobile { color: var(--accent); }
-  .bn-item#bnUploadMobile svg { stroke: var(--accent); }
 }
 
 @keyframes slideUpSheet {
