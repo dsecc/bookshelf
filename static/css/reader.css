@@ -284,17 +284,48 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
     pointer-events: none;
   }
   .reader-topbar-inner { display: none; }
+  /* La busqueda sale de DETRAS de la pildora, no de una barra arriba: mismo
+     ancho, mismo lenguaje, y un z-index menor para que se vea asomar. Cuando
+     el teclado aparece, --kb-offset la sube junto con la barra (lo mide
+     reader.js con visualViewport). */
   .search-bar-reader {
     pointer-events: auto;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    position: fixed; z-index: 140;
+    left: var(--nav-bar-side); right: var(--nav-bar-side);
+    bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px));
+    margin: 0;
+    display: flex; align-items: center; gap: .4rem;
+    height: 48px;
+    padding: 0 .4rem 0 1rem;
+    background: color-mix(in srgb, var(--surface2) 96%, transparent);
     border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 999px;
-    margin: .5rem var(--nav-bar-side);
-    padding: .3rem .4rem .3rem .9rem;
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
     backdrop-filter: blur(20px) saturate(1.4);
     box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    /* Arranca escondida justo detras de la barra; al abrirse sube su propio
+       alto mas un respiro. */
+    transform: translateY(0);
+    opacity: 0;
+    /* Siempre montada: si pasara de display:none a visible en el mismo frame,
+       la primera apertura no animaria. Invisible y sin capturar toques. */
+    pointer-events: none;
+    transition: transform .32s var(--nav-ease), opacity .2s var(--nav-ease);
   }
+  .search-bar-reader.open { pointer-events: auto; }
+  .search-bar-reader.open {
+    transform: translateY(calc(-1 * (var(--nav-bar-height) + 8px)));
+    opacity: 1;
+  }
+  .search-bar-reader input {
+    flex: 1; min-width: 0;
+    background: none; border: none; outline: none;
+    color: var(--text); font-size: .9rem; font-family: inherit;
+  }
+
+  /* La barra sube con el teclado para no quedar tapada. */
+  .bottom-nav { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
+  .nav-sheet  { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
 
   /* El final del contenido tiene que poder despejar la pildora: se superpone
      a proposito (se ve pasar por detras), pero sin esto los ultimos ~88px

@@ -33,7 +33,12 @@ const RN_ICO = {
   "list": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><line x1=\"8\" y1=\"6\" x2=\"21\" y2=\"6\"/><line x1=\"8\" y1=\"12\" x2=\"21\" y2=\"12\"/><line x1=\"8\" y1=\"18\" x2=\"21\" y2=\"18\"/><line x1=\"3\" y1=\"6\" x2=\"3.01\" y2=\"6\"/><line x1=\"3\" y1=\"12\" x2=\"3.01\" y2=\"12\"/><line x1=\"3\" y1=\"18\" x2=\"3.01\" y2=\"18\"/></svg>",
   "lupa": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/><path d=\"M11 8v6M8 11h6\"/></svg>",
   "down": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>",
-  "share": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"/><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"/></svg>"
+  "share": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"/><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"/></svg>",
+  "wa": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884\"/></svg>",
+  "send": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><line x1=\"19\" y1=\"8\" x2=\"19\" y2=\"14\"/><line x1=\"16\" y1=\"11\" x2=\"22\" y2=\"11\"/></svg>",
+  "off": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/><line x1=\"3\" y1=\"21\" x2=\"21\" y2=\"21\"/></svg>",
+  "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><polyline points=\"3 6 5 6 21 6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/></svg>",
+  "tag": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z\"/><line x1=\"7\" y1=\"7\" x2=\"7.01\" y2=\"7\"/></svg>"
 };
 
 function _rnClick(id) {
@@ -41,83 +46,159 @@ function _rnClick(id) {
   if (el) el.click();
 }
 
-// "Mas": herramientas de lectura que no entraron en los tres accesos directos.
-function openReaderMoreSheet() {
+// Panel unico del lector. Todo lo que se puede hacer con el libro abierto
+// entra aca: primero las herramientas, que son todas del mismo tipo y por eso
+// se ven iguales (una fila con icono y etiqueta, no botones de estilos
+// distintos), y despues los campos del libro, restilados como pildoras para
+// que el panel se lea como una sola pieza.
+//
+// Las herramientas NO reimplementan nada: hacen click() sobre los botones
+// originales, que siguen en el DOM con sus handlers. Los campos, en cambio, se
+// mueven adentro y se devuelven al cerrar, porque hay que poder escribirlos.
+function openReaderSheet() {
+  const panelBody = document.querySelector("#infoPanel .panel-body");
+  const rename = panelBody.querySelector(".panel-rename");
+  const modos  = document.getElementById("viewModeSelector");
+  const colSel = document.getElementById("infoCollection");
+  const colBtn = document.getElementById("btnMoveCollection");
+  const movidos = [rename, modos, colSel, colBtn].filter(Boolean);
+  const devolver = movidos.map(el => [el, el.parentNode, el.nextSibling]);
+
+  const delegar = fn => () => { closeNavSheet(); setTimeout(fn, NAV_SHEET_CLOSE_MS); };
+
   openNavSheet(body => {
     const head = document.createElement("div");
     head.className = "nav-sheet-title";
-    head.innerHTML = "<span>Herramientas</span>";
+    head.innerHTML = "<span>" + ((currentBook && currentBook.title) || "Libro") + "</span>";
     body.appendChild(head);
 
-    const filas = [
-      ["Subrayar", RN_ICO.hl, () => _rnClick("btnHighlight"), highlightMode],
-      ["Ver bookmarks", RN_ICO.list, () => _rnClick("btnBookmarkList")],
-      ["Descargar", RN_ICO.down, () => _rnClick("btnDownloadReader")],
-      ["Compartir", RN_ICO.share, () => _rnClick("btnShareReader")],
+    const seccion = txt => {
+      const d = document.createElement("div");
+      d.className = "nav-sheet-section"; d.textContent = txt;
+      body.appendChild(d);
+    };
+    const sep = () => body.appendChild(
+      Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+
+    seccion("Herramientas");
+    const herramientas = [
+      ["Subrayar", RN_ICO.hl, "btnHighlight", highlightMode],
+      ["Ver bookmarks", RN_ICO.list, "btnBookmarkList"],
+      ["Descargar", RN_ICO.down, "btnDownloadReader"],
+      ["Compartir", RN_ICO.share, "btnShareReader"],
+      ["Compartir por WhatsApp", RN_ICO.wa, "btnWhatsappPanel"],
+      ["Enviar a otro usuario", RN_ICO.send, "btnSendToUser"],
     ];
-    // La lupa solo existe en modo Doble: se muestra si su boton esta visible.
+    // La lupa solo existe en modo Doble.
     const lupa = document.getElementById("btnMagnifier");
     if (lupa && lupa.style.display !== "none") {
-      filas.splice(1, 0, ["Lupa", RN_ICO.lupa, () => _rnClick("btnMagnifier")]);
+      herramientas.splice(1, 0, ["Lupa", RN_ICO.lupa, "btnMagnifier"]);
     }
-
-    filas.forEach(([label, icon, fn, active]) => {
+    herramientas.forEach(([label, icon, id, active]) => {
       body.appendChild(navSheetRow({
-        label, icon, active: !!active,
-        onClick: () => { closeNavSheet(); setTimeout(fn, NAV_SHEET_CLOSE_MS); },
+        label, icon, active: !!active, onClick: delegar(() => _rnClick(id)),
       }));
     });
-  });
-}
 
-// "Libro": lo que vive en el panel de info. Se mueven sus nodos adentro y se
-// devuelven al cerrar, igual que hace la biblioteca con el form de subir: asi
-// renombrar, modo de visualizacion, coleccion, enviar, guardar sin conexion y
-// borrar siguen funcionando con sus handlers tal cual.
-function openReaderBookSheet() {
-  const panel = document.getElementById("infoPanel");
-  const cuerpo = panel.querySelector(".panel-body");
-  const movidos = [...cuerpo.children];
+    // Guardar sin conexion es una herramienta mas, pero con estado: la etiqueta
+    // del boton original ya dice si el libro esta guardado.
+    const offLabel = document.getElementById("btnOfflineLabel");
+    const guardado = offLabel && offLabel.textContent.trim().toLowerCase().startsWith("disponible");
+    const filaOff = navSheetRow({
+      label: "Guardar sin conexion", icon: RN_ICO.off,
+      detail: guardado ? "Guardado" : null,
+      active: !!guardado,
+      onClick: delegar(() => _rnClick("btnOffline")),
+    });
+    const est = filaOff.querySelector(".row-count");
+    if (est) est.className = "row-state";
+    body.appendChild(filaOff);
 
-  openNavSheet(body => {
-    const head = document.createElement("div");
-    head.className = "nav-sheet-title";
-    head.innerHTML = "<span>" + (currentBook && currentBook.title ? currentBook.title : "Libro") + "</span>";
-    body.appendChild(head);
-    const cont = document.createElement("div");
-    cont.className = "nav-sheet-panel";
-    movidos.forEach(el => cont.appendChild(el));
-    body.appendChild(cont);
+    sep();
+    seccion("Libro");
+    if (rename) {
+      rename.className = "nav-sheet-field";
+      body.appendChild(rename);
+    }
+    if (modos) {
+      modos.className = "nav-sheet-seg";
+      body.appendChild(modos);
+    }
+    if (colSel) {
+      const campo = document.createElement("div");
+      campo.className = "nav-sheet-field";
+      campo.appendChild(colSel);
+      if (colBtn) {
+        colBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+        colBtn.removeAttribute("style");
+        campo.appendChild(colBtn);
+      }
+      body.appendChild(campo);
+    }
+
+    sep();
+    body.appendChild(navSheetRow({
+      label: "Eliminar libro", icon: RN_ICO.trash,
+      onClick: delegar(() => _rnClick("btnDeleteReader")),
+    }));
+    body.lastChild.classList.add("danger");
   }, () => {
-    movidos.forEach(el => cuerpo.appendChild(el));
+    // Devolver cada nodo a su lugar exacto, con las clases originales.
+    if (rename) rename.className = "panel-rename";
+    if (modos)  modos.className  = "view-mode-selector";
+    devolver.forEach(([el, padre, siguiente]) => padre.insertBefore(el, siguiente));
   });
 }
 
-// Doble tap: esconde la pildora para leer sin nada encima, y la trae de vuelta.
-// Misma animacion de salida que usa la referencia para su barra: se va hacia
-// abajo por su propio alto mas la separacion, con la opacidad acompanando.
-let _rnHidden = false;
-function _toggleReaderNav() {
-  const nav = document.getElementById("readerNav");
-  if (!nav) return;
-  closeNavSheet();
-  _rnHidden = !_rnHidden;
-  nav.style.transition = "transform .32s cubic-bezier(.4,0,.2,1), opacity .24s cubic-bezier(.4,0,.2,1)";
-  nav.style.transform = _rnHidden
-    ? "translateY(calc(100% + var(--nav-bar-bottom) + 16px))"
-    : "translateY(0)";
-  nav.style.opacity = _rnHidden ? "0" : "1";
-  nav.style.pointerEvents = _rnHidden ? "none" : "auto";
+// ── Barra de busqueda ────────────────────────────────────────────────────────
+// En mobile sale de DETRAS de la pildora (una clase mueve su transform), no de
+// una barra arriba de la pantalla. En desktop sigue siendo display, que es lo
+// que espera su layout dentro de la topbar.
+function toggleSearchBar(forzar) {
+  const bar = document.getElementById("searchBarReader");
+  if (!bar) return;
+  const movil = window.innerWidth <= 640;
+  // El display:none inline del HTML impediria animar la primera apertura.
+  if (movil && bar.style.display === "none") bar.style.display = "";
+  const abierta = movil ? bar.classList.contains("open") : bar.style.display !== "none";
+  const abrir = forzar === undefined ? !abierta : forzar;
+
+  if (movil) {
+    bar.style.display = "";
+    bar.classList.toggle("open", abrir);
+  } else {
+    bar.style.display = abrir ? "" : "none";
+  }
+  if (abrir) document.getElementById("searchTextInput").focus();
+  else       document.getElementById("searchTextInput").blur();
+}
+
+// ── El teclado no puede tapar la barra ───────────────────────────────────────
+// visualViewport se encoge cuando aparece el teclado; la diferencia contra
+// innerHeight es cuanto ocupa. Se publica como --kb-offset y la pildora, el
+// panel y la busqueda lo suman a su separacion del borde.
+function initKeyboardOffset() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const sync = () => {
+    const tapado = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    // Umbral: cambios chicos son la barra de direcciones, no el teclado.
+    document.documentElement.style.setProperty("--kb-offset", (tapado > 120 ? tapado : 0) + "px");
+  };
+  vv.addEventListener("resize", sync);
+  vv.addEventListener("scroll", sync);
+  sync();
 }
 
 function initReaderNav() {
   const nav = document.getElementById("readerNav");
   if (!nav) return;
+  const bar = document.getElementById("searchBarReader");
+  if (bar && window.innerWidth <= 640) bar.style.display = "";
   document.getElementById("rnBack").onclick     = () => { window.location.href = "/"; };
-  document.getElementById("rnSearch").onclick   = () => { closeNavSheet(); _rnClick("btnSearch"); };
+  document.getElementById("rnSearch").onclick   = () => { closeNavSheet(); toggleSearchBar(); };
   document.getElementById("rnBookmark").onclick = () => { closeNavSheet(); _rnClick("btnBookmark"); };
-  document.getElementById("rnMore").onclick     = () => openReaderMoreSheet();
-  document.getElementById("rnBook").onclick     = () => openReaderBookSheet();
+  document.getElementById("rnMore").onclick     = () => openReaderSheet();
 }
 
 async function init() {
@@ -163,6 +244,7 @@ async function init() {
   // ni el boton de volver funciona.
   bindAll();
   initReaderNav();
+  initKeyboardOffset();
   loadBookmarks();
   initTopbarBehavior();
   initPinchZoom();
@@ -864,12 +946,8 @@ function bindAll() {
   };
 
   // Search
-  document.getElementById("btnSearch").onclick = () => {
-    const bar = document.getElementById("searchBarReader");
-    bar.style.display = bar.style.display !== "none" ? "none" : "";
-    if (bar.style.display !== "none") document.getElementById("searchTextInput").focus();
-  };
-  document.getElementById("btnSearchClose").onclick     = () => { document.getElementById("searchBarReader").style.display = "none"; };
+  document.getElementById("btnSearch").onclick = () => toggleSearchBar();
+  document.getElementById("btnSearchClose").onclick     = () => toggleSearchBar(false);
   document.getElementById("searchTextInput").onkeydown  = e => { if (e.key === "Enter") searchInPDF(e.target.value); };
   document.getElementById("btnSearchNext").onclick      = () => navigateSearch(1);
   document.getElementById("btnSearchPrev").onclick      = () => navigateSearch(-1);

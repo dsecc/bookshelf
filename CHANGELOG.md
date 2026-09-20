@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.6.3 — Un solo panel en el lector, y la busqueda sale de la barra
+
+### Cambiado
+- **Los dos paneles del lector se unifican en uno.** Se habian separado por miedo a que no entrara todo; entra comodo. La barra queda en cuatro slots: **Volver · Buscar · Bookmark · Mas**.
+- **Todas las herramientas se ven igual.** Guardar sin conexion, Enviar a otro usuario y Compartir por WhatsApp eran botones con estilos propios dentro del drawer, cuando son herramientas del mismo tipo que Subrayar o Descargar. Ahora son filas identicas: icono, etiqueta, y estado a la derecha cuando corresponde (Guardar sin conexion muestra "Guardado").
+- **Los campos del libro pasan a la estetica del panel.** El input de titulo, el select de coleccion, el selector de modo y los botones de confirmar dejan de ser rectangulos: son pildoras con el mismo radio y los mismos bordes que las filas, para que el panel se lea como una sola pieza y no como un formulario pegado abajo de una lista. El panel queda dividido en **Herramientas** y **Libro**, con un separador.
+- **La busqueda sale de detras de la pildora** en vez de abrirse como una barra arriba de la pantalla: mismo ancho, mismo lenguaje visual, y un `z-index` menor para que se vea asomar desde atras.
+- **La barra sube con el teclado.** `visualViewport` se encoge cuando el teclado aparece; la diferencia contra `innerHeight` se publica como `--kb-offset` y la pildora, el panel y la busqueda la suman a su separacion del borde, asi que el campo nunca queda tapado. Hay un umbral de 120px para no confundir el teclado con la barra de direcciones.
+
+### Notas
+- `VERSION` del service worker: `v12` → `v13`.
+- La barra de busqueda queda **siempre montada** en mobile, invisible y sin capturar toques, en vez de `display:none`. Con display, la primera apertura pasaba de oculta a visible en el mismo frame y la animacion no corria; se verifico capturando la posicion a mitad de la transicion (780 → 744 → 712).
+- Verificado con navegador real: las ocho herramientas como filas, los cuatro controles con radio 999px, las dos secciones, escribir en el titulo y el modo activo marcado, los nodos volviendo a su lugar exacto al cerrar, la busqueda animando y subiendo con `--kb-offset` junto a la barra. Desktop intacto (pildora oculta, topbar con iconos, busqueda como antes, drawer con todo su contenido) y el modo sin conexion sin regresiones.
+
 ## v1.6.2 — La navbar tambien en el lector
 
 ### Cambiado
