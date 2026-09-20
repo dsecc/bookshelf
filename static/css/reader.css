@@ -269,6 +269,39 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
   #btnFullscreen { display: none; }
 }
 
+/* ── La navbar reemplaza a la topbar en mobile ─────────────────────────────
+   La fila de iconos de la topbar se va: sus herramientas viven ahora en la
+   pildora de abajo y en sus dos paneles. La topbar en si NO se oculta del
+   todo porque la barra de busqueda cuelga de ella en el DOM (moverla romperia
+   el layout de desktop); queda como contenedor transparente, sin fondo ni
+   alto, visible solo cuando la busqueda esta abierta. */
+@media (max-width: 640px) {
+  .reader-topbar {
+    background: none;
+    border-bottom: none;
+    height: auto;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .reader-topbar-inner { display: none; }
+  .search-bar-reader {
+    pointer-events: auto;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+    border-radius: 999px;
+    margin: .5rem var(--nav-bar-side);
+    padding: .3rem .4rem .3rem .9rem;
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+
+  /* El final del contenido tiene que poder despejar la pildora: se superpone
+     a proposito (se ve pasar por detras), pero sin esto los ultimos ~88px
+     quedan atrapados abajo, imposibles de scrollear. */
+  html.doc-scroll #pdfScrollWrap { padding-bottom: var(--nav-space); }
+}
+
 /* ── Scroll del documento en mobile (modo scroll de PDF) ───────────────────
    iOS recorta el pintado de un contenedor con overflow propio al viewport,
    que en una PWA standalone es mas corto que la pantalla fisica: quedaba una

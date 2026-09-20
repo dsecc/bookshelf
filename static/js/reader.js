@@ -23,6 +23,103 @@ let searchMatches = [], searchIdx = 0;
 let isFullscreen = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+
+// ── Navbar del lector (mobile) ───────────────────────────────────────────────
+// La pildora reemplaza a la topbar. Los botones no reimplementan nada: hacen
+// click() sobre los de la topbar, que siguen en el DOM con sus handlers ya
+// enganchados. Asi no hay dos copias de la logica que se puedan desincronizar.
+const RN_ICO = {
+  "hl": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z\"/></svg>",
+  "list": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><line x1=\"8\" y1=\"6\" x2=\"21\" y2=\"6\"/><line x1=\"8\" y1=\"12\" x2=\"21\" y2=\"12\"/><line x1=\"8\" y1=\"18\" x2=\"21\" y2=\"18\"/><line x1=\"3\" y1=\"6\" x2=\"3.01\" y2=\"6\"/><line x1=\"3\" y1=\"12\" x2=\"3.01\" y2=\"12\"/><line x1=\"3\" y1=\"18\" x2=\"3.01\" y2=\"18\"/></svg>",
+  "lupa": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/><path d=\"M11 8v6M8 11h6\"/></svg>",
+  "down": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>",
+  "share": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"/><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"/></svg>"
+};
+
+function _rnClick(id) {
+  const el = document.getElementById(id);
+  if (el) el.click();
+}
+
+// "Mas": herramientas de lectura que no entraron en los tres accesos directos.
+function openReaderMoreSheet() {
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Herramientas</span>";
+    body.appendChild(head);
+
+    const filas = [
+      ["Subrayar", RN_ICO.hl, () => _rnClick("btnHighlight"), highlightMode],
+      ["Ver bookmarks", RN_ICO.list, () => _rnClick("btnBookmarkList")],
+      ["Descargar", RN_ICO.down, () => _rnClick("btnDownloadReader")],
+      ["Compartir", RN_ICO.share, () => _rnClick("btnShareReader")],
+    ];
+    // La lupa solo existe en modo Doble: se muestra si su boton esta visible.
+    const lupa = document.getElementById("btnMagnifier");
+    if (lupa && lupa.style.display !== "none") {
+      filas.splice(1, 0, ["Lupa", RN_ICO.lupa, () => _rnClick("btnMagnifier")]);
+    }
+
+    filas.forEach(([label, icon, fn, active]) => {
+      body.appendChild(navSheetRow({
+        label, icon, active: !!active,
+        onClick: () => { closeNavSheet(); setTimeout(fn, NAV_SHEET_CLOSE_MS); },
+      }));
+    });
+  });
+}
+
+// "Libro": lo que vive en el panel de info. Se mueven sus nodos adentro y se
+// devuelven al cerrar, igual que hace la biblioteca con el form de subir: asi
+// renombrar, modo de visualizacion, coleccion, enviar, guardar sin conexion y
+// borrar siguen funcionando con sus handlers tal cual.
+function openReaderBookSheet() {
+  const panel = document.getElementById("infoPanel");
+  const cuerpo = panel.querySelector(".panel-body");
+  const movidos = [...cuerpo.children];
+
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>" + (currentBook && currentBook.title ? currentBook.title : "Libro") + "</span>";
+    body.appendChild(head);
+    const cont = document.createElement("div");
+    cont.className = "nav-sheet-panel";
+    movidos.forEach(el => cont.appendChild(el));
+    body.appendChild(cont);
+  }, () => {
+    movidos.forEach(el => cuerpo.appendChild(el));
+  });
+}
+
+// Doble tap: esconde la pildora para leer sin nada encima, y la trae de vuelta.
+// Misma animacion de salida que usa la referencia para su barra: se va hacia
+// abajo por su propio alto mas la separacion, con la opacidad acompanando.
+let _rnHidden = false;
+function _toggleReaderNav() {
+  const nav = document.getElementById("readerNav");
+  if (!nav) return;
+  closeNavSheet();
+  _rnHidden = !_rnHidden;
+  nav.style.transition = "transform .32s cubic-bezier(.4,0,.2,1), opacity .24s cubic-bezier(.4,0,.2,1)";
+  nav.style.transform = _rnHidden
+    ? "translateY(calc(100% + var(--nav-bar-bottom) + 16px))"
+    : "translateY(0)";
+  nav.style.opacity = _rnHidden ? "0" : "1";
+  nav.style.pointerEvents = _rnHidden ? "none" : "auto";
+}
+
+function initReaderNav() {
+  const nav = document.getElementById("readerNav");
+  if (!nav) return;
+  document.getElementById("rnBack").onclick     = () => { window.location.href = "/"; };
+  document.getElementById("rnSearch").onclick   = () => { closeNavSheet(); _rnClick("btnSearch"); };
+  document.getElementById("rnBookmark").onclick = () => { closeNavSheet(); _rnClick("btnBookmark"); };
+  document.getElementById("rnMore").onclick     = () => openReaderMoreSheet();
+  document.getElementById("rnBook").onclick     = () => openReaderBookSheet();
+}
+
 async function init() {
   try {
     const [bookRes, colRes] = await Promise.all([
@@ -65,6 +162,7 @@ async function init() {
   // Siempre se enganchan los handlers, aunque el libro no haya cargado: si no,
   // ni el boton de volver funciona.
   bindAll();
+  initReaderNav();
   loadBookmarks();
   initTopbarBehavior();
   initPinchZoom();
@@ -1080,7 +1178,7 @@ document.addEventListener("touchend", function(e) {
   if (e.target.closest(".side-panel, .modal-overlay, #readerTopbar")) return;
   const now = Date.now();
   if (now - _lastTap < 300) {
-    _toggleTopbar();
+    _toggleReaderNav();
     _lastTap = 0;
   } else {
     _lastTap = now;

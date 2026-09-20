@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.6.2 — La navbar tambien en el lector
+
+### Cambiado
+- **En mobile la pildora reemplaza a la topbar del lector**, con las mismas medidas y el mismo comportamiento que en la biblioteca. Cinco slots: **Volver · Buscar · Bookmark · Mas · Libro**. Los tres primeros son acceso directo por ser lo mas usado mientras se lee; el resto vive en los dos paneles que crecen desde la barra.
+- **"Mas"** trae las herramientas de lectura: Subrayar, Ver bookmarks, Descargar y Compartir. La **Lupa** aparece solo cuando corresponde (modo Doble), igual que antes.
+- **"Libro"** trae lo que vivia en el drawer de info: renombrar, modo de visualizacion, coleccion, enviar a otro usuario, guardar sin conexion y borrar. En mobile el drawer lateral ya no se usa.
+- **El doble tap ahora esconde la pildora** en vez de la topbar (que en mobile ya no se ve), con la misma animacion de salida de la referencia: se va hacia abajo por su propio alto mas la separacion. Otro doble tap la trae de vuelta.
+
+### Notas de implementacion
+- La pildora y el panel desplegable pasan a `static/css/nav.css` y `static/js/nav.js`, compartidos por las dos pantallas. Antes vivian en los archivos de la biblioteca, que el lector no carga; duplicarlos habria dejado las medidas en dos lugares distintos.
+- **Los botones de la navbar no reimplementan nada**: hacen `click()` sobre los de la topbar, que siguen en el DOM con sus handlers ya enganchados. No hay dos copias de la logica que se puedan desincronizar.
+- **"Libro" mueve los nodos del panel de info adentro** y los devuelve al cerrar, igual que hace la biblioteca con el formulario de subir. Renombrar, cambiar de coleccion, enviar y guardar sin conexion siguen funcionando con sus handlers tal cual.
+- La topbar **no se oculta del todo** en mobile: la barra de busqueda cuelga de ella en el DOM y moverla habria roto el layout de desktop. Queda como contenedor transparente, sin fondo ni alto, visible solo cuando la busqueda esta abierta — y la barra de busqueda se restilo como pildora para que acompane.
+
+### Notas
+- `VERSION` del service worker: `v11` → `v12`. `nav.css` y `nav.js` se agregaron al app shell.
+- Verificado con navegador real: la pildora mide 16/16/16/60 igual que en la biblioteca, con 5 slots y la fila de iconos de la topbar oculta; los dos paneles salen de la posicion exacta de la barra; "Libro" trae el contenido del drawer y lo devuelve al cerrar; el doble tap la esconde. Desktop intacto (pildora oculta, topbar con sus iconos, drawer lateral funcionando) y el modo sin conexion sin regresiones.
+
 ## v1.6.1 — Colecciones y Subir crecen desde la pildora
 
 ### Cambiado

@@ -13,15 +13,17 @@
 // cache-first, asi que sin cambiar el nombre del cache los dispositivos que ya
 // visitaron la app seguirian con los archivos viejos para siempre. Ademas el
 // navegador solo detecta un service worker nuevo si el archivo cambio.
-const VERSION = "v11";
+const VERSION = "v12";
 const SHELL_CACHE = "bookshelf-shell-" + VERSION;
 const DATA_CACHE  = "bookshelf-data-" + VERSION;
 const BOOKS_CACHE = "bookshelf-books-v1"; // sin VERSION: los libros guardados
                                           // por el usuario sobreviven updates
 
 const SHELL_ASSETS = [
+  "/static/css/nav.css",
   "/static/css/main.css",
   "/static/css/reader.css",
+  "/static/js/nav.js",
   "/static/js/app.js",
   "/static/js/reader.js",
   "/static/js/pdf.worker.min.js",

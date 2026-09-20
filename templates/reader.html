@@ -6,6 +6,7 @@
      estado) y el contenido nunca puede llegar al borde de la pantalla. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lector</title>
+<link rel="stylesheet" href="/static/css/nav.css?v={{ static_ver }}">
 <link rel="stylesheet" href="/static/css/reader.css?v={{ static_ver }}">
 <link rel="manifest" href="/static/manifest.json">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -268,6 +269,29 @@
 
 <div id="magnifierLens"><canvas id="magnifierCanvas"></canvas></div>
 <div id="magnifierCursor"></div>
+<!-- Bottom nav mobile del lector: la misma pildora que la biblioteca, con las
+     herramientas de lectura. Reemplaza a la topbar en mobile (ver reader.css).
+     Volver / Buscar / Bookmark son acceso directo por ser lo mas usado
+     mientras se lee; el resto vive en los dos paneles desplegables. -->
+<nav class="bottom-nav" id="readerNav">
+  <span class="bn-indicator" id="rnIndicator" style="opacity:0"></span>
+  <button class="bn-item" id="rnBack" aria-label="Volver" title="Volver">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>
+  </button>
+  <button class="bn-item" id="rnSearch" aria-label="Buscar" title="Buscar">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+  </button>
+  <button class="bn-item" id="rnBookmark" aria-label="Bookmark" title="Bookmark">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+  </button>
+  <button class="bn-item" id="rnMore" aria-label="Mas herramientas" title="Mas">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <button class="bn-item" id="rnBook" aria-label="Libro" title="Libro">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+  </button>
+</nav>
+
 <div id="toast" class="toast"></div>
 <!-- Librerias servidas localmente: el lector tiene que funcionar sin internet
      (modo offline) y en un servidor privado sin salida a la red. -->
@@ -275,6 +299,7 @@
 <script src="/static/js/vendor/jszip.min.js?v={{ static_ver }}"></script>
 <script src="/static/js/vendor/page-flip.browser.js?v={{ static_ver }}"></script>
 <script src="/static/js/vendor/epub.min.js?v={{ static_ver }}"></script>
+<script src="/static/js/nav.js?v={{ static_ver }}"></script>
 <script src="/static/js/reader.js?v={{ static_ver }}"></script>
 </body>
 </html>
