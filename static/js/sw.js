@@ -13,7 +13,7 @@
 // cache-first, asi que sin cambiar el nombre del cache los dispositivos que ya
 // visitaron la app seguirian con los archivos viejos para siempre. Ademas el
 // navegador solo detecta un service worker nuevo si el archivo cambio.
-const VERSION = "v20";
+const VERSION = "v21";
 const SHELL_CACHE = "bookshelf-shell-" + VERSION;
 const DATA_CACHE  = "bookshelf-data-" + VERSION;
 const BOOKS_CACHE = "bookshelf-books-v1"; // sin VERSION: los libros guardados
@@ -36,6 +36,9 @@ const SHELL_ASSETS = [
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/apple-touch-icon.png",
+  "/static/icons/icon-maskable-192.png",
+  "/static/icons/icon-maskable-512.png",
+  "/static/icons/logo.svg",
 ];
 
 self.addEventListener("install", e => {

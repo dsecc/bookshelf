@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.9 — Logo propio
+
+La marca deja de ser el icono generico de libro que se repetia por toda la interfaz. Ahora hay un logo propio: un pajaro cuya ala es un libro, con senalador.
+
+### Agregado
+- **`static/icons/logo.svg`**, unica fuente de verdad. Es **monocromo a proposito**: hereda `currentColor`, asi en el titulo sale del mismo color que la palabra y se desvanecen como una sola pieza. Si fuera de color fijo, al apagarse el titulo se veria el color quedandose atras. Los huecos (ojo, paginas, senalador) calan con `fill-rule="evenodd"`, por eso funciona en un solo color sobre cualquier fondo.
+- El logo aparece ahora en **cinco lugares**: el titulo de la biblioteca en mobile, el sidebar de desktop, la pantalla de login, el panel de administracion (que era **la unica pantalla sin marca**) y los iconos de app.
+
+### Corregido
+- **Login y admin no tenian `apple-touch-icon`.** No es cosmetico: el flujo natural para instalar la PWA es entrar al sitio, caer en `/login` y recien ahi agregar a inicio — justo donde iOS no encontraba icono y usaba una captura de la pantalla. Login ademas no linkeaba el manifest, asi que Android tampoco ofrecia instalar desde ahi.
+- **Los iconos declaraban `purpose: "any maskable"` en el mismo archivo.** Android recorta los *maskable* a circulo o squircle y solo garantiza visible el 80% central, asi que estaba recortando un icono sin margen de seguridad. Ahora son cuatro archivos: `icon-192/512` para `any` (el logo al 76% del lienzo) y `icon-maskable-192/512` con el margen del 20%.
+
+### Notas de implementacion
+- El logo llego como PNG y hubo que vectorizarlo, sin potrace ni inkscape en la maquina y con `pip` bloqueado. El trazado se hizo a mano con numpy y scipy: mascara por distancia de color, seguimiento de contornos por Moore-neighbor, promedio movil para matar la escalera de pixeles, Douglas-Peucker, y curvas Catmull-Rom **respetando las esquinas** — el libro y el senalador tienen aristas rectas que no se podian redondear. Resultado: 6.8 KB con **1.28% de diferencia** contra el original.
+- Las primeras versiones salian facetadas porque la deteccion de esquinas a 48° marcaba casi todo el contorno como arista y lo emitia en rectas. Se calibro comparando tres combinaciones de suavizado, tolerancia y umbral de esquina contra el original.
+- El logo va en el violeta de la app (`--accent`, `#7c6ff7`), no en el del archivo original (`#5935a3`), para que concuerde con el resto.
+- `VERSION` del service worker: `v20` → `v21`; `logo.svg` y los maskable se agregaron al app shell.
+
 ## v1.8 — Notificaciones en el panel y cambio de contrasena
 
 ### Agregado
