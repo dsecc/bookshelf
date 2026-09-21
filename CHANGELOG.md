@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.9.1 — Los dos buscadores vuelven a ser el mismo
+
+### Corregido
+- **El buscador del lector se veia distinto al de la biblioteca**, cuando deberian ser la misma barra. La causa: `reader.css` carga **despues** de `nav.css` y conservaba las reglas viejas de `.search-bar-reader` con la **misma especificidad** que `.nav-search`, asi que le ganaban por orden. El lector terminaba con otro padding (perdiendo el calce por detras de la pildora), otro fondo, y la fuente del input en `.85rem`.
+- Ese ultimo detalle era ademas un bug real: **revivia el zoom de iOS al enfocar**, que habiamos corregido en v1.6.4 poniendo 16px. El arreglo estaba, pero una regla vieja lo pisaba solo en el lector.
+- Las reglas viejas quedan acotadas a desktop con `@media (min-width: 641px)`, que es donde el buscador del lector si vive dentro de la topbar.
+
+### Notas
+- `VERSION` del service worker: `v21` → `v22`.
+- Verificado midiendo las dos barras propiedad por propiedad: alto 78, visible 52, margenes 16/16, radio 24px arriba y 0 abajo, mismo fondo, mismo padding y fuente 16px en las dos. La unica diferencia es la que corresponde: el lector suma las flechas y la cruz (tres botones de 38px). Desktop sin cambios.
+
 ## v1.9 — Logo propio
 
 La marca deja de ser el icono generico de libro que se repetia por toda la interfaz. Ahora hay un logo propio: un pajaro cuya ala es un libro, con senalador.
