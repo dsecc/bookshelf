@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.10 — El scroll del lector, robusto
+
+Investigacion completa del scroll en mobile. Eran **cuatro causas distintas**, no una.
+
+### Corregido
+- **Las paginas sin renderizar no reservaban su alto.** Un `<canvas>` recien creado mide 300x150 por defecto, asi que una pagina sin dibujar aportaba 150px en vez de sus ~551px reales: el documento media **la mitad** (10577px con 40 paginas, contra 22242 reales). Cada pagina que se renderizaba crecia ~400px y empujaba todo lo de abajo — de ahi los saltos y la sensacion de scroll cortado. Ahora cada pagina reserva su alto desde el arranque, calculado con la proporcion de la primera, y lo suelta al dibujarse.
+- **El progreso guardaba solo el numero de pagina.** Al reabrir, el lector volvia al **borde superior** de esa pagina, no al punto donde estabas: medido, **184px mas arriba**. Ahora se guarda tambien el desplazamiento dentro de la pagina (el backend no cambia: `progress_data` ya era JSON libre). Ademas se guarda al scrollear, no solo al cambiar de pagina, asi moverse dentro de una pagina larga tambien queda registrado.
+- **Habia una inercia propia peleando contra la del navegador.** Estaba rota —usaba `S`, que vive dentro de `initPDFScroll`, asi que tiraba `"S is not defined"` en **cada gesto**, en silencio— y aunque funcionara, sobra: desde que el lector scrollea el documento (v1.5.6) el navegador ya aplica la suya, y dos motores moviendo la pagina a la vez son exactamente los tirones. Eliminada; los gestos horizontales se mantienen, porque los otros modos no tienen scroll nativo que los resuelva.
+- **El indicador de pagina se equivocaba al saltar lejos** (pedir la 25 mostraba la 26, la 40 mostraba la 39). El `IntersectionObserver` solo entrega las paginas que **cambiaron** de estado, y el codigo elegia la mas visible **entre esas**: la pagina buscada no habia cambiado, asi que ni figuraba. Ahora se lleva el registro completo de visibilidad y se elige entre todas.
+- `goPage` disparaba el render sin esperarlo y calculaba el destino con el layout viejo.
+
+### Notas
+- `VERSION` del service worker: `v22` → `v23`.
+- Verificado con un PDF de 40 paginas: al abrir se renderizan **4 de 40** (antes 11, con el documento a mitad de alto), la altura completa esta reservada de entrada y **no cambia** al renderizar (22242 → 22232), el scroll no se corre solo, reabrir cae dentro de **±10px** del punto exacto en tres posiciones distintas, los saltos a las paginas 1/3/12/25/33/40 clavan todos, y no hay un solo error de JS. Desktop sin cambios.
+- Correccion sobre una medicion propia: al principio reporte que se renderizaban "40 de 40" paginas. Era falso —eran 11— porque contaba canvas con `width > 10` sin saber que un canvas vacio ya mide 300x150. El problema real no era cuantas se renderizaban sino que el documento media la mitad de lo que debia.
+
 ## v1.9.1 — Los dos buscadores vuelven a ser el mismo
 
 ### Corregido

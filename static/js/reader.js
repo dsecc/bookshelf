@@ -438,6 +438,10 @@ async function initPDF() {
   }
   const prog = await fetchProgress();
   pdfPage = prog.page || 1;
+  // Desplazamiento DENTRO de la pagina guardada. Sin esto el lector volvia
+  // siempre al borde superior de la pagina, o sea un poco mas arriba de donde
+  // uno habia dejado la lectura.
+  _pdfOffset = Number(prog.offset) || 0;
   // Solo el modo scroll re-escala al cambiar el ancho; si se cambia a otro
   // modo hay que soltar el handler viejo para no redibujar un viewer oculto.
   _scrollRerender = null;
@@ -446,6 +450,8 @@ async function initPDF() {
   else if (viewMode === "book")   await initPDFBook();
   else if (viewMode === "spread") await initPDFSpread();
 }
+
+let _pdfOffset = 0;
 
 // ── SCROLL MODE ───────────────────────────────────────────────────────────────
 
@@ -519,9 +525,22 @@ async function initPDFScroll() {
   const wrappers = [], canvases = [];
   const done = new Set();
 
+  // Alto estimado de cada pagina, a partir de la proporcion de la primera.
+  // Es la pieza que faltaba: sin reservar el espacio los wrappers nacen con
+  // alto 0, TODOS quedan apilados en la misma posicion y el IntersectionObserver
+  // los da por visibles a la vez — o sea que se renderizaba el libro entero al
+  // abrir, justo lo que la carga diferida queria evitar. Ademas cada pagina que
+  // aparecia empujaba a las de abajo y movia la lectura de lugar.
+  let altoEstimado = 0;
+  try {
+    const vp = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+    altoEstimado = Math.round(availW * vp.height / vp.width);
+  } catch { altoEstimado = Math.round(availW * 1.414); }  // A4 como ultimo recurso
+
   for (let i = 0; i < pdfTotal; i++) {
     const w = document.createElement("div");
     w.style.cssText = "display:flex;justify-content:center;width:100%;flex-shrink:0;";
+    if (altoEstimado > 0) w.style.minHeight = altoEstimado + "px";
     w.dataset.page = i + 1;
     const c = document.createElement("canvas");
     // La sombra la pone el CSS (#pdfScrollWrap canvas): inline le ganaria a la
@@ -543,6 +562,8 @@ async function initPDFScroll() {
       wrappers[i].classList.add("pdf-page-container");
     }
     await renderPageWithTextLayer(page, c, availW, 0, null, 0);
+    // Ya hay canvas: el alto real reemplaza a la reserva.
+    wrappers[i].style.minHeight = "";
   }
 
   const startIdx = Math.max(0, pdfPage - 1);
@@ -550,7 +571,8 @@ async function initPDFScroll() {
   // scrollIntoView tambien puede scrollear la ventana/documento entero (no
   // solo este contenedor), tapando la topbar arriba del viewport — se
   // setea el scroll directo sobre "wrap" para que quede contenido ahi.
-  S.top = S.offsetOf(wrappers[startIdx]);
+  // Se suma el offset guardado: volver al punto exacto, no al borde de la hoja.
+  S.top = S.offsetOf(wrappers[startIdx]) + _pdfOffset;
 
   // Renderizar de a poco: solo las paginas que se acercan al viewport, no
   // el documento entero de una — con libros largos, renderizar todo al
@@ -575,23 +597,46 @@ async function initPDFScroll() {
   };
 
   let saveTimer = null;
+  // Cuanto de cada pagina se ve. Hace falta el registro COMPLETO: el observer
+  // solo entrega las paginas que cambiaron de estado desde el aviso anterior,
+  // y elegir "la mejor de esas" daba la pagina equivocada al saltar lejos —
+  // la que uno queria no habia cambiado, asi que ni figuraba en la lista.
+  const visible = new Map();
   const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => visible.set(parseInt(e.target.dataset.page), e.intersectionRatio));
     let best = null, bestR = 0;
-    entries.forEach(e => { if (e.intersectionRatio > bestR) { bestR = e.intersectionRatio; best = e; } });
+    visible.forEach((ratio, pag) => { if (ratio > bestR) { bestR = ratio; best = pag; } });
     if (best && bestR > 0.2) {
-      const p = parseInt(best.target.dataset.page);
+      const p = best;
       if (p !== pdfPage) {
         pdfPage = p; info.textContent = p + " / " + pdfTotal; input.value = p;
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(() => saveProgress({ page: p, total: pdfTotal }), 1200);
+        saveTimer = setTimeout(guardarPosicion, 1200);
       }
     }
   }, { root: S.root, threshold: [0.2, 0.5, 0.8] });
   wrappers.forEach(w => observer.observe(w));
 
-  function goPage(p) {
+  // Guarda pagina + cuanto se bajo DENTRO de esa pagina.
+  function guardarPosicion() {
+    const w = wrappers[pdfPage - 1];
+    const off = w ? Math.round(S.top - S.offsetOf(w)) : 0;
+    saveProgress({ page: pdfPage, total: pdfTotal, offset: off });
+  }
+  // El observer solo avisa al CAMBIAR de pagina; sin esto, moverse dentro de
+  // una pagina larga no quedaba guardado.
+  let guardarTimer = null;
+  (docScroll ? window : wrap).addEventListener("scroll", () => {
+    clearTimeout(guardarTimer);
+    guardarTimer = setTimeout(guardarPosicion, 900);
+  }, { passive: true });
+
+  async function goPage(p) {
     if (p < 1 || p > pdfTotal) return;
-    renderOne(p - 1);
+    // Esperar el render ANTES de calcular el destino: la pagina pasa del alto
+    // estimado al real al dibujarse, y sin esperar el salto se calculaba con el
+    // layout viejo y caia una pagina mas abajo.
+    await renderOne(p - 1);
     S.to(S.offsetOf(wrappers[p - 1]), true);
   }
   document.getElementById("pdfScrollPrev").onclick = () => goPage(pdfPage - 1);
@@ -1131,12 +1176,11 @@ async function navigateSearch(dir) {
 
 // ── Touch gestos con inercia ──────────────────────────────────────────────────
 function initTouch() {
-  let tx0 = 0, ty0 = 0, tt0 = 0, velY = 0, rafId = null;
+  let tx0 = 0, ty0 = 0, tt0 = 0;
 
   document.addEventListener("touchstart", e => {
     if (!e.touches || !e.touches[0]) return;
     tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY; tt0 = Date.now();
-    velY = 0; if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }, { passive: true });
 
   document.addEventListener("touchend", e => {
@@ -1157,20 +1201,15 @@ function initTouch() {
       else if (epubRendition) dir > 0 ? epubRendition.next() : epubRendition.prev();
       return;
     }
-    if (viewMode === "scroll" && Math.abs(dy) > 15) {
-      const wrap = document.getElementById("pdfScrollWrap");
-      if (!wrap) return;
-      // dy > 0 = dedo baja = scroll arriba = scrollTop decrece
-      // dy < 0 = dedo sube = scroll abajo = scrollTop crece
-      velY = (dy / dt) * 10;
-      function animate() {
-        S.top = S.top - velY;
-        velY *= 0.88;
-        if (Math.abs(velY) > 0.2) rafId = requestAnimationFrame(animate);
-        else rafId = null;
-      }
-      rafId = requestAnimationFrame(animate);
-    }
+    // El modo scroll NO lleva inercia propia. Tenia una, y hacia dos danos:
+    //  - Estaba rota: usaba `S`, que vive dentro de initPDFScroll, asi que
+    //    tiraba "S is not defined" en cada gesto, sin senal visible.
+    //  - Aunque funcionara, sobra. Desde que el lector scrollea el DOCUMENTO
+    //    (v1.5.6), el navegador ya aplica su propia inercia; sumarle otra deja
+    //    dos motores moviendo la pagina a la vez, que es de donde salian los
+    //    tirones y la sensacion de scroll cortado.
+    // Los gestos horizontales de arriba si se mantienen: los otros modos no
+    // tienen scroll nativo que los resuelva.
   }, { passive: true });
 }
 
