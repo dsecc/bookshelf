@@ -39,6 +39,9 @@ const RN_ICO = {
   "off": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/><line x1=\"3\" y1=\"21\" x2=\"21\" y2=\"21\"/></svg>",
   "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><polyline points=\"3 6 5 6 21 6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/></svg>",
   "tag": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z\"/><line x1=\"7\" y1=\"7\" x2=\"7.01\" y2=\"7\"/></svg>",
+  "bm": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z\"/></svg>",
+  "bmPlus": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z\"/><path d=\"M12 7v6M9 10h6\"/></svg>",
+  "x": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg>",
   "check": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\"><polyline points=\"20 6 9 17 4 12\"/></svg>"
 };
 
@@ -89,8 +92,12 @@ function openReaderSheet() {
       herramientas.splice(1, 0, ["Lupa", RN_ICO.lupa, "btnMagnifier"]);
     }
     herramientas.forEach(([label, icon, id, active]) => {
+      // Ver bookmarks abre el panel que sale de la pildora, no el drawer
+      // lateral de escritorio (que es lo que hace el boton de la topbar).
+      const accion = id === "btnBookmarkList" ? openBookmarksSheet : () => _rnClick(id);
       body.appendChild(navSheetRow({
-        label, icon, active: !!active, onClick: delegar(() => _rnClick(id)),
+        label, icon, active: !!active, onClick: delegar(accion),
+        detail: id === "btnBookmarkList" ? String(_bookmarks.length || "") : undefined,
       }));
     });
 
@@ -190,6 +197,93 @@ function openReaderSheet() {
   });
 }
 
+// ── Bookmarks en mobile ──────────────────────────────────────────────────────
+// El boton de la pildora abre un panel chico con las dos acciones. "Nuevo"
+// saca una barra de escribir igual al buscador (de atras de la pildora, sube
+// con el teclado); "Ver" abre la lista en el mismo panel que crece de la barra.
+function openBookmarkMenu() {
+  const delegar = fn => () => { closeNavSheet(); setTimeout(fn, NAV_SHEET_CLOSE_MS); };
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Bookmarks</span>";
+    body.appendChild(head);
+    body.appendChild(navSheetRow({
+      label: "Nuevo bookmark", icon: RN_ICO.bmPlus,
+      detail: pdfDoc ? "Pag " + pdfPage : undefined,
+      onClick: delegar(() => toggleBookmarkBar(true)),
+    }));
+    body.appendChild(navSheetRow({
+      label: "Ver bookmarks", icon: RN_ICO.list,
+      detail: String(_bookmarks.length),
+      onClick: delegar(openBookmarksSheet),
+    }));
+  });
+}
+
+function openBookmarksSheet() {
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Bookmarks</span>";
+    body.appendChild(head);
+
+    const vacio = () => {
+      const d = document.createElement("div");
+      d.className = "nav-sheet-empty";
+      d.textContent = "Todavia no hay bookmarks en este libro";
+      body.appendChild(d);
+    };
+    if (!_bookmarks.length) vacio();
+
+    _bookmarks.forEach(bm => {
+      const pos = _bmPos(bm);
+      // La fila es un <button>; el borrar no puede ir adentro (boton dentro de
+      // boton es HTML invalido y Safari lo saca afuera), va al costado.
+      const item = document.createElement("div");
+      item.className = "nav-sheet-item";
+      const fila = navSheetRow({
+        label: bm.label || "Bookmark", icon: RN_ICO.bm,
+        detail: pos.page ? "Pag " + pos.page : "",
+        active: !!pdfDoc && pos.page === pdfPage,
+        onClick: () => { closeNavSheet(); irABookmark(pos); },
+      });
+      const del = document.createElement("button");
+      del.className = "nav-sheet-del";
+      del.setAttribute("aria-label", "Borrar bookmark");
+      del.innerHTML = RN_ICO.x;
+      del.onclick = async () => {
+        await borrarBookmark(bm.id);
+        item.remove();
+        if (!_bookmarks.length) vacio();
+      };
+      item.appendChild(fila);
+      item.appendChild(del);
+      body.appendChild(item);
+    });
+
+    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+    body.appendChild(navSheetRow({
+      label: "Nuevo bookmark", icon: RN_ICO.bmPlus,
+      onClick: () => { closeNavSheet(); setTimeout(() => toggleBookmarkBar(true), NAV_SHEET_CLOSE_MS); },
+    }));
+  });
+}
+
+function toggleBookmarkBar(forzar) {
+  const bar = document.getElementById("bmBarReader");
+  if (!bar) return;
+  const abrir = forzar === undefined ? !bar.classList.contains("open") : forzar;
+  const input = document.getElementById("bmBarInput");
+  if (abrir) {
+    toggleSearchBar(false);
+    input.value = "";
+    input.placeholder = pdfDoc ? "Bookmark en la pagina " + pdfPage : "Nombre del bookmark";
+  }
+  bar.classList.toggle("open", abrir);
+  if (abrir) input.focus(); else input.blur();
+}
+
 // ── Barra de busqueda ────────────────────────────────────────────────────────
 // En mobile sale de DETRAS de la pildora (una clase mueve su transform), no de
 // una barra arriba de la pantalla. En desktop sigue siendo display, que es lo
@@ -205,6 +299,7 @@ function toggleSearchBar(forzar) {
 
   if (movil) {
     bar.style.display = "";
+    if (abrir) toggleBookmarkBar(false);
     bar.classList.toggle("open", abrir);
   } else {
     bar.style.display = abrir ? "" : "none";
@@ -239,6 +334,7 @@ function _toggleReaderNav() {
   if (!nav) return;
   closeNavSheet();
   toggleSearchBar(false);
+  toggleBookmarkBar(false);
   _rnHidden = !_rnHidden;
   nav.style.transition = "transform .32s cubic-bezier(.4,0,.2,1), opacity .24s cubic-bezier(.4,0,.2,1)";
   nav.style.transform = _rnHidden
@@ -255,7 +351,19 @@ function initReaderNav() {
   if (bar && window.innerWidth <= 640) bar.style.display = "";
   document.getElementById("rnBack").onclick     = () => { window.location.href = "/"; };
   document.getElementById("rnSearch").onclick   = () => { closeNavSheet(); toggleSearchBar(); };
-  document.getElementById("rnBookmark").onclick = () => { closeNavSheet(); _rnClick("btnBookmark"); };
+  // Con la barra de bookmark abierta, el mismo boton la cierra (como la lupa
+  // con el buscador); si no, abre el menu de nuevo / ver.
+  document.getElementById("rnBookmark").onclick = () => {
+    const bmBar = document.getElementById("bmBarReader");
+    if (bmBar && bmBar.classList.contains("open")) { toggleBookmarkBar(false); return; }
+    toggleSearchBar(false);
+    openBookmarkMenu();
+  };
+  document.getElementById("bmBarSave").onclick = () => saveBookmark(document.getElementById("bmBarInput").value);
+  document.getElementById("bmBarInput").onkeydown = e => {
+    if (e.key === "Enter") saveBookmark(e.target.value);
+    if (e.key === "Escape") toggleBookmarkBar(false);
+  };
   document.getElementById("rnMore").onclick     = () => openReaderSheet();
 }
 
@@ -948,37 +1056,49 @@ function saveProgress(data) {
   });
 }
 
+// Lista en memoria: la usan el drawer de escritorio y los paneles de mobile.
+let _bookmarks = [];
+const _bmPos = bm => (typeof bm.position === "string" ? JSON.parse(bm.position) : bm.position) || {};
+
+function irABookmark(pos) {
+  if (!pos.page) return;
+  if (viewMode === "scroll" && window._scrollGoPage) window._scrollGoPage(pos.page);
+  else if (viewMode === "page" && window._pdfPageGo) window._pdfPageGo(pos.page - pdfPage);
+  pdfPage = pos.page;
+}
+
+async function borrarBookmark(id) {
+  await fetch("/api/books/" + bookId + "/bookmarks/" + id + "?device_id=" + deviceId, { method: "DELETE" });
+  await loadBookmarks();
+}
+
 async function loadBookmarks() {
-  const bms = await (await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId)).json();
+  try {
+    _bookmarks = await (await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId)).json();
+  } catch { _bookmarks = []; }
   const ul  = document.getElementById("bmList");
-  ul.innerHTML = bms.length ? "" : "<li style='padding:.75rem 1rem;color:var(--text-muted);font-size:.82rem'>Sin bookmarks</li>";
-  bms.forEach(bm => {
+  ul.innerHTML = _bookmarks.length ? "" : "<li style='padding:.75rem 1rem;color:var(--text-muted);font-size:.82rem'>Sin bookmarks</li>";
+  _bookmarks.forEach(bm => {
     const li = document.createElement("li"); li.className = "bm-item";
-    const pos = typeof bm.position === "string" ? JSON.parse(bm.position) : bm.position;
-    li.innerHTML = "<div><div class='bm-label'>" + (bm.label||"Bookmark") + "</div><div class='bm-page'>Pag " + (pos.page||"?") + "</div></div>" +
+    const pos = _bmPos(bm);
+    li.innerHTML = "<div><div class='bm-label'></div><div class='bm-page'>Pag " + (pos.page||"?") + "</div></div>" +
       "<button class='bm-del'><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M18 6 6 18M6 6l12 12'/></svg></button>";
-    li.querySelector(".bm-del").onclick = async e => {
-      e.stopPropagation();
-      await fetch("/api/books/" + bookId + "/bookmarks/" + bm.id + "?device_id=" + deviceId, { method: "DELETE" });
-      loadBookmarks();
-    };
-    if (pos.page) li.onclick = async e => {
-      if (e.target.closest(".bm-del")) return;
-      pdfPage = pos.page;
-      if (viewMode === "scroll" && window._scrollGoPage) window._scrollGoPage(pdfPage);
-      else if (viewMode === "page" && window._pdfPageGo) window._pdfPageGo(pos.page - pdfPage);
-    };
+    li.querySelector(".bm-label").textContent = bm.label || "Bookmark";
+    li.querySelector(".bm-del").onclick = e => { e.stopPropagation(); borrarBookmark(bm.id); };
+    if (pos.page) li.onclick = e => { if (!e.target.closest(".bm-del")) irABookmark(pos); };
     ul.appendChild(li);
   });
 }
 
-async function saveBookmark() {
-  const label    = document.getElementById("bmNameInput").value.trim();
+// Sin argumento lee el modal de escritorio; la barra de mobile pasa su texto.
+async function saveBookmark(texto) {
+  const label    = (typeof texto === "string" ? texto : document.getElementById("bmNameInput").value).trim();
   const position = pdfDoc ? { page: pdfPage } : {};
   await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, position })
   });
-  closeModal("modalBookmark"); loadBookmarks(); toast("Bookmark guardado");
+  closeModal("modalBookmark"); toggleBookmarkBar(false);
+  loadBookmarks(); toast("Bookmark guardado");
 }
 
 async function renameBook() {
@@ -1036,7 +1156,7 @@ function bindAll() {
     openModal("modalBookmark");
     setTimeout(() => document.getElementById("bmNameInput").focus(), 80);
   };
-  document.getElementById("btnSaveBookmark").onclick    = saveBookmark;
+  document.getElementById("btnSaveBookmark").onclick    = () => saveBookmark();
   document.getElementById("bmNameInput").onkeydown      = e => { if (e.key === "Enter") saveBookmark(); };
   document.getElementById("btnBookmarkList").onclick    = () => { togglePanel(bmPanel); infoPanel.classList.remove("open"); };
   document.getElementById("closeBmPanel").onclick       = () => bmPanel.classList.remove("open");

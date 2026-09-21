@@ -212,6 +212,21 @@
   }
   .nav-sheet-seg .vm-btn.active { background: var(--nav-active-bg); color: var(--text); }
 
+  /* Fila con una accion al costado (la lista de bookmarks). El boton de
+     borrar va afuera de la fila porque un boton dentro de otro es invalido. */
+  .nav-sheet-item { display: flex; align-items: center; gap: .25rem; }
+  .nav-sheet-item .nav-sheet-row { flex: 1; min-width: 0; }
+  .nav-sheet-item .row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-sheet-del {
+    flex-shrink: 0; width: 38px; height: 38px;
+    border-radius: 999px; border: none; background: none;
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-sheet-del:active { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+  .nav-sheet-empty { padding: .4rem .9rem .8rem; font-size: .82rem; color: var(--text-muted); }
+
   /* Sub-opciones desplegadas dentro de una fila (p. ej. las colecciones). */
   .nav-sheet-suboption {
     padding-left: 2.6rem;
@@ -269,6 +284,10 @@
   }
   .nav-search .r-btn svg { width: 18px; height: 18px; }
   .nav-search .r-btn:active { background: var(--nav-active-bg); }
+  /* Confirmar de la barra de bookmark: el unico boton con acento, igual
+     que el tilde de los campos del panel. */
+  .nav-search .bm-bar-save { background: var(--accent); color: #fff; }
+  .nav-search .bm-bar-save:active { background: var(--accent-hover); }
   .search-results-count { font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
 
 }

@@ -495,3 +495,5 @@ body.magnifier-active #pdfSpreadViewer {
   background: rgba(124,111,247,.12);
 }
 
+/* La barra de bookmark es solo de mobile; en escritorio sigue el modal. */
+@media (min-width: 641px) { .bm-bar { display: none; } }

@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.11 — Bookmarks desde la pildora
+
+### Cambiado
+- **El boton de bookmark de la pildora abre un panel con dos opciones**: *Nuevo bookmark* (con la pagina actual al costado) y *Ver bookmarks* (con la cantidad). Antes solo abria el modal viejo para crear uno.
+- **Nuevo bookmark es una barra para escribir, igual al buscador**: sale de atras de la pildora, sube con el teclado y se confirma con Enter o con el tilde. El nombre es opcional; el placeholder avisa en que pagina queda. Tocar de nuevo el boton de bookmark la cierra, y el buscador y esta barra nunca estan abiertos a la vez.
+- **Ver bookmarks abre la lista en el panel que crece de la pildora**, tanto desde el boton de bookmark como desde *Mas → Ver bookmarks* (que antes abria el drawer lateral viejo). Tocar uno te lleva a su pagina; la cruz al costado lo borra sin cerrar el panel. El de la pagina en la que estas aparece resaltado.
+- En escritorio no cambia nada: siguen el modal y el drawer lateral.
+
+### Corregido
+- El nombre de un bookmark se insertaba como HTML en la lista. Ahora va como texto.
+
+### Notas
+- `VERSION` del service worker: `v23` → `v24`.
+
 ## v1.10 — El scroll del lector, robusto
 
 Investigacion completa del scroll en mobile. Eran **cuatro causas distintas**, no una.
