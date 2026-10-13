@@ -335,12 +335,13 @@ function makeOverlay(book) {
   // Fecha si viene del endpoint recent
   if (book.last_read) rowDate.querySelector(".overlay-last-read").textContent = formatDate(book.last_read);
 
-  // Cargar progreso inmediatamente (no esperar hover — en mobile no hay hover)
-  const dev = localStorage.getItem("bs_device_id") || "default";
-  fetch("/api/books/" + book.id + "/progress?device_id=" + dev)
-    .then(r => r.json())
-    .then(p => {
-      if (p.updated_at) rowDate.querySelector(".overlay-last-read").textContent = formatDate(p.updated_at);
+  // Cargar progreso inmediatamente (no esperar hover — en mobile no hay hover).
+  // Local primero (progress.js): sin conexion muestra lo ultimo leido de
+  // verdad, no la copia que habia quedado en el cache.
+  Progress.load(book.id)
+    .then(res => {
+      const p = (res && res.data) || {};
+      if (res && res.ts) rowDate.querySelector(".overlay-last-read").textContent = formatDate(new Date(res.ts).toISOString().slice(0, 19));
       else if (!book.last_read) rowDate.querySelector(".overlay-last-read").textContent = "Nunca abierto";
 
       const total = (p.total && p.total > 1) ? p.total : totalPages;

@@ -671,10 +671,36 @@ def book_progress(book_id):
     if not book:
         conn.close(); abort(404)
     if request.method == "POST":
-        data = request.json
-        conn.execute("INSERT INTO progress (book_id, device_id, progress_data, updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(book_id, device_id) DO UPDATE SET progress_data=excluded.progress_data, updated_at=CURRENT_TIMESTAMP", (book_id, device_id, json.dumps(data)))
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            conn.close(); return jsonify({"error": "JSON invalido"}), 400
+        # "ts" es el momento en que se leyo, en el reloj del telefono (ms). El
+        # progreso se guarda local y se sincroniza despues, a veces horas mas
+        # tarde y con reintentos que pueden llegar desordenados: un guardado
+        # mas viejo que el que ya esta no tiene que pisarlo. Sin "ts" (clientes
+        # viejos) se acepta siempre, como antes.
+        # La comparacion va dentro del UPSERT (no un SELECT previo) para que
+        # dos POST simultaneos en workers distintos no se crucen.
+        try:
+            ts = max(int(data.get("ts") or 0), 0)
+        except (TypeError, ValueError):
+            ts = 0
+        data["ts"] = ts
+        # updated_at es "cuando se leyo", no "cuando llego": ordena bien
+        # "Continuar leyendo" aunque la sesion del gimnasio sincronice a la
+        # noche. Acotado a ahora por si el reloj del telefono esta adelantado.
+        now_s = int(_time.time())
+        read_s = min(ts // 1000, now_s) if ts else now_s
+        cur = conn.execute(
+            "INSERT INTO progress (book_id, device_id, progress_data, updated_at) "
+            "VALUES (?,?,?,datetime(?, 'unixepoch')) "
+            "ON CONFLICT(book_id, device_id) DO UPDATE SET "
+            "progress_data=excluded.progress_data, updated_at=excluded.updated_at "
+            "WHERE ?=0 OR COALESCE(json_extract(progress.progress_data, '$.ts'), 0) < ?",
+            (book_id, device_id, json.dumps(data), read_s, ts, ts))
+        applied = cur.rowcount > 0
         conn.commit(); conn.close()
-        return jsonify({"ok":True})
+        return jsonify({"ok": True, "applied": applied})
     row = conn.execute("SELECT * FROM progress WHERE book_id=? AND device_id=?", (book_id, device_id)).fetchone()
     conn.close()
     if not row: return jsonify({})

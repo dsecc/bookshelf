@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.10** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.12** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -121,7 +121,7 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
 - 📖 Lector integrado para PDF y EPUB
 - 🔖 Bookmarks con nombre
-- 📍 Progreso guardado por dispositivo
+- 📍 Progreso guardado por dispositivo, también sin conexión (se sincroniza solo al volver internet)
 - ⬇️ Descarga directa de archivos
 - 🔗 Compartir link + WhatsApp
 - 📱 PWA instalable en el teléfono

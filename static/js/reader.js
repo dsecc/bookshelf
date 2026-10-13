@@ -553,6 +553,7 @@ async function initPDF() {
   // Solo el modo scroll re-escala al cambiar el ancho; si se cambia a otro
   // modo hay que soltar el handler viejo para no redibujar un viewer oculto.
   _scrollRerender = null;
+  _capturePosition = null;
   if (viewMode === "scroll")  await initPDFScroll();
   else if (viewMode === "page")   await initPDFPage();
   else if (viewMode === "book")   await initPDFBook();
@@ -560,6 +561,12 @@ async function initPDF() {
 }
 
 let _pdfOffset = 0;
+
+// Mide y guarda la posicion exacta en el modo scroll. Los guardados van con
+// debounce; al salir del lector (volver, cambiar de app, bloquear) se llama
+// directo para no perder el ultimo tramo leido.
+let _capturePosition = null;
+Progress.onLeave(() => { if (_capturePosition) _capturePosition(); });
 
 // ── SCROLL MODE ───────────────────────────────────────────────────────────────
 
@@ -719,7 +726,7 @@ async function initPDFScroll() {
       if (p !== pdfPage) {
         pdfPage = p; info.textContent = p + " / " + pdfTotal; input.value = p;
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(guardarPosicion, 1200);
+        saveTimer = setTimeout(guardarPosicion, 300);
       }
     }
   }, { root: S.root, threshold: [0.2, 0.5, 0.8] });
@@ -732,12 +739,14 @@ async function initPDFScroll() {
     saveProgress({ page: pdfPage, total: pdfTotal, offset: off });
   }
   // El observer solo avisa al CAMBIAR de pagina; sin esto, moverse dentro de
-  // una pagina larga no quedaba guardado.
+  // una pagina larga no quedaba guardado. Guardar es solo escribir en
+  // localStorage (la red va aparte), por eso el debounce puede ser corto.
   let guardarTimer = null;
   (docScroll ? window : wrap).addEventListener("scroll", () => {
     clearTimeout(guardarTimer);
-    guardarTimer = setTimeout(guardarPosicion, 900);
+    guardarTimer = setTimeout(guardarPosicion, 300);
   }, { passive: true });
+  _capturePosition = guardarPosicion;
 
   async function goPage(p) {
     if (p < 1 || p > pdfTotal) return;
@@ -1047,13 +1056,13 @@ function initUnsupported() {
 }
 
 // ── Progress & Bookmarks ──────────────────────────────────────────────────────
+// Local primero, servidor despues: ver progress.js. saveProgress no toca la
+// red; la sincronizacion la maneja Progress con reintentos.
 async function fetchProgress() {
-  try { return await (await fetch("/api/books/" + bookId + "/progress?device_id=" + deviceId)).json(); } catch { return {}; }
+  try { const p = await Progress.load(bookId); return (p && p.data) || {}; } catch { return {}; }
 }
 function saveProgress(data) {
-  fetch("/api/books/" + bookId + "/progress?device_id=" + deviceId, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
-  });
+  Progress.save(bookId, data);
 }
 
 // Lista en memoria: la usan el drawer de escritorio y los paneles de mobile.

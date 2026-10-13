@@ -5,6 +5,8 @@
 //  - Navegacion (/ y /read/<id>): network-first con fallback a cache.
 //  - Datos (/api/books, /api/collections, portadas): network-first con
 //    fallback a cache, para poder ver la biblioteca sin conexion.
+//  - Progreso de lectura (/api/books/<id>/progress): solo red. La fuente de
+//    verdad offline es localStorage (progress.js), no este cache.
 //  - Archivos de libros (/api/books/<id>/file): NUNCA se cachean solos (pesan
 //    demasiado). Solo se sirven desde cache si el usuario guardo ese libro
 //    explicitamente con "Guardar sin conexion".
@@ -13,7 +15,7 @@
 // cache-first, asi que sin cambiar el nombre del cache los dispositivos que ya
 // visitaron la app seguirian con los archivos viejos para siempre. Ademas el
 // navegador solo detecta un service worker nuevo si el archivo cambio.
-const VERSION = "v24";
+const VERSION = "v25";
 const SHELL_CACHE = "bookshelf-shell-" + VERSION;
 const DATA_CACHE  = "bookshelf-data-" + VERSION;
 const BOOKS_CACHE = "bookshelf-books-v1"; // sin VERSION: los libros guardados
@@ -24,6 +26,7 @@ const SHELL_ASSETS = [
   "/static/css/main.css",
   "/static/css/reader.css",
   "/static/js/nav.js",
+  "/static/js/progress.js",
   "/static/js/app.js",
   "/static/js/reader.js",
   "/static/js/pdf.worker.min.js",
@@ -128,6 +131,11 @@ self.addEventListener("fetch", e => {
     e.respondWith(cacheFirst(req, SHELL_CACHE));
     return;
   }
+
+  // Progreso de lectura: solo red, nunca cache. La copia local la lleva
+  // progress.js; si aca se sirviera un GET cacheado, sin conexion el lector
+  // abriria en la pagina de la ultima vez que hubo internet.
+  if (/^\/api\/books\/\d+\/progress$/.test(url.pathname)) return;
 
   // Portadas y datos de la biblioteca: network-first con fallback.
   if (url.pathname.startsWith("/api/")) {

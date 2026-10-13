@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.12 — El progreso sobrevive sin conexion
+
+Leias un libro descargado sin internet (en el gimnasio), avanzabas de la 70 a la 100, salias, y al volver a entrar estabas otra vez en la 70. Reproducido tal cual en Chromium con el modo offline real.
+
+### Corregido
+- **Sin conexion, el lector abria en una pagina vieja.** El progreso se pedia por GET al abrir el libro, y sin red ese GET lo contestaba el service worker con la ultima copia cacheada: la de la ultima vez que se abrio el libro **con** internet. Todo lo leido despues no existia.
+- **Lo leido sin conexion se perdia para siempre.** Cada cambio de pagina era un POST "dispara y olvida": sin red fallaba en silencio y nadie lo reintentaba. Al volver internet el servidor seguia en la 70.
+- **Salir rapido perdia el ultimo tramo, incluso con internet.** La posicion se guardaba con un debounce de 0.9–1.2 s; tocar *volver* antes de que venciera lo cancelaba, y la navegacion ademas abortaba el POST en vuelo.
+- **Con conexion a medias el lector podia quedar colgado** esperando el GET del progreso, sin timeout.
+
+### Cambiado
+- **El progreso es local primero** (`static/js/progress.js`, compartido por biblioteca y lector). Cada guardado se escribe al instante en `localStorage` con una marca de tiempo y queda pendiente de sincronizar. Al abrir un libro manda la copia local: el progreso es por dispositivo, asi que nadie mas puede tener una version mas nueva. El servidor solo se consulta si no hay copia local (libro nunca abierto en este telefono, o progreso de antes de esta version), con timeout de 4 s.
+- **Sincronizacion con reintentos.** Lo pendiente se manda con debounce mientras se lee, de inmediato al salir (con `keepalive`, sobrevive a la navegacion), al cambiar de app o bloquear la pantalla (`visibilitychange`, el unico aviso confiable en iOS), al volver la conexion, al volver a la app y al abrir cualquier pagina. Si falla, backoff de 5 s a 60 s. Background Sync no existe en iOS, por eso se hace a mano.
+- **El servidor ignora guardados mas viejos que el que ya tiene**, comparando la marca de tiempo del cliente dentro del mismo `UPSERT` (atomico entre los dos workers de gunicorn). Un reintento atrasado o desordenado nunca pisa uno nuevo. Clientes viejos sin `ts` se aceptan siempre, como antes.
+- **`updated_at` es cuando se leyo, no cuando llego** (acotado a "ahora" por si el reloj del telefono esta adelantado): *Continuar leyendo* ordena bien aunque la sesion del gimnasio sincronice a la noche.
+- Las tarjetas de la biblioteca muestran el progreso local: sin conexion dicen la pagina real.
+- El service worker **ya no cachea** `/api/books/<id>/progress`.
+
+### Notas
+- `VERSION` del service worker: `v24` → `v25`; `progress.js` agregado al app shell. Hay que abrir la app **una vez con internet** para que el telefono tome la version nueva.
+- Verificado en Chromium mobile (390x844) con el modo offline real y el service worker activo, misma escena contra la version anterior y contra esta:
+  - Antes: online hasta la 70 → offline hasta la 100 → reabre en **70**; al volver internet el servidor sigue en **70**.
+  - Ahora: reabre en **100**; tocar volver inmediatamente despues de scrollear tambien queda guardado; al volver internet el servidor pasa a la ultima posicion solo, sin abrir el libro.
+  - Migracion: un progreso que solo estaba en el servidor se toma bien y queda copiado local.
+  - Tarjeta de la biblioteca sin conexion: muestra la pagina real.
+  - GET del progreso colgado (conexion a medias): el lector abre a los ~4 s en vez de quedarse esperando.
+  - Servidor: un guardado mas viejo o con el mismo `ts` no se aplica; uno mas nuevo si; `ts` en el futuro se acota; JSON invalido da 400.
+- `README.md` y `docker-compose.yml` saltan de 1.10 a 1.12: en v1.11 no se habian actualizado.
+
 ## v1.11 — Bookmarks desde la pildora
 
 ### Cambiado
