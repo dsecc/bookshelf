@@ -111,3 +111,37 @@ function colOptionsHTML(collections, selectedId) {
     "   ".repeat(depth) + (depth ? "└ " : "") + esc(c.name) + "</option>"
   ).join("");
 }
+
+// ── Desplegar / plegar subcarpetas ───────────────────────────────────────────
+// Se anima el alto del bloque de hijas (y se funde), con la misma curva que la
+// pildora. La hoja del celu toma su alto del contenido, asi que crece sola
+// junto con la lista. Sin animacion si el sistema pide reducir movimiento.
+const TREE_MS = 300;
+const _treeQuieto = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function _treeAnimar(el, desde, hasta, alTerminar) {
+  el.style.overflow = "hidden";
+  el.style.height = desde.h + "px";
+  el.style.opacity = desde.o;
+  el.offsetHeight; // fija el punto de partida antes de la transicion
+  el.style.transition = "height " + TREE_MS + "ms var(--nav-ease), opacity " + (TREE_MS - 60) + "ms ease";
+  el.style.height = hasta.h + "px";
+  el.style.opacity = hasta.o;
+  let listo = false;
+  const fin = () => { if (listo) return; listo = true; alTerminar(); };
+  el.addEventListener("transitionend", e => { if (e.target === el && e.propertyName === "height") fin(); });
+  setTimeout(fin, TREE_MS + 120); // por si transitionend no llega (pestaña oculta)
+}
+
+function treeOpen(el) {
+  if (_treeQuieto()) return;
+  _treeAnimar(el, { h: 0, o: 0 }, { h: el.scrollHeight, o: 1 }, () => {
+    el.style.overflow = el.style.height = el.style.opacity = el.style.transition = "";
+  });
+}
+
+// Pliega y despues saca el bloque del DOM.
+function treeClose(el) {
+  if (_treeQuieto()) { el.remove(); return; }
+  _treeAnimar(el, { h: el.scrollHeight, o: 1 }, { h: 0, o: 0 }, () => el.remove());
+}

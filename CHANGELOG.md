@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.14.1 — El progreso te sigue entre dispositivos
+
+### Corregido
+- **Un dispositivo nuevo no mostraba lo leído en otro.** El progreso se guardaba y se leía por dispositivo (cada navegador tiene su id, y cambia si se borran los datos del sitio): en producción había 8 ids distintos, y la PC solo veía el suyo. Además, abrir un libro guarda la página en la que arranca, así que un dispositivo nuevo quedaba en "página 1" aunque el libro fuera por la 22 en el celu.
+
+### Cambiado
+- **Al abrir un libro con internet se va a donde se leyó por última vez, en cualquier dispositivo** (como Kindle). El servidor elige el mejor progreso entre todos (`GET .../progress?latest=1`) y se compara con la copia local con la misma regla: lectura real antes que "abierto sin avanzar" (página 1, 0%), y después la más reciente. Sin conexión manda la copia local, como antes. Con copia local se espera al servidor como mucho 1,5 s para no demorar la apertura.
+- Las tarjetas de la biblioteca muestran ese mismo progreso: `/api/books` y `/api/books/recent` lo traen en `progress`, sin un pedido por tarjeta.
+- Cada dispositivo sigue guardando su propia fila: no hay migración, lo leído antes aparece solo.
+- **Desplegar y plegar subcarpetas está animado**, en el sidebar de la PC y en la hoja de colecciones del celu: el bloque se estira o se encoge con la curva de la píldora y se funde, y la hoja crece junto con él. Respeta "reducir movimiento" del sistema.
+
+### Notas
+- `VERSION` del service worker: `v27` → `v28`.
+- Verificado con el caso real: celu en la página 22 de hace 3 días y PC con "página 1" de hace una hora → la PC abre en la 22 y la tarjeta dice 22. Si la PC leyó de verdad hasta la 5 hace un minuto, gana la 5. Sin conexión abre con la copia local.
+- Animación medida cuadro a cuadro: en la PC el bloque pasa por 0 → 47 → 78 px al abrir y por 79 → 24 → 0 al plegar, sin restos en el DOM; en el celu la hoja crece de 565 a 697 px en ~25 cuadros.
+
 ## v1.14 — Colecciones como carpetas, Temporal y Papelera
 
 Cambio de motor: las colecciones dejan de ser filas de la base y pasan a ser **carpetas** dentro de `uploads/<usuario>/`, como una bóveda de Obsidian. La base queda como índice (ids, progreso, portadas, metadatos).

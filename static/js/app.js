@@ -109,6 +109,14 @@ async function openCollection(id) {
 // queda desplegado el camino hasta la coleccion abierta.
 function renderSidebar() {
   const list = document.getElementById("colList");
+  // Lo que estaba desplegado antes: lo que se abre ahora se anima abriendose,
+  // y lo que se cerro se reengancha un momento para animarlo cerrandose.
+  const antes = new Map();
+  list.querySelectorAll(".col-children:not(.closing)").forEach(ul => antes.set(Number(ul.dataset.parent), ul));
+  const primera = !list.dataset.pintada; // al cargar la pagina no se anima nada
+  list.dataset.pintada = "1";
+  // Las animaciones corren al final: necesitan medir el bloque ya en pagina.
+  const animar = [];
   list.innerHTML = "";
   const open = new Set(activeColId != null ? ancestorsOf(activeColId) : []);
   const EDIT_ICO = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
@@ -157,12 +165,20 @@ function renderSidebar() {
     if (expanded) {
       const sub = document.createElement("ul");
       sub.className = "col-children tree-children";
+      sub.dataset.parent = c.id;
       build(sub, kids);
       li.appendChild(sub);
+      if (!primera && !antes.has(c.id)) animar.push(() => treeOpen(sub));
+    } else if (antes.has(c.id)) {
+      const viejo = antes.get(c.id);
+      viejo.classList.add("closing");
+      li.appendChild(viejo);
+      animar.push(() => treeClose(viejo));
     }
     ul.appendChild(li);
   });
   build(list, topLevel());
+  animar.forEach(f => f());
 
   const tc = document.getElementById("navTrashCount");
   const n = collections.length ? collections[0].trash_count || 0 : 0;
@@ -555,9 +571,9 @@ function makeOverlay(book) {
   if (book.last_read) rowDate.querySelector(".overlay-last-read").textContent = formatDate(book.last_read);
 
   // Cargar progreso inmediatamente (no esperar hover — en mobile no hay hover).
-  // Local primero (progress.js): sin conexion muestra lo ultimo leido de
-  // verdad, no la copia que habia quedado en el cache.
-  Progress.load(book.id)
+  // Lo mejor entre la copia local y lo que trajo la lista (el ultimo lugar
+  // leido en cualquier dispositivo), sin un pedido por tarjeta.
+  Promise.resolve(Progress.peek(book.id, book.progress))
     .then(res => {
       const p = (res && res.data) || {};
       if (res && res.ts) rowDate.querySelector(".overlay-last-read").textContent = formatDate(new Date(res.ts).toISOString().slice(0, 19));
@@ -1360,29 +1376,41 @@ function openMobileColSheet() {
         onClick: () => { s.close(); salirDeEspeciales(); openCollection(c.id); },
       });
       rowWrap.appendChild(row);
+      const hijas = () => {
+        const sub = document.createElement("div");
+        sub.className = "tree-children";
+        build(sub, kids);
+        return sub;
+      };
       if (kids.length) {
         const chev = document.createElement("button");
-        chev.className = "tree-chev" + (abiertas.has(c.id) ? " open" : "");
-        chev.setAttribute("aria-label", (abiertas.has(c.id) ? "Plegar " : "Desplegar ") + c.name);
+        const pintarChev = () => {
+          chev.className = "tree-chev" + (abiertas.has(c.id) ? " open" : "");
+          chev.setAttribute("aria-label", (abiertas.has(c.id) ? "Plegar " : "Desplegar ") + c.name);
+        };
+        pintarChev();
         chev.innerHTML = ICO_CHEV;
+        // Solo cambia esta carpeta, animada: rehacer el arbol lo haria saltar.
         chev.onclick = () => {
-          if (abiertas.has(c.id)) abiertas.delete(c.id); else abiertas.add(c.id);
-          pintar();
+          if (abiertas.has(c.id)) {
+            abiertas.delete(c.id);
+            const sub = node.querySelector(":scope > .tree-children:not(.closing)");
+            if (sub) { sub.classList.add("closing"); treeClose(sub); }
+          } else {
+            abiertas.add(c.id);
+            const sub = hijas();
+            node.appendChild(sub);
+            treeOpen(sub);
+          }
+          pintarChev();
         };
         rowWrap.appendChild(chev);
       }
       node.appendChild(rowWrap);
-      if (kids.length && abiertas.has(c.id)) {
-        const sub = document.createElement("div");
-        sub.className = "tree-children";
-        build(sub, kids);
-        node.appendChild(sub);
-      }
+      if (kids.length && abiertas.has(c.id)) node.appendChild(hijas());
       parent.appendChild(node);
     });
-    // Repinta solo el arbol: rehacer todo el panel lo volveria a animar.
-    const pintar = () => { tree.innerHTML = ""; build(tree, topLevel()); };
-    pintar();
+    build(tree, topLevel());
   });
 }
 

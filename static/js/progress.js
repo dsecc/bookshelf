@@ -27,6 +27,7 @@ const Progress = (() => {
   const PUSH_DELAY = 3000;          // debounce mientras se lee
   const RETRY_MIN = 5000, RETRY_MAX = 60000;
   const FETCH_TIMEOUT = 4000;       // con conexion a medias un GET puede colgarse
+  const LOCAL_WAIT = 1500;          // si ya hay copia local, no hacer esperar al abrir
 
   const deviceId = () => localStorage.getItem("bs_device_id") || "default";
   const url = bookId => "/api/books/" + bookId + "/progress?device_id=" + encodeURIComponent(deviceId());
@@ -62,25 +63,61 @@ const Progress = (() => {
   }
 
   // ── Leer ─────────────────────────────────────────────────────────────────
-  // Devuelve { data, ts } o null. La copia local gana siempre; el servidor es
-  // el respaldo y lo que llega de ahi queda guardado como ya sincronizado.
-  async function load(bookId) {
-    const local = read(bookId);
-    if (local) return { data: local.data || {}, ts: local.ts || 0 };
-    const remote = await fetchRemote(bookId);
+  // El progreso sigue al libro entre dispositivos: gana el ultimo lugar donde
+  // se leyo, en cualquiera. El servidor manda el mejor de todos (?latest=1) y
+  // se compara con la copia local, que sigue siendo la fuente de verdad sin
+  // conexion. Abrir un libro guarda donde arranca (pagina 1, 0%): eso no
+  // cuenta como lectura, asi no tapa lo leido en otro lado. Misma regla que
+  // best_progress en app.py.
+  function isStart(d) {
+    d = d || {};
+    if (d.page != null) return Number(d.page) <= 1;
+    if (d.percentage != null) return Number(d.percentage) <= 0;
+    return !d.cfi;
+  }
+  // a y b son { data, ts } o null.
+  function pick(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const sa = isStart(a.data), sb = isStart(b.data);
+    if (sa !== sb) return sa ? b : a;
+    return (b.ts || 0) > (a.ts || 0) ? b : a;
+  }
+  function fromServer(remote) {
     if (!remote) return null;
     const { updated_at, ts, ...data } = remote;
-    const entry = { data, ts: Number(ts) || serverTs(updated_at), synced: true };
-    // Si mientras esperabamos la red se guardo algo local, eso es mas nuevo.
-    if (!read(bookId)) write(bookId, entry);
-    return { data: entry.data, ts: entry.ts };
+    return { data, ts: Number(ts) || serverTs(updated_at) };
   }
 
-  async function fetchRemote(bookId) {
+  // Devuelve { data, ts } o null. Con copia local se espera poco al servidor
+  // (abre igual si la conexion es mala); sin copia, hasta FETCH_TIMEOUT.
+  async function load(bookId) {
+    const local = read(bookId);
+    const mine = local ? { data: local.data || {}, ts: local.ts || 0 } : null;
+    const remote = fromServer(await fetchRemote(bookId, local ? LOCAL_WAIT : FETCH_TIMEOUT));
+    const best = pick(mine, remote);
+    if (!best) return null;
+    // Lo que llega del servidor queda como copia local ya sincronizada. Si
+    // mientras esperabamos la red se guardo algo local, eso es mas nuevo.
+    if (best === remote) {
+      const now = read(bookId);
+      if (!now || now.ts === (local && local.ts)) write(bookId, { data: remote.data, ts: remote.ts, synced: true });
+    }
+    return best;
+  }
+
+  // Para las tarjetas de la biblioteca: sin red. "hint" es el progreso que
+  // ya vino con la lista de libros (/api/books lo trae, ver attach_progress).
+  function peek(bookId, hint) {
+    const local = read(bookId);
+    return pick(local ? { data: local.data || {}, ts: local.ts || 0 } : null, fromServer(hint));
+  }
+
+  async function fetchRemote(bookId, timeout) {
     const ctrl = typeof AbortController === "function" ? new AbortController() : null;
-    const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT) : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
     try {
-      const res = await fetch(url(bookId), ctrl ? { signal: ctrl.signal } : undefined);
+      const res = await fetch(url(bookId) + "&latest=1", ctrl ? { signal: ctrl.signal } : undefined);
       if (!res.ok) return null;
       const body = await res.json();
       return body && Object.keys(body).length ? body : null;
@@ -194,5 +231,5 @@ const Progress = (() => {
   // Al abrir cualquier pagina se manda lo que haya quedado de antes.
   if (pendingIds().length) setTimeout(() => flush(), 1000);
 
-  return { save, load, flush, onLeave, read };
+  return { save, load, peek, flush, onLeave, read };
 })();

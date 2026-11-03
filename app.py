@@ -1047,6 +1047,55 @@ def rename_collection(col_id):
     conn.close()
     return jsonify(dict(col))
 
+# ── Progreso entre dispositivos ───────────────────────────────────────────────
+# Cada dispositivo guarda su propia fila (el progreso es local primero, ver
+# progress.js), pero lo que se muestra es el mejor de todos: el ultimo lugar
+# donde se leyo, en cualquier dispositivo. Abrir un libro guarda la posicion
+# en la que arranca (pagina 1, 0%): eso no cuenta como lectura, asi un
+# dispositivo nuevo no tapa lo leido en otro.
+def progress_is_start(d):
+    try:
+        if d.get("page") is not None:
+            return int(d.get("page") or 0) <= 1
+        if d.get("percentage") is not None:
+            return float(d.get("percentage") or 0) <= 0
+    except (TypeError, ValueError):
+        pass
+    return not d.get("cfi")
+
+def best_progress(rows):
+    """De las filas (progress_data, updated_at) de un libro, la que se
+    muestra: lectura real antes que "abierto sin avanzar", y despues la mas
+    reciente. Devuelve el dict con ts y updated_at, o None."""
+    best = None
+    for r in rows:
+        try:
+            d = json.loads(r["progress_data"] or "{}")
+        except ValueError:
+            continue
+        if not isinstance(d, dict):
+            continue
+        ts = int(d.get("ts") or 0)
+        if not ts and r["updated_at"]:
+            ts = int(datetime.strptime(r["updated_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() * 1000)
+        key = (0 if progress_is_start(d) else 1, ts)
+        if best is None or key > best[0]:
+            best = (key, dict(d, ts=ts, updated_at=r["updated_at"]))
+    return best[1] if best else None
+
+def attach_progress(conn, books):
+    """Agrega a cada libro su mejor progreso entre dispositivos: las tarjetas
+    de la biblioteca lo muestran sin un pedido por libro."""
+    ids = [b["id"] for b in books]
+    rows = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for r in conn.execute(f"SELECT book_id, progress_data, updated_at FROM progress WHERE book_id IN ({','.join('?' * len(chunk))})", chunk):
+            rows.setdefault(r["book_id"], []).append(r)
+    for b in books:
+        b["progress"] = best_progress(rows.get(b["id"], []))
+    return books
+
 def book_json(r):
     b = dict(r)
     rel = b.get("relpath") or ""
@@ -1078,8 +1127,8 @@ def get_books():
             rows = conn.execute(base + " AND b.collection_id=?", (uid, col["id"])).fetchall()
     else:
         rows = conn.execute(base, (uid,)).fetchall()
+    books = attach_progress(conn, [book_json(r) for r in rows])
     conn.close()
-    books = [book_json(r) for r in rows]
     books.sort(key=lambda b: (b["group_name"].casefold(), b["title"].casefold()))
     return jsonify(books)
 
@@ -1311,6 +1360,11 @@ def book_progress(book_id):
         applied = cur.rowcount > 0
         conn.commit(); conn.close()
         return jsonify({"ok": True, "applied": applied})
+    if request.args.get("latest"):
+        # El mejor entre todos los dispositivos (ver best_progress).
+        best = best_progress(conn.execute("SELECT progress_data, updated_at FROM progress WHERE book_id=?", (book_id,)).fetchall())
+        conn.close()
+        return jsonify(best or {})
     row = conn.execute("SELECT * FROM progress WHERE book_id=? AND device_id=?", (book_id, device_id)).fetchone()
     conn.close()
     if not row: return jsonify({})
@@ -1358,8 +1412,9 @@ def recent_books():
               "JOIN books b ON b.id = p.book_id LEFT JOIN collections c ON c.id = b.collection_id "
               "WHERE b.user_id=? AND b.deleted_at IS NULL GROUP BY b.id ORDER BY last_read DESC LIMIT ?")
     rows = conn.execute(query, (current_user_id(), limit)).fetchall()
+    books = attach_progress(conn, [dict(r) for r in rows])
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(books)
 
 
 
