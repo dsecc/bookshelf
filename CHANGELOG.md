@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.15.5 — Un solo vidrio, que se estira
+
+Relevamiento de todos los lugares que usan la pildora (celu y PC): 10 paneles, 3 barras que salen de atras, 2 pildoras y 2 topbars flotantes. El sistema quedo documentado en `docs/pildoras.md`, base para v1.16.
+
+### Cambiado
+- **Todo lo que se despliega tiene la misma transparencia que la barra.** Los paneles eran casi opacos (96%) y el buscador y la barra de bookmark, opacos y mas oscuros; ahora todo usa el mismo vidrio (78% con desenfoque). El material vive en tokens (`--glass-*` en nav.css) que usan la pildora, la topbar flotante, los paneles y las barras. Adentro, los campos, segmentados y formularios mudados al panel (subir, notificaciones) usan rellenos translucidos.
+- **La barra se transforma en el panel, al estilo Liquid Glass:** al abrir, sus iconos se desvanecen y deja de dibujar su fondo; el panel arranca con la forma exacta de la barra, se estira hacia arriba y se asienta con un rebote chico. Al cerrar, vuelve a la forma de la barra y recien ahi reaparecen los iconos. Una sola capa de vidrio en todo momento. Respeta "reducir movimiento".
+- **El buscador y la barra de bookmark** salen de atras de la pildora con el mismo vidrio; la parte metida detras se recorta en el medio para que no se vea la doble capa a traves de la barra.
+- Con el telefono de costado, los paneles y las barras tambien respetan el notch (antes solo las pildoras).
+
+### Notas
+- `VERSION` del service worker: `v32` → `v33`.
+- Verificado en Chromium, celu (390x844) y PC (1440x900), abriendo uno por uno: Colecciones, Subir, Mas, Notificaciones, libro en la Papelera, buscador de la biblioteca; Info, Bookmarks, Ver bookmarks, Enviar, Eliminar, buscador y barra de bookmark del lector. En todos: el mismo vidrio que la barra, la barra sin fondo ni iconos mientras el panel esta abierto, y todo de vuelta al cerrar. La apertura arranca con la forma de la barra (`inset(calc(100% - 60px) … round 999px)`) y termina en `inset(-80px round 108px)`.
+
 ## v1.15.2 — Arriba, solo donde estas
 
 ### Cambiado

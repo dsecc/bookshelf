@@ -26,19 +26,55 @@
   --nav-ease: cubic-bezier(.4,0,.2,1);
 }
 
+/* ── Material: un solo vidrio ───────────────────────────────────────────────
+   La pildora, la topbar flotante, los paneles que crecen de ella y las barras
+   que salen de atras son LA MISMA pieza: mismo fondo translucido, mismo
+   desenfoque, mismo borde. Nada se despliega con un material distinto (ver
+   docs/pildoras.md). Lo de adentro (campos, segmentados, filas activas) usa
+   rellenos translucidos (--glass-fill), nunca superficies opacas. */
+:root {
+  --glass-bg: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--text) 10%, transparent);
+  --glass-blur: blur(20px) saturate(1.4);
+  --glass-shadow: 0 10px 30px rgba(0,0,0,.45);
+  --glass-shadow-raised: 0 22px 60px rgba(0,0,0,.55), 0 4px 14px rgba(0,0,0,.35);
+  --glass-fill: color-mix(in srgb, var(--text) 7%, transparent);
+  --glass-fill-strong: color-mix(in srgb, var(--text) 11%, transparent);
+  /* Bordes izquierdo/derecho de todas las piezas. Con el telefono de costado
+     el notch/camara queda a un lado: no se meten ahi. */
+  --nav-left:  max(var(--nav-bar-side), calc(env(safe-area-inset-left, 0px) + 8px));
+  --nav-right: max(var(--nav-bar-side), calc(env(safe-area-inset-right, 0px) + 8px));
+}
+
 /* La pildora: vidrio flotante anclado abajo. La estetica vale en cualquier
    ancho (el lector la usa tambien en la PC, ver reader.css); en la biblioteca
    solo se ve en el celu. La topbar flotante es su gemela, anclada arriba. */
 .bottom-nav, .top-nav {
   position: fixed; z-index: 150;
-  left: var(--nav-bar-side); right: var(--nav-bar-side);
+  left: var(--nav-left); right: var(--nav-right);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  box-shadow: 0 10px 30px rgba(0,0,0,.45);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  backdrop-filter: blur(20px) saturate(1.4);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
+/* La barra SE TRANSFORMA en el panel (al estilo Liquid Glass): al abrir, sus
+   iconos se desvanecen y deja de dibujar su fondo; el panel arranca con la
+   forma exacta de la barra y se estira hacia arriba. Una sola capa de vidrio
+   en todo momento. Al cerrar, el panel vuelve a la forma de la barra y recien
+   ahi reaparecen los iconos (la clase se saca al terminar, ver nav.js). */
+/* Los iconos pueden estar adentro de grupos (la pildora del lector): con
+   display:contents el grupo no dibuja caja y su opacidad no les llegaria, asi
+   que se apunta tambien a lo de adentro. */
+.bottom-nav > *, .bottom-nav .rn-group > * { transition: opacity .2s var(--nav-ease); }
+.nav-sheet-abierta .bottom-nav {
+  background-color: transparent; border-color: transparent; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  pointer-events: none;
+}
+.nav-sheet-abierta .bottom-nav > *,
+.nav-sheet-abierta .bottom-nav .rn-group > * { opacity: 0; transition-duration: .12s; }
 .bottom-nav {
   display: none;
   bottom: var(--nav-bar-bottom);
@@ -53,11 +89,6 @@
 
 @media (max-width: 640px) {
   .bottom-nav { display: flex; }
-  /* De costado el notch/camara queda a un lado: las pildoras no se meten ahi. */
-  .bottom-nav, .top-nav {
-    left: max(var(--nav-bar-side), calc(env(safe-area-inset-left, 0px) + 8px));
-    right: max(var(--nav-bar-side), calc(env(safe-area-inset-right, 0px) + 8px));
-  }
   .top-nav:not([hidden]) {
     display: flex; align-items: center;
     top: var(--top-nav-top); height: var(--top-nav-h);
@@ -113,17 +144,18 @@
 
   .nav-sheet {
     position: fixed; z-index: 170;
-    left: var(--nav-bar-side); right: var(--nav-bar-side);
+    left: var(--nav-left); right: var(--nav-right);
     bottom: var(--nav-bar-bottom);
     max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 24px);
     display: flex; flex-direction: column; overflow: hidden;
     border-radius: 28px;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
-    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-    /* Sin fondo oscurecido, la sombra es lo que lo despega de lo de atras. */
-    box-shadow: 0 22px 60px rgba(0,0,0,.6), 0 4px 14px rgba(0,0,0,.4);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    backdrop-filter: blur(20px) saturate(1.4);
+    /* El mismo vidrio que la pildora (antes era casi opaco, 96%). Sin fondo
+       oscurecido atras, la sombra es lo que lo despega. */
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-raised);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
     clip-path: inset(calc(100% - var(--nav-bar-height)) 0px 0px 0px round 999px);
     -webkit-clip-path: inset(calc(100% - var(--nav-bar-height)) 0px 0px 0px round 999px);
     transition: clip-path .32s var(--nav-ease), -webkit-clip-path .32s var(--nav-ease);
@@ -135,6 +167,8 @@
   .nav-sheet.open {
     clip-path: inset(-80px round 108px);
     -webkit-clip-path: inset(-80px round 108px);
+    /* El estiramiento termina con un rebote chico, como algo liquido. */
+    animation: navLiquid .5s cubic-bezier(.25, 1.35, .45, 1) both;
   }
 
   /* El padding inferior reserva el alto de la barra: esa franja es literalmente
@@ -187,7 +221,7 @@
   .nav-sheet-field input,
   .nav-sheet-field select {
     flex: 1; min-width: 0;
-    background: var(--surface2);
+    background: var(--glass-fill);
     border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     color: var(--text);
     border-radius: 999px;
@@ -226,7 +260,7 @@
   .nav-sheet-seg {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: .25rem; margin: 0 .35rem .35rem;
-    background: var(--surface2);
+    background: var(--glass-fill);
     border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 999px; padding: .25rem;
   }
@@ -292,19 +326,27 @@
     --search-tuck: 26px;
     pointer-events: none;
     position: fixed; z-index: 140;
-    left:  var(--nav-bar-side);
-    right: var(--nav-bar-side);
+    left:  var(--nav-left);
+    right: var(--nav-right);
     bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px) + var(--nav-bar-height) - var(--search-tuck));
     margin: 0;
     height: calc(52px + var(--search-tuck));
     display: flex; align-items: center; gap: .4rem;
     padding: 0 .5rem var(--search-tuck) 1.1rem;
-    background: color-mix(in srgb, var(--surface) 45%, var(--bg));
-    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+    /* El mismo vidrio que la pildora. La parte que se mete por detras de
+       ella (--search-tuck) se recorta en el medio, para que no se vea la
+       doble capa a traves de la pildora; se deja solo en los extremos, donde
+       tapa el hueco de las esquinas redondeadas de la barra. */
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-bottom: none;
     border-radius: 24px 24px 0 0;
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    --tuck-r: calc(var(--nav-bar-height) / 2);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - var(--tuck-r)) 100%,
+      calc(100% - var(--tuck-r)) calc(100% - var(--search-tuck)), var(--tuck-r) calc(100% - var(--search-tuck)),
+      var(--tuck-r) 100%, 0 100%);
     /* Cerrada: escondida detras de la pildora. */
     transform: translateY(52px);
     opacity: 0;
@@ -353,3 +395,22 @@
   border-left: 1.5px solid var(--tree-line); border-bottom: 1.5px solid var(--tree-line);
   border-bottom-left-radius: 7px; pointer-events: none;
 }
+
+/* Contenido que se muda de un modal al panel (en el celu: subir y
+   notificaciones). Adentro del vidrio nada es opaco: rellenos translucidos. */
+.nav-sheet .form-group select,
+.nav-sheet .form-group input { background: var(--glass-fill); border-color: var(--glass-border); }
+.nav-sheet .drop-zone { border-color: color-mix(in srgb, var(--text) 18%, transparent); }
+.nav-sheet .progress-bar { background: var(--glass-fill); }
+.nav-sheet .notif-row { background: var(--glass-fill); border-color: var(--glass-border); }
+.nav-sheet .notif-row.unread:hover { background: var(--glass-fill-strong); }
+
+@keyframes navLiquid {
+  0%   { transform: scale(1, .985); }
+  100% { transform: scale(1, 1); }
+}
+.nav-sheet { transform-origin: 50% 100%; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-sheet, .nav-sheet.open { transition: none; animation: none; }
+}
+

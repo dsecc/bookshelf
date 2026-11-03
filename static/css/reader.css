@@ -170,7 +170,7 @@ html[data-text-theme] body { background: var(--tx-bg); }
 }
 .info-title-text:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .info-title.editing .info-title-text {
-  background: var(--surface2); padding: .45rem 1rem;
+  background: var(--glass-fill-strong); padding: .45rem 1rem;
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 /* El lapiz se transforma en el tilde de guardar. */

@@ -17,8 +17,16 @@ let _navSheetOnClose = null;
 function _navSheetCleanup() {
   const fn = _navSheetOnClose;
   _navSheetOnClose = null;
+  // Recien cuando el panel termino de volver a la forma de la pildora: la
+  // barra recupera su fondo en el mismo lugar, sin salto.
+  document.documentElement.classList.remove("nav-sheet-abierta");
   if (fn) fn();
 }
+
+// ── La barra se transforma en el panel ───────────────────────────────────────
+// Mientras el panel esta abierto, la pagina lleva .nav-sheet-abierta: la barra
+// esconde sus iconos y deja de dibujar su fondo (ver nav.css). Se saca en la
+// limpieza, cuando el panel ya volvio a la forma de la barra.
 
 function closeNavSheet(inmediato) {
   const sheet = document.getElementById("navSheet");
@@ -45,6 +53,7 @@ function openNavSheet(build, onClose) {
   closeNavSheet(true);
 
   _navSheetOnClose = onClose || null;
+  document.documentElement.classList.add("nav-sheet-abierta");
 
   const back = document.createElement("div");
   back.id = "navSheetBackdrop";
