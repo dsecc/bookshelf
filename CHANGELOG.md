@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.16.3 — Libros arriba, lapiz en las colecciones y Ajustes en el panel
+
+### Cambiado
+- **Sin lugar vacio arriba**: en el inicio (celu y PC) los libros arrancan arriba de todo y la topbar flota encima. Adentro de una carpeta el celu sigue dejando el lugar (la ruta ocupa mas); en la PC nunca.
+- **Los libros del inicio miden lo mismo que adentro de una carpeta** (celu y PC): las tarjetas de las hileras toman el ancho de una columna de la grilla, con la misma cuenta que hace la grilla (`medirTarjetas`).
+- **Renombrar pasa a un lapiz al lado de cada carpeta** en el panel de colecciones (no en Sin coleccion ni en Temporal): la carpeta se vuelve campo en el lugar y el lapiz se transforma en el tilde. La topbar queda solo para ver donde estas y navegar (tocar la carpeta actual tambien abre las colecciones).
+- **Celu: "Mas" queda con Notificaciones y Ajustes**, y las dos se abren en el mismo panel, que se estira hasta su contenido (`swapNavSheet`), sin ir a otra pantalla. Ajustes es el mismo de la PC: Papelera, Releer biblioteca, Cambiar contrasena, Cerrar sesion y la tarjeta de creditos (lo que era Informacion).
+- `VERSION` del service worker: `v38` → `v39`.
+
 ## v1.16.2 — El teclado sube la barra, no la pagina
 
 ### Arreglado

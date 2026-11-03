@@ -368,11 +368,11 @@ function renderLibTopNav() {
   }
   bar.hidden = false;
   document.body.classList.add("con-topnav");
-  // Tocar la barra (la "/" o cualquier lugar que no sea un tramo) abre las
-  // colecciones, que bajan desde ella. Los tramos de arriba siguen llevando
-  // ahi y la carpeta actual se renombra.
+  // Tocar la barra (la "/", la carpeta actual o cualquier lugar que no sea un
+  // tramo de arriba) abre las colecciones, que bajan desde ella. Los tramos de
+  // arriba siguen llevando ahi.
   bar.onclick = e => {
-    if (e.target.closest("button.ltn-crumb:not(.ltn-root), .ltn-crumb.renombrable")) return;
+    if (e.target.closest("button.ltn-crumb:not(.ltn-root)")) return;
     openColSheet();
   };
   box.innerHTML = "";
@@ -383,21 +383,14 @@ function renderLibTopNav() {
   raiz.setAttribute("aria-label", "Colecciones");
   box.appendChild(raiz);
   let actual = tramos.length ? null : raiz;
-  const col = vista === "biblioteca" && !trashView && !offlineView ? colById(activeColId) : null;
   tramos.forEach(([txt, fn], i) => {
     if (i) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
-    // La actual es un span: se vuelve editable en el lugar (un boton no).
     const b = document.createElement(fn ? "button" : "span");
     b.className = "ltn-crumb" + (fn ? "" : " current");
     b.textContent = txt;
     if (fn) b.onclick = fn; else { b.setAttribute("aria-current", "page"); actual = b; }
     box.appendChild(b);
   });
-  if (actual && actual !== raiz && col && !col.is_root && !col.is_temp) {
-    actual.classList.add("renombrable");
-    actual.title = "Cambiar el nombre";
-    actual.onclick = () => renombrarEnTopbar(actual, col);
-  }
   medirLibTopNav(actual);
 }
 
@@ -417,40 +410,6 @@ function medirLibTopNav(actual) {
     const fin = actual ? actual.offsetLeft - box.firstElementChild.offsetLeft + actual.offsetWidth + pad + 16 : 0;
     box.scrollLeft = Math.max(0, fin - box.clientWidth);
   });
-}
-
-// Renombrar: tocar la carpeta actual la vuelve campo en el lugar, con la misma
-// transicion que el titulo del libro en el lector. Enter o salir guarda;
-// Escape vuelve atras. La topbar se estira mientras se escribe.
-function renombrarEnTopbar(el, col) {
-  if (el.classList.contains("editando")) return;
-  el.classList.add("editando");
-  el.contentEditable = "plaintext-only";
-  if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
-  el.spellcheck = false;
-  el.focus();
-  const r = document.createRange(); r.selectNodeContents(el);
-  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-  const medir = () => medirLibTopNav(el);
-  setTimeout(medir, 300); // despues de que crece el padding
-  let listo = false;
-  const terminar = async guardar => {
-    if (listo) return;
-    listo = true;
-    el.contentEditable = "false";
-    el.classList.remove("editando");
-    getSelection().removeAllRanges();
-    const nuevo = el.textContent.replace(/\s+/g, " ").trim();
-    if (guardar && nuevo && nuevo !== col.name && await renameCollection(col.id, nuevo)) return;
-    el.textContent = col.name;
-    setTimeout(medir, 300);
-  };
-  el.oninput = medir;
-  el.onkeydown = e => {
-    if (e.key === "Enter") { e.preventDefault(); terminar(true); }
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); terminar(false); }
-  };
-  el.onblur = () => terminar(true);
 }
 
 async function renameCollection(id, name) {
@@ -481,6 +440,7 @@ function renderBooks(filter) {
     // volver hacia arriba, y la papelera vacia dice que esta vacia.
     animateOut(container, () => {
       container.innerHTML = "";
+      marcarRaiz();
       const head = makeViewHead();
       if (head) container.appendChild(head);
       animateIn(container);
@@ -502,6 +462,8 @@ function renderBooks(filter) {
   // Capturar el render en una funcion y ejecutar con animacion
   function doPopulate() {
     container.innerHTML = "";
+    marcarRaiz();
+    medirTarjetas();
 
   if (activeColId == null && !offlineView && !trashView) {
     // Hileras seguidas, sin titulos: el nombre de cada una lo dice la
@@ -549,6 +511,28 @@ function renderBooks(filter) {
   });
 }
 
+
+// En la raiz (el inicio, con hileras) el celu no reserva lugar arriba para la
+// topbar: los libros van arriba de todo y ella flota encima. Se marca recien
+// con el contenido escondido (animateOut), para que el salto no se vea.
+function marcarRaiz() {
+  const raiz = vistaActual() === "biblioteca" && activeColId == null && !offlineView && !trashView;
+  document.body.classList.toggle("en-raiz", raiz);
+}
+
+// Las tarjetas de las hileras miden lo mismo que las de la grilla de una
+// carpeta: la misma cuenta que hace CSS con auto-fill (cuantas columnas de
+// --card-min entran, y se reparten el ancho).
+function medirTarjetas() {
+  const box = document.getElementById("booksContainer");
+  if (!box || !box.clientWidth) return;
+  const css = getComputedStyle(document.documentElement);
+  const min = parseFloat(css.getPropertyValue("--card-min")) || 197;
+  const gap = parseFloat(css.getPropertyValue("--grid-gap-x")) || 13.6;
+  const cols = Math.max(1, Math.floor((box.clientWidth + gap) / (min + gap)));
+  box.style.setProperty("--card-w", Math.floor((box.clientWidth - gap * (cols - 1)) / cols) + "px");
+}
+window.addEventListener("resize", () => medirTarjetas());
 
 function animateOut(el, cb) {
   el.style.transition = "opacity .18s ease, transform .18s ease";
@@ -776,7 +760,7 @@ function setView(view) {
   document.getElementById("viewAbout").style.display     = view === "about"       ? "" : "none";
   document.getElementById("viewSettings").style.display  = view === "settings"    ? "" : "none";
   // La topbar dice donde estas: tambien en Ajustes e Informacion.
-  if (view !== "biblioteca") renderLibTopNav();
+  if (view !== "biblioteca") { renderLibTopNav(); document.body.classList.remove("en-raiz"); }
   rowTag.refresh();
 }
 
@@ -1278,57 +1262,37 @@ function toggleLibSearch(forzar) {
   }
 }
 
-// ── Panel "Mas" de la biblioteca ─────────────────────────────────────────────
-// Recibe lo que dejo de tener la topbar (notificaciones, cerrar sesion) y lo
-// que salio de la barra (About, Ajustes): son consultas ocasionales, no algo
-// que uno haga a cada rato.
+// ── Panel "Mas" de la biblioteca (celu) ──────────────────────────────────────
+// Notificaciones y Ajustes: consultas ocasionales. Las dos se abren en el
+// mismo panel, que se estira hasta su contenido (sin ir a otra pantalla).
 function openMoreSheet() {
   const ICO = {
     notif: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
-    info:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
     set:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V12z"/></svg>',
-    out:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
   };
-  const s = openNavSheet(body => {
+  openNavSheet(body => {
 
     // Notificaciones: el contador del boton original se replica como detalle.
     const badge = document.getElementById("notifBadge");
     const sinVer = badge && badge.style.display !== "none" ? badge.textContent.trim() : null;
+    // Las dos se abren en el mismo panel: se estira hasta su contenido.
     body.appendChild(navSheetRow({
       label: "Notificaciones", icon: ICO.notif, detail: sinVer, active: !!sinVer,
-      onClick: () => { s.close(); setTimeout(() => document.getElementById("btnNotif").click(), NAV_SHEET_CLOSE_MS); },
+      onClick: () => { loadNotifications(); openNotifSheet(true); },
     }));
-
     body.appendChild(navSheetRow({
-      label: "Informacion", icon: ICO.info, active: vistaActual() === "about",
-      onClick: () => {
-        s.close();
-        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-        setNavActive("navAbout"); setView("about"); loadAbout();
-      },
-    }));
-
-    body.appendChild(navSheetRow({
-      label: "Ajustes", icon: ICO.set, active: vistaActual() === "settings",
-      onClick: () => {
-        s.close();
-        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-        setNavActive("navSettings"); setView("settings");
-      },
-    }));
-
-    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
-    body.appendChild(navSheetRow({
-      label: "Cerrar sesion", icon: ICO.out,
-      onClick: () => { window.location.href = "/logout"; },
+      label: "Ajustes", icon: ICO.set,
+      onClick: () => openAjustesSheet(true),
     }));
   });
 }
 
-// ── Ajustes (PC) ─────────────────────────────────────────────────────────────
-// La ruedita de la pildora. Junta lo chico: la papelera, releer la biblioteca,
-// la contrasena (se despliega en el lugar), cerrar sesion y los creditos.
-function openAjustesSheet() {
+// ── Ajustes ──────────────────────────────────────────────────────────────────
+// La ruedita de la pildora en la PC; en el celu, desde "Mas" (enLugar: el
+// mismo panel se estira hasta esto). Junta lo chico: la papelera, releer la
+// biblioteca, la contrasena (se despliega en el lugar), cerrar sesion y los
+// creditos (lo que era Informacion).
+function openAjustesSheet(enLugar) {
   const ico = d => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' + d + '</svg>';
   const ICO = {
     trash: ico('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
@@ -1340,7 +1304,7 @@ function openAjustesSheet() {
   const form = document.getElementById("formPassword");
   const casa = form.parentNode;
 
-  const s = openNavSheet(body => {
+  const s = (enLugar ? swapNavSheet : openNavSheet)(body => {
     const head = document.createElement("div");
     head.className = "nav-sheet-title";
     head.innerHTML = "<span>Ajustes</span>";
@@ -1543,12 +1507,12 @@ const rowTag = (() => {
 // aparecer como una hoja desde abajo. Se mueven los nodos del modal adentro y
 // se devuelven al cerrar, asi loadNotifications() sigue pintando sobre los
 // mismos elementos y los handlers de cada notificacion no se tocan.
-function openNotifSheet() {
+function openNotifSheet(enLugar) {
   const inner  = document.querySelector("#modalNotif .modal");
   const header = inner.querySelector(".modal-header");
   const movidos = [...inner.children].filter(el => el !== header);
 
-  openNavSheet(body => {
+  (enLugar ? swapNavSheet : openNavSheet)(body => {
     const head = document.createElement("div");
     head.className = "nav-sheet-title";
     head.innerHTML = "<span>Notificaciones</span>";
@@ -1658,6 +1622,9 @@ function openColSheet() {
   // cierra directo a esa medida (si no, cerraria a la vieja y saltaria).
   const ir = fn => { salirDeEspeciales(); fn(); renderLibTopNav(); s.close(); };
 
+  const ICO_PEN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICO_OK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>';
+
   const s = openNavSheet(body => {
     const head = document.createElement("div");
     head.className = "nav-sheet-title";
@@ -1668,6 +1635,46 @@ function openColSheet() {
     nueva.onclick = () => { closeNavSheet(); setTimeout(openNewColSheet, NAV_SHEET_CLOSE_MS); };
     head.appendChild(nueva);
     body.appendChild(head);
+
+    // Renombrar: el lapiz de al lado de la carpeta la vuelve campo en el
+    // lugar (misma transicion que el titulo del libro) y se transforma en el
+    // tilde. Enter, el tilde o salir guarda; Escape vuelve atras. La fila se
+    // cambia por una copia que no es boton (un campo editable adentro de un
+    // boton se porta mal) y vuelve al terminar.
+    const renombrar = (row, c, lapiz) => {
+      const fila = document.createElement("div");
+      fila.className = row.className;
+      fila.innerHTML = row.innerHTML;
+      row.replaceWith(fila);
+      const lbl = fila.querySelector(".row-label");
+      lbl.contentEditable = "plaintext-only";
+      if (lbl.contentEditable !== "plaintext-only") lbl.contentEditable = "true";
+      lbl.spellcheck = false;
+      requestAnimationFrame(() => { fila.classList.add("renombrando"); lapiz.classList.add("editando"); });
+      lbl.focus({ preventScroll: true });
+      const r = document.createRange(); r.selectNodeContents(lbl);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      let listo = false;
+      const terminar = async guardar => {
+        if (listo) return;
+        listo = true;
+        getSelection().removeAllRanges();
+        lbl.contentEditable = "false";
+        fila.classList.remove("renombrando");
+        lapiz.classList.remove("editando");
+        lapiz._terminar = null;
+        const nuevo = lbl.textContent.replace(/\s+/g, " ").trim();
+        if (guardar && nuevo && nuevo !== c.name && await renameCollection(c.id, nuevo)) c.name = nuevo;
+        row.querySelector(".row-label").textContent = c.name;
+        setTimeout(() => fila.replaceWith(row), 280);
+      };
+      lbl.onkeydown = e => {
+        if (e.key === "Enter") { e.preventDefault(); terminar(true); }
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); terminar(false); }
+      };
+      lbl.onblur = () => terminar(true);
+      lapiz._terminar = terminar;
+    };
 
     body.appendChild(navSheetRow({
       label: "Todos los libros", icon: ICO_ALL,
@@ -1714,6 +1721,19 @@ function openColSheet() {
         onClick: () => ir(() => openCollection(c.id)),
       });
       rowWrap.appendChild(row);
+      // La raiz (Sin coleccion) y Temporal no se renombran.
+      if (!c.is_root && !c.is_temp) {
+        const lapiz = Object.assign(document.createElement("button"), { className: "tree-pen", title: "Cambiar el nombre" });
+        lapiz.setAttribute("aria-label", "Cambiar el nombre de " + c.name);
+        lapiz.innerHTML = '<span class="ico-edit">' + ICO_PEN + '</span><span class="ico-ok">' + ICO_OK + '</span>';
+        // mousedown y no click: si no, el blur del campo guarda antes.
+        lapiz.onmousedown = e => { if (lapiz._terminar) { e.preventDefault(); lapiz._guardo = true; lapiz._terminar(true); } };
+        lapiz.onclick = () => {
+          if (lapiz._guardo) { lapiz._guardo = false; return; }
+          if (!lapiz._terminar) renombrar(row, c, lapiz);
+        };
+        rowWrap.appendChild(lapiz);
+      }
       const hijas = () => {
         const sub = document.createElement("div");
         sub.className = "tree-children";
@@ -1743,6 +1763,9 @@ function openColSheet() {
           pintarChev();
         };
         rowWrap.appendChild(chev);
+      } else {
+        // El lugar de la flechita, para que los lapices queden en columna.
+        rowWrap.appendChild(Object.assign(document.createElement("span"), { className: "tree-chev tree-chev-vacio" }));
       }
       node.appendChild(rowWrap);
       if (kids.length && abiertas.has(c.id)) node.appendChild(hijas());

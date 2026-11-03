@@ -83,6 +83,27 @@ function openNavSheet(build, onClose, opts) {
   return { sheet, body, close: () => closeNavSheet() };
 }
 
+// Cambia el contenido del panel abierto por otro, sin cerrarlo: el panel
+// estira (o achica) su alto hasta el nuevo y el contenido entra con un
+// fundido. Si no hay uno abierto de abajo, abre normal.
+function swapNavSheet(build, onClose) {
+  const sheet = document.getElementById("navSheet");
+  if (!sheet || !sheet.classList.contains("open") || sheet._desde) return openNavSheet(build, onClose);
+  const viejo = _navSheetOnClose;
+  _navSheetOnClose = onClose || null;
+  if (viejo) viejo();
+  const body = sheet.querySelector(".nav-sheet-body");
+  const h0 = sheet.offsetHeight;
+  body.replaceChildren();
+  build(body);
+  const h1 = sheet.offsetHeight;
+  if (sheet.animate && !_treeQuieto()) {
+    sheet.animate([{ height: h0 + "px" }, { height: h1 + "px" }], { duration: 460, easing: _ease });
+    body.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 140, easing: "ease", fill: "backwards" });
+  }
+  return { sheet, body, close: () => closeNavSheet() };
+}
+
 // ── Panel que crece desde la topbar ──────────────────────────────────────────
 // El espejo del de abajo, en dos tiempos de una sola animacion: la topbar (que
 // mide lo que muestra) primero se ensancha hasta el ancho de la pildora de

@@ -170,13 +170,16 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   scroll-snap-type: x mandatory; scrollbar-width: none;
 }
 .books-row::-webkit-scrollbar { display: none; }
-.books-row .book-card { flex-shrink: 0; width: 197px; scroll-snap-align: start; }
+/* Las tarjetas de las hileras miden lo mismo que las de la grilla de una
+   coleccion: --card-w lo calcula app.js (medirTarjetas) con la misma cuenta
+   que hace la grilla (cuantas columnas de --card-min entran). */
+:root { --card-min: 197px; --grid-gap-x: 13.6px; }
+.books-row .book-card { flex-shrink: 0; width: var(--card-w, var(--card-min)); scroll-snap-align: start; }
 
-/* Grilla de una coleccion: entran tantas columnas como permita el ancho. El
-   minimo de cada columna es el mismo ancho que tienen las tarjetas en las filas. */
+/* Grilla de una coleccion: entran tantas columnas como permita el ancho. */
 .books-grid {
-  display: grid; gap: 1.1rem .85rem;
-  grid-template-columns: repeat(auto-fill, minmax(197px, 1fr));
+  display: grid; gap: 1.1rem var(--grid-gap-x);
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
 }
 
 /* Book card */
@@ -606,12 +609,15 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   }
 
   /* ── Libros: grilla mas compacta ── */
+  :root { --card-min: 132px; --grid-gap-x: 9.6px; }
   .books-row { gap: .6rem; padding-bottom: .5rem; }
-  .books-row .book-card { width: 132px; }
-  .books-grid { gap: .9rem .6rem; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+  .books-grid { gap: .9rem var(--grid-gap-x); }
   .col-head { display: block; }
-  /* El contenido arranca debajo de la topbar flotante. */
+  /* Adentro de una carpeta el contenido arranca debajo de la topbar (que
+     ocupa mas con la ruta); en la raiz los libros van arriba de todo y la
+     topbar flota encima. */
   body.con-topnav .content { padding-top: calc(var(--top-nav-top) + var(--top-nav-h) + 14px); }
+  body.con-topnav.en-raiz .content { padding-top: var(--top-nav-top); }
   .trash-head .view-head-title { display: block; width: 100%; }
   .trash-head .btn-danger { min-height: 44px; }
   .book-cover { border-radius: 5px; }
@@ -665,8 +671,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 /* ── Pantalla muy chica ── */
 @media (max-width: 380px) {
-  .books-row .book-card { width: 114px; }
-  .books-grid { grid-template-columns: repeat(auto-fill, minmax(114px, 1fr)); }
+  :root { --card-min: 114px; }
   .topbar-title { font-size: .78rem; }
 }
 
@@ -880,15 +885,28 @@ body.logging-out {
 .col-tree.apagado { opacity: .4; }
 .col-tree.apagado .nav-sheet-row.active { background: none; }
 
-/* Renombrar desde la topbar: la carpeta actual se vuelve editable en el
-   lugar, con la misma transicion que el titulo del libro en el lector. */
-.ltn-crumb.current.renombrable { cursor: text; }
-.ltn-crumb.editando {
-  outline: none; cursor: text; padding: 0 .8rem;
-  background: var(--glass-fill-strong);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent);
+/* Renombrar desde el panel de colecciones: el lapiz de al lado de cada
+   carpeta la vuelve campo en el lugar (la transicion del titulo del libro en
+   el lector) y se transforma en el tilde. */
+.tree-pen {
+  position: relative; flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; border: none; cursor: pointer;
+  background: none; color: var(--text-muted); opacity: .6;
+  transition: background .25s var(--nav-ease), color .25s var(--nav-ease), opacity .2s;
+  -webkit-tap-highlight-color: transparent;
 }
-.ltn-crumb { transition: background .28s var(--nav-ease), box-shadow .28s var(--nav-ease), padding .28s var(--nav-ease); }
+.tree-pen:hover { opacity: 1; background: var(--nav-active-bg); }
+.tree-chev-vacio { pointer-events: none; }
+.tree-pen > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transition: opacity .2s ease, transform .28s var(--nav-ease); }
+.tree-pen .ico-ok { opacity: 0; transform: rotate(-45deg) scale(.6); }
+.tree-pen.editando { opacity: 1; background: var(--accent); color: #fff; }
+.tree-pen.editando .ico-edit { opacity: 0; transform: rotate(45deg) scale(.6); }
+.tree-pen.editando .ico-ok { opacity: 1; transform: none; }
+.nav-sheet-row .row-label { border-radius: 999px; outline: none; transition: background .28s var(--nav-ease), box-shadow .28s var(--nav-ease), padding .28s var(--nav-ease), margin .28s var(--nav-ease); }
+.nav-sheet-row.renombrando .row-label {
+  background: var(--glass-fill-strong); padding: .3rem .8rem; margin: -.3rem 0;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent);
+  overflow: visible; text-overflow: clip;
+}
 
 /* Pildora: los botones solo de la PC y el icono de Ajustes. */
 .bn-item .ico-cel { display: contents; }
@@ -912,7 +930,8 @@ body.logging-out {
     --nav-space: calc(var(--nav-bar-height) + var(--nav-bar-bottom) + 14px);
   }
   .sidebar, .topbar { display: none !important; }
-  .content { padding: calc(var(--top-nav-top) + var(--top-nav-h) + 18px) 1.25rem calc(var(--nav-space) + 1rem); }
+  /* En la PC sobra lugar: la topbar flota encima de los libros siempre. */
+  .content { padding: var(--top-nav-top) 1.25rem calc(var(--nav-space) + 1rem); }
   .lib-top-nav:not([hidden]) { display: flex; align-items: center; top: var(--top-nav-top); height: var(--top-nav-h); overflow: hidden; }
   .ltn-crumb:hover:not(.current) { background: var(--nav-active-bg); color: var(--text); }
 
