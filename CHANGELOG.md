@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.16.4 — La rueda, por mitades
+
+### Cambiado
+- **PC: la rueda del mouse sobre una hilera la corre de costado si el puntero esta en la mitad derecha de la pantalla**; en la mitad izquierda (donde esta la etiqueta) baja la pagina. Si la hilera ya llego al final para ese lado, la rueda baja la pagina igual. Shift + rueda y el touchpad siguen corriendo de costado en cualquier lado.
+- `VERSION` del service worker: `v39` → `v40`.
+
 ## v1.16.3 — Libros arriba, lapiz en las colecciones y Ajustes en el panel
 
 ### Cambiado

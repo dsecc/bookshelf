@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.16.3"
+APP_VERSION = "1.16.4"
 
 @app.context_processor
 def inject_ver():

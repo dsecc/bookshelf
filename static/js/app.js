@@ -1732,9 +1732,22 @@ function openColSheet() {
 function _originalInit() {}
 init();
 
-// La rueda sobre una hilera ya no la corre de costado: sin sidebar y con las
-// hileras seguidas, casi toda la pantalla es hilera y no habia forma de bajar.
-// De costado: Shift + rueda o el touchpad (lo hace el navegador solo).
+// La rueda sobre una hilera: en la mitad derecha de la pantalla la corre de
+// costado; en la izquierda (donde esta la etiqueta) baja la pagina. Con las
+// hileras seguidas casi toda la pantalla es hilera, y si la rueda siempre las
+// corriera no habria forma de bajar. Si la hilera ya llego al final para ese
+// lado, la rueda baja la pagina igual. Shift + rueda y el touchpad corren de
+// costado en cualquier lado (lo hace el navegador solo).
+document.addEventListener("wheel", e => {
+  if (e.shiftKey || e.clientX < window.innerWidth / 2) return;
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; // ya es de costado
+  const row = e.target.closest(".books-row");
+  if (!row) return;
+  const tope = e.deltaY > 0 ? row.scrollLeft + row.clientWidth >= row.scrollWidth - 1 : row.scrollLeft <= 0;
+  if (tope) return;
+  e.preventDefault();
+  row.scrollBy({ left: e.deltaY * 2.5, behavior: "smooth" });
+}, { passive: false });
 
 // Scroll sidebar -> content con inercia suave
 (function() {

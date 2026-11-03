@@ -254,8 +254,8 @@ La biblioteca en la PC ya no tiene sidebar, topbar vieja ni modales: arriba la
 topbar de la ruta y abajo la pildora (4.1), con las medidas de PC del lector
 (600px, 58px de alto). Los modales que quedan en el HTML (Subir, Notificaciones)
 son solo deposito: su contenido se muda al panel. Libros un 20% mas grandes
-(197px en PC, 132px en el celu). La rueda del mouse sobre una hilera ya no la
-corre de costado (casi toda la pantalla es hilera): de costado, Shift + rueda o
-el touchpad.
+(197px en PC, 132px en el celu). La rueda del mouse sobre una hilera la corre de
+costado en la mitad derecha de la pantalla y baja la pagina en la izquierda
+(v1.16.4); si la hilera ya llego al final, baja la pagina.
 
 Escape cierra el panel abierto, o si no el buscador.
