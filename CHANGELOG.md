@@ -2,6 +2,17 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17.1 — Borrar carpetas sin perder libros
+
+### Agregado
+- **Borrar una colección desde el panel.** Al tocar el lápiz (editar el nombre), la flechita de al lado se convierte en un **tachito**. El primer toque lo pone rojo y la cuenta dice *¿Borrar?* (con un aviso de a dónde va lo de adentro); el segundo la borra, la fila se pliega y el árbol se rehace. Si no se toca de nuevo en 4 segundos, se desarma.
+- **No se pierde nada:** lo que había adentro (libros y subcarpetas, con todo lo suyo) **sube un nivel**: a la carpeta de arriba si era una subcarpeta, o a *Sin colección* si era de primer nivel. Si arriba ya hay una subcarpeta con el mismo nombre se juntan, y un archivo con el nombre de otro queda como `nombre (1)`. Las subcarpetas que suben ocupan el lugar de la borrada en el orden; lo que estaba en la papelera y había salido de ahí restaura al lugar nuevo. Los libros conservan su progreso, marcadores y copias sin conexión.
+- Si estabas adentro de la carpeta que borraste, quedás en la de arriba.
+- *Sin colección* y *Temporal* no se pueden borrar.
+
+### Cambiado
+- Los avisos largos ocupan dos renglones en lugar de salirse de la pantalla.
+
 ## v1.17 — Las carpetas, en el orden que quieras
 
 ### Agregado

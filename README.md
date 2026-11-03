@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.17** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.17.1** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -22,7 +22,7 @@ Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, boo
 
 Celu y PC comparten la misma interfaz: **dos barras de vidrio flotando sobre los libros** (ver [docs/pildoras.md](docs/pildoras.md)).
 
-- **Arriba, la ruta** (`/`, `/ Ciberseguridad / Malware`). Cada tramo lleva ahí; tocar la barra en cualquier otro lado la ensancha y baja el **panel de colecciones**: el árbol de carpetas, *+ Nueva*, un **lápiz al lado de cada carpeta** para renombrarla en el lugar y una **flechita** que la sube un lugar, para ordenarlas a gusto.
+- **Arriba, la ruta** (`/`, `/ Ciberseguridad / Malware`). Cada tramo lleva ahí; tocar la barra en cualquier otro lado la ensancha y baja el **panel de colecciones**: el árbol de carpetas, *+ Nueva*, un **lápiz al lado de cada carpeta** para renombrarla en el lugar y una **flechita** que la sube un lugar, para ordenarlas a gusto. Editando el nombre, la flechita pasa a ser un **tachito**: borrar una carpeta no borra libros, lo de adentro sube a la carpeta de arriba (o a *Sin colección*).
 - **Abajo, la píldora**. En la PC: Biblioteca, Sin conexión, Buscar, Subir, Notificaciones y Ajustes. En el celu: Biblioteca, Buscar, Subir y *Más* (Notificaciones y Ajustes). Todo lo que se abre crece desde la píldora, sin ventanas.
 - **Ajustes**: Papelera, Releer biblioteca, Cambiar contraseña, Cerrar sesión y la versión.
 - **El inicio**: los libros arrancan arriba de todo. *Últimos leídos* es la primera hilera en la PC; en el celu llena la primera pantalla (en un iPhone 12 mini, tres filas de dos). Después, una hilera por colección, en el orden del panel de colecciones (*Temporal* siempre última), sin títulos: el nombre lo dice una **etiqueta vertical a la izquierda** que se arrastra arriba o abajo y, tocándola, entra a esa colección.

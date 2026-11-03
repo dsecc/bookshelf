@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.17"
+APP_VERSION = "1.17.1"
 
 @app.context_processor
 def inject_ver():
@@ -1023,7 +1023,11 @@ def order_collections():
 @app.route("/api/collections/<int:col_id>", methods=["DELETE"])
 @login_required
 def delete_collection(col_id):
-    # Solo carpetas vacias: lo que tiene libros se vacia primero (o a mano).
+    """Borrar una carpeta no borra libros: todo lo de adentro (libros y
+    subcarpetas, con lo suyo) sube un nivel, a la carpeta de arriba o a la raiz
+    ("Sin coleccion"). Si arriba ya hay una subcarpeta con el mismo nombre se
+    juntan, y un archivo con el nombre de otro queda como "nombre (1)". Las
+    subcarpetas que suben quedan en el lugar de la borrada en el orden."""
     uid = current_user_id()
     conn = get_db()
     col = owned_collection(conn, col_id)
@@ -1031,17 +1035,104 @@ def delete_collection(col_id):
         conn.close(); abort(404)
     if col["path"] in ("", TEMP_COLLECTION_NAME):
         conn.close(); return jsonify({"error": "No se puede borrar"}), 400
+    old, dest = col["path"], parent_rel(col["path"])
+    inside = lambda p: p.startswith(old + "/")
     with library_lock():
+        cols = conn.execute("SELECT * FROM collections WHERE user_id=?", (uid,)).fetchall()
+        # Carpetas que ya existen (sin mayusculas/minusculas, como al crear):
+        # lo que sube y choca con una de ellas se mete adentro.
+        existing = {c["path"].casefold(): c for c in cols if c["path"] != old and not inside(c["path"])}
+        target = {}  # carpeta de adentro -> a donde va
+
+        def moved(p):
+            # p esta adentro de la borrada: su lugar un nivel mas arriba.
+            return join_rel(target.get(parent_rel(p), dest), p.rsplit("/", 1)[-1])
+
+        # 1. Subcarpetas, de arriba hacia abajo: cada una se mueve (conserva id
+        #    y orden) o, si ya hay una igual donde cae, se junta con esa.
+        siblings = [c for c in cols if c["parent_id"] == col["parent_id"] and c["id"] != col_id
+                    and c["path"] != TEMP_COLLECTION_NAME]
+        level_up = []  # las hijas directas que suben, en su orden
+        for c in sorted((c for c in cols if inside(c["path"])), key=lambda c: c["path"].count("/")):
+            new = moved(c["path"])
+            same = existing.get(new.casefold())
+            if same:
+                target[c["path"]] = same["path"]
+                conn.execute("DELETE FROM collections WHERE id=?", (c["id"],))
+                continue
+            target[c["path"]] = new
+            parent_id = existing[parent_rel(new).casefold()]["id"] if parent_rel(new) else None
+            conn.execute("UPDATE collections SET path=?, parent_id=? WHERE id=?", (new, parent_id, c["id"]))
+            existing[new.casefold()] = {"id": c["id"], "path": new}
+            if parent_rel(c["path"]) == old:
+                level_up.append(c)
+            os.makedirs(rel_to_abs(uid, new), exist_ok=True)
+
+        # 2. Libros: cada archivo a su lugar nuevo (con nombre libre).
+        books_moved = 0
+        for b in conn.execute("SELECT id, relpath FROM books WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchall():
+            rel = b["relpath"] or ""
+            if not inside(rel):
+                continue
+            folder = target.get(parent_rel(rel), dest)
+            new_rel = unique_rel(conn, uid, folder, rel.rsplit("/", 1)[-1], ignore_id=b["id"])
+            src = rel_to_abs(uid, rel)
+            if os.path.lexists(src):
+                os.makedirs(rel_to_abs(uid, folder), exist_ok=True)
+                os.rename(src, rel_to_abs(uid, new_rel))
+            place_book(conn, uid, b["id"], new_rel)
+            books_moved += 1
+
+        # 3. Lo de la papelera que vino de adentro restaura al lugar nuevo.
+        for b in conn.execute("SELECT id, deleted_from FROM books WHERE user_id=? AND deleted_at IS NOT NULL", (uid,)).fetchall():
+            frm = b["deleted_from"] or ""
+            if inside(frm):
+                conn.execute("UPDATE books SET deleted_from=? WHERE id=?",
+                             (join_rel(target.get(parent_rel(frm), dest), frm.rsplit("/", 1)[-1]), b["id"]))
+
+        # 4. Lo que quede en disco y no es un libro indexado (otros archivos)
+        #    tambien sube; despues se borran las carpetas, ya vacias.
+        root = rel_to_abs(uid, old)
+        for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+            rel_dir = nfc(os.path.relpath(dirpath, user_upload_dir(uid)).replace(os.sep, "/"))
+            folder = target.get(rel_dir) or (moved(rel_dir) if inside(rel_dir) else dest)
+            for f in filenames:
+                base, ext = os.path.splitext(f)
+                dst, n = rel_to_abs(uid, join_rel(folder, f)), 1
+                while os.path.lexists(dst):
+                    dst = rel_to_abs(uid, join_rel(folder, f"{base} ({n}){ext}")); n += 1
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                os.rename(os.path.join(dirpath, f), dst)
+            for d in dirnames:
+                full = os.path.join(dirpath, d)
+                if os.path.islink(full):
+                    os.rename(full, rel_to_abs(uid, join_rel(folder, d + " (enlace)")))
+                else:
+                    try: os.rmdir(full)
+                    except OSError: pass
         try:
-            os.rmdir(rel_to_abs(uid, col["path"]))
+            os.rmdir(root)
         except FileNotFoundError:
             pass
-        except OSError:
-            conn.close(); return jsonify({"error": "La coleccion no esta vacia"}), 409
+        except OSError as e:
+            print("Coleccion borrada pero su carpeta no quedo vacia:", root, e)
         conn.execute("DELETE FROM collections WHERE id=?", (col_id,))
+
+        # 5. Orden: las hijas que suben ocupan el lugar de la borrada. Si ella
+        #    no tenia lugar elegido (iba entre las alfabeticas), ellas tampoco.
+        if col["sort_order"] is None:
+            for c in level_up:
+                conn.execute("UPDATE collections SET sort_order=NULL WHERE id=?", (c["id"],))
+        else:
+            key = lambda c: (c["sort_order"] is None, c["sort_order"] or 0, c["name"].casefold())
+            before = [c for c in siblings if c["sort_order"] is not None and c["sort_order"] < col["sort_order"]]
+            after = [c for c in siblings if c["id"] not in {b["id"] for b in before}]
+            for i, c in enumerate(sorted(before, key=key) + sorted(level_up, key=key) + sorted(after, key=key)):
+                conn.execute("UPDATE collections SET sort_order=? WHERE id=?", (i, c["id"]))
         conn.commit()
     conn.close()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "books_moved": books_moved,
+                    "to": col["parent_id"], "to_name": dest.rsplit("/", 1)[-1] if dest else DEFAULT_COLLECTION_NAME})
 
 @app.route("/api/collections/<int:col_id>", methods=["PATCH"])
 @login_required

@@ -1610,12 +1610,13 @@ function openColSheet() {
   const ICO_PEN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const ICO_OK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>';
   const ICO_UP = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg>';
+  const ICO_DEL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
   // Ordenar: la flechita sube la carpeta un lugar entre sus hermanas (Temporal
   // queda fija al final). Se guarda el orden de todo ese nivel y las filas se
   // cruzan animadas; las hileras de la biblioteca se acomodan al cerrar.
   let reordenado = false;
-  const pintarFlechas = cont => cont.querySelectorAll(":scope > .tree-node > .tree-row > .tree-up")
+  const pintarFlechas = cont => cont.querySelectorAll(":scope > .tree-node > .tree-row > button.tree-up")
     .forEach((f, i) => { f.classList.toggle("primera", i === 0); f.tabIndex = i === 0 ? -1 : 0; });
   const subir = async (c, node) => {
     const hermanas = (c.parent_id == null ? topLevel() : childrenOf(c.parent_id)).filter(x => !x.is_temp);
@@ -1671,7 +1672,9 @@ function openColSheet() {
       lbl.contentEditable = "plaintext-only";
       if (lbl.contentEditable !== "plaintext-only") lbl.contentEditable = "true";
       lbl.spellcheck = false;
-      requestAnimationFrame(() => { fila.classList.add("renombrando"); lapiz.classList.add("editando"); });
+      // Mientras se edita, la flechita de al lado es el tachito (borrar).
+      const flecha = lapiz.parentNode.querySelector(":scope > .tree-up");
+      requestAnimationFrame(() => { fila.classList.add("renombrando"); lapiz.classList.add("editando"); if (flecha) flecha.classList.add("editando"); });
       lbl.focus({ preventScroll: true });
       const r = document.createRange(); r.selectNodeContents(lbl);
       const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -1683,6 +1686,7 @@ function openColSheet() {
         lbl.contentEditable = "false";
         fila.classList.remove("renombrando");
         lapiz.classList.remove("editando");
+        if (flecha) flecha.classList.remove("editando", "seguro");
         lapiz._terminar = null;
         const nuevo = lbl.textContent.replace(/\s+/g, " ").trim();
         if (guardar && nuevo && nuevo !== c.name && await renameCollection(c.id, nuevo)) c.name = nuevo;
@@ -1697,7 +1701,7 @@ function openColSheet() {
       lapiz._terminar = terminar;
     };
 
-    body.appendChild(navSheetRow({
+    const todos = body.appendChild(navSheetRow({
       label: "Todos los libros", icon: ICO_ALL,
       active: !offlineView && !trashView && activeColId === null,
       onClick: () => {
@@ -1749,8 +1753,11 @@ function openColSheet() {
       else {
         const flecha = Object.assign(document.createElement("button"), { className: "tree-up", title: "Subir" });
         flecha.setAttribute("aria-label", "Subir " + c.name);
-        flecha.innerHTML = ICO_UP;
-        flecha.onclick = () => subir(c, node);
+        flecha.innerHTML = '<span class="ico-up">' + ICO_UP + '</span><span class="ico-del">' + ICO_DEL + '</span>';
+        // Editando el nombre es el tachito: mousedown y no click, igual que el
+        // lapiz, para que el campo no pierda el foco (y guarde) antes.
+        flecha.onmousedown = e => { if (flecha.classList.contains("editando")) e.preventDefault(); };
+        flecha.onclick = () => flecha.classList.contains("editando") ? borrar(c, node, flecha) : subir(c, node);
         rowWrap.appendChild(flecha);
       }
       if (c.is_root || c.is_temp) hueco("tree-pen");
@@ -1807,6 +1814,60 @@ function openColSheet() {
     });
     build(tree, topLevel());
     pintarFlechas(tree);
+
+    // Borrar: el primer toque al tachito pregunta (se pone rojo y dice a
+    // donde va lo de adentro), el segundo borra. Los libros y las subcarpetas
+    // no se borran: suben a la carpeta de arriba (o a Sin coleccion). La fila
+    // se pliega y el arbol se rehace con lo que subio.
+    const borrar = async (c, node, flecha) => {
+      const arriba = c.parent_id != null ? collections.find(x => x.id === c.parent_id) : collections.find(x => x.is_root);
+      const destino = arriba ? arriba.name : "Sin coleccion";
+      const lleno = (c.book_count || 0) > 0 || childrenOf(c.id).length > 0;
+      const cuenta = () => node.querySelector(":scope > .tree-row .nav-sheet-row .row-count");
+      if (!flecha.classList.contains("seguro")) {
+        flecha.classList.add("seguro");
+        const n = cuenta();
+        if (n) { n.dataset.antes = n.textContent; n.textContent = "¿Borrar?"; n.classList.add("pregunta"); }
+        toast(lleno ? "Toca de nuevo: lo de adentro pasa a " + destino : "Toca de nuevo para borrarla");
+        clearTimeout(flecha._desarmar);
+        flecha._desarmar = setTimeout(() => {
+          flecha.classList.remove("seguro");
+          const n = cuenta();
+          if (n && n.dataset.antes != null) { n.textContent = n.dataset.antes; n.classList.remove("pregunta"); }
+        }, 4000);
+        return;
+      }
+      clearTimeout(flecha._desarmar);
+      const lapiz = node.querySelector(":scope > .tree-row > .tree-pen");
+      if (lapiz && lapiz._terminar) lapiz._terminar(false);
+      const res = await fetch("/api/collections/" + c.id, { method: "DELETE" }).catch(() => null);
+      if (!res || !res.ok) {
+        const err = res ? await res.json().catch(() => ({})) : {};
+        toast(res ? err.error || "No se pudo borrar" : "Sin conexion: no se pudo borrar");
+        return;
+      }
+      const r = await res.json();
+      treeClose(node);
+      // Si se estaba adentro, se queda en la de arriba (o en la biblioteca).
+      if (activeColId === c.id) activeColId = c.parent_id != null ? c.parent_id : null;
+      toast(c.name + " borrada" + (r.books_moved ? ". " + r.books_moved + (r.books_moved === 1 ? " libro paso" : " libros pasaron") + " a " + r.to_name : ""));
+      await refresh();
+      // Despues de plegarse, el arbol con los datos nuevos (cuentas y las
+      // subcarpetas que subieron); el panel acompaña el cambio de alto.
+      setTimeout(() => {
+        const sheet = tree.closest(".nav-sheet");
+        if (!sheet || !tree.isConnected) return;
+        const h0 = sheet.offsetHeight;
+        tree.replaceChildren();
+        todos.classList.toggle("active", !offlineView && !trashView && activeColId === null);
+        build(tree, topLevel());
+        pintarFlechas(tree);
+        const h1 = sheet.offsetHeight;
+        if (h0 !== h1 && sheet.animate && !_treeQuieto())
+          sheet.animate([{ height: h0 + "px" }, { height: h1 + "px" }], { duration: 460, easing: "cubic-bezier(.32,.72,0,1)" });
+        tree.animate && tree.animate([{ opacity: .4 }, { opacity: 1 }], { duration: 260, easing: "ease" });
+      }, TREE_MS + 40);
+    };
   }, () => {
     // Si se ordeno y se sigue en la biblioteca, las hileras toman el orden
     // nuevo (si se fue a una coleccion, esa ya se pinta sola).
