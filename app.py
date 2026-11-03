@@ -14,7 +14,7 @@ UPLOAD_FOLDER = "/app/uploads"
 COVERS_FOLDER = "/app/data/covers"
 DB_PATH = "/app/data/bookshelf.db"
 SECRET_KEY_PATH = "/app/data/secret_key"
-ALLOWED_EXTENSIONS = {"pdf","epub","mobi","cbz","cbr","djvu","fb2","txt","doc","docx"}
+ALLOWED_EXTENSIONS = {"pdf","epub","mobi","cbz","cbr","djvu","fb2","txt","md","doc","docx"}
 DEFAULT_COLLECTION_NAME = "Sin coleccion"
 SHARE_CLEANUP_DAYS = 7
 

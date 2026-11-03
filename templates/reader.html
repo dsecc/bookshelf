@@ -165,6 +165,28 @@
   </div>
 </div>
 
+<!-- TXT / Markdown. La barra de ajustes va arriba del texto y se va con el
+     scroll: se toca una vez y queda guardada (bs_text_prefs). Son botones y no
+     selects a proposito: un select con fuente < 16px hace zoom en iOS. -->
+<div id="textViewer" class="viewer" style="display:none">
+  <div class="text-wrap" id="textWrap">
+    <div class="text-toolbar">
+      <button class="text-tb-btn" id="textFont" title="Tipo de letra">Serif</button>
+      <span class="text-tb-group">
+        <button class="text-tb-btn" id="textSmaller" title="Letra mas chica" aria-label="Letra mas chica">A&#8722;</button>
+        <span class="text-tb-size" id="textSize">18</span>
+        <button class="text-tb-btn" id="textBigger" title="Letra mas grande" aria-label="Letra mas grande">A+</button>
+      </span>
+      <span class="text-tb-group">
+        <button class="text-theme" data-theme="dark" title="Oscuro" aria-label="Tema oscuro"></button>
+        <button class="text-theme" data-theme="sepia" title="Sepia" aria-label="Tema sepia"></button>
+        <button class="text-theme" data-theme="light" title="Claro" aria-label="Tema claro"></button>
+      </span>
+    </div>
+    <article class="text-body" id="textBody"></article>
+  </div>
+</div>
+
 <!-- Unsupported -->
 <div id="unsupportedViewer" class="viewer" style="display:none">
   <div class="unsupported-msg">
@@ -308,6 +330,7 @@
 <script src="/static/js/vendor/epub.min.js?v={{ static_ver }}"></script>
 <script src="/static/js/nav.js?v={{ static_ver }}"></script>
 <script src="/static/js/progress.js?v={{ static_ver }}"></script>
+<script src="/static/js/mdlite.js?v={{ static_ver }}"></script>
 <script src="/static/js/reader.js?v={{ static_ver }}"></script>
 </body>
 </html>

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.13 — Colecciones en grilla, doble pagina nitida y lector de texto
+
+### Cambiado
+- **Dentro de una coleccion los libros se ven en grilla**, una hilera debajo de la otra, con tantas columnas como entren en la pantalla (6 en una compu de 1440 px, 3 en un iPhone). Antes era una sola fila que habia que scrollear de costado. La biblioteca general sigue igual: una fila por coleccion. *Sin conexion* y la busqueda dentro de una coleccion tambien usan la grilla.
+
+### Agregado
+- **Lector de TXT y Markdown (.md).** Scroll continuo, con letra (Serif / Sans / Mono), tamaño y tema (oscuro, sepia, claro) ajustables. Son preferencias del dispositivo y valen para todos los textos. Guarda el progreso (porcentaje leido, el mismo campo que el EPUB, asi la tarjeta muestra "% leido"), tiene bookmarks (por porcentaje) y busqueda con las coincidencias marcadas.
+  - El Markdown cubre lo de las notas tipo Obsidian: titulos, negrita, italica, tachado, `==resaltado==`, codigo, bloques de codigo, citas, listas anidadas y de tareas, tablas, links, imagenes y `[[wikilinks]]` (se ven, no navegan). El front matter de YAML no se muestra.
+  - **Seguro por construccion:** `static/js/mdlite.js` es un renderizador propio que escapa todo el HTML antes de darle formato, y solo deja links `http(s)`, `mailto` o relativos. Importa porque los libros se comparten entre usuarios: un `.md` ajeno se dibuja en tu sesion. La contra es que el HTML crudo dentro de un `.md` se ve como texto.
+  - Un `.txt` que no es UTF-8 valido se lee como Windows-1252 (los `.txt` viejos de Windows salian con los acentos rotos).
+  - En el celu scrollea el documento, como el modo scroll del PDF, y respeta la safe area de arriba y la pildora de abajo. Los ajustes son botones de 44 px y no selects (un select con fuente chica hace zoom en iOS).
+  - `.md` se puede subir (antes lo rechazaba el servidor).
+
+### Corregido
+- **La doble pagina (y el modo libro) se veian borrosos en la compu.** El marco de cada hoja era A4 fijo y el canvas se estiraba para llenarlo: en cualquier PDF que no fuera A4 la hoja quedaba reescalada (6 % mas ancha en un libro de 6x9, y en el modo libro ademas agrandada un 11 %). Ahora el marco toma la proporcion real del PDF y el canvas tiene exactamente los pixeles de la pantalla, tambien con el escalado de Windows al 125 %/150 %.
+- **Al agrandar la ventana, entrar a pantalla completa o hacer zoom en el navegador**, las hojas no se volvian a dibujar y quedaban chicas o borrosas. Ahora se rearman (solo si de verdad cambio el tamaño o la densidad de pixeles).
+- **Volver a la doble pagina o al modo libro despues de cambiar de modo rompia el lector** (`Cannot set properties of null`): el `destroy()` de StPageFlip saca del DOM el contenedor de las hojas, y al volver no habia donde dibujarlas.
+- **En un EPUB, elegir un modo de lectura (scroll, pagina, libro, doble) dejaba la pantalla en blanco.** Esos modos son solo del PDF; en los demas formatos el selector ya no aparece.
+
+### Notas
+- `VERSION` del service worker: `v25` → `v26`; `mdlite.js` agregado al app shell.
+- Verificado en Chromium, escritorio (1440x900, con `devicePixelRatio` 1 y 1.25) y mobile (390x844), contra la version anterior:
+  - Grilla: antes 1 fila con 14 libros; ahora 3 filas en escritorio y 5 en el celu, sin scroll horizontal.
+  - Doble pagina y libro: antes canvas de 509 px mostrado en 541 (proporcion 0,667 estirada a 0,708); ahora 1:1 en todos los casos, tambien despues de cambiar el tamaño de la ventana. Ir y volver entre modos, flechas del teclado y *Siguiente* funcionan sin errores y conservan la pagina.
+  - Markdown con `<script>`, `onerror=`, links `javascript:` e imagenes `data:`: ninguno llega al DOM como codigo (cero scripts, cero atributos `on*`, cero links `javascript:`).
+  - Preferencias y progreso sobreviven una recarga; ir a un bookmark vuelve al mismo porcentaje; un TXT en Windows-1252 muestra "canción, año, pingüino".
+
 ## v1.12 — El progreso sobrevive sin conexion
 
 Leias un libro descargado sin internet (en el gimnasio), avanzabas de la 70 a la 100, salias, y al volver a entrar estabas otra vez en la 70. Reproducido tal cual en Chromium con el modo offline real.

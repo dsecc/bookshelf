@@ -211,10 +211,12 @@ function renderBooks(filter) {
       container.appendChild(row);
     });
   } else {
-    const row = document.createElement("div");
-    row.className = "books-row";
-    filtered.forEach(b => row.appendChild(makeCard(b)));
-    container.appendChild(row);
+    // Dentro de una coleccion (o Sin conexion) no hay filas por coleccion que
+    // separar: se muestra todo en una grilla que ocupa el ancho disponible.
+    const grid = document.createElement("div");
+    grid.className = "books-grid";
+    filtered.forEach(b => grid.appendChild(makeCard(b)));
+    container.appendChild(grid);
   }
   } // fin doPopulate
 

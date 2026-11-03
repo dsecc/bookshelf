@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.12** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.13** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -111,7 +111,8 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 ## Formatos soportados
 - **PDF** — lector completo con zoom y navegación por páginas
 - **EPUB** — lector con fuente, tamaño y tema ajustable
-- **MOBI, CBZ, CBR, DJVU, FB2, TXT** — descarga directa
+- **TXT y Markdown (.md)** — lector con fuente, tamaño, tema, búsqueda y bookmarks. El Markdown se dibuja con un renderizador propio (`static/js/mdlite.js`) que escapa todo el HTML: un `.md` compartido no puede ejecutar nada
+- **MOBI, CBZ, CBR, DJVU, FB2** — descarga directa
 
 ## Funcionalidades
 - 👤 Multiusuario, con bibliotecas completamente aisladas
@@ -119,7 +120,7 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 - 📴 Lectura sin conexión: guardás los libros que quieras y se leen sin internet
 - 📁 Colecciones (crear, mover libros entre ellas)
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
-- 📖 Lector integrado para PDF y EPUB
+- 📖 Lector integrado para PDF, EPUB, TXT y Markdown
 - 🔖 Bookmarks con nombre
 - 📍 Progreso guardado por dispositivo, también sin conexión (se sincroniza solo al volver internet)
 - ⬇️ Descarga directa de archivos

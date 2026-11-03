@@ -210,7 +210,7 @@ function openBookmarkMenu() {
     body.appendChild(head);
     body.appendChild(navSheetRow({
       label: "Nuevo bookmark", icon: RN_ICO.bmPlus,
-      detail: pdfDoc ? "Pag " + pdfPage : undefined,
+      detail: _bmLabel(_bmHere()) || undefined,
       onClick: delegar(() => toggleBookmarkBar(true)),
     }));
     body.appendChild(navSheetRow({
@@ -244,7 +244,7 @@ function openBookmarksSheet() {
       item.className = "nav-sheet-item";
       const fila = navSheetRow({
         label: bm.label || "Bookmark", icon: RN_ICO.bm,
-        detail: pos.page ? "Pag " + pos.page : "",
+        detail: _bmLabel(pos),
         active: !!pdfDoc && pos.page === pdfPage,
         onClick: () => { closeNavSheet(); irABookmark(pos); },
       });
@@ -278,7 +278,8 @@ function toggleBookmarkBar(forzar) {
   if (abrir) {
     toggleSearchBar(false);
     input.value = "";
-    input.placeholder = pdfDoc ? "Bookmark en la pagina " + pdfPage : "Nombre del bookmark";
+    input.placeholder = pdfDoc ? "Bookmark en la pagina " + pdfPage
+      : _text ? "Bookmark en el " + _bmLabel(_bmHere()) : "Nombre del bookmark";
   }
   bar.classList.toggle("open", abrir);
   if (abrir) input.focus(); else input.blur();
@@ -402,8 +403,12 @@ async function init() {
     }
 
     const fmt = currentBook.format.toUpperCase();
+    // Los modos (scroll, pagina, libro, doble) son solo del PDF: en otro
+    // formato elegir uno escondia el visor y dejaba la pantalla en blanco.
+    if (fmt !== "PDF") document.getElementById("viewModeSelector").style.display = "none";
     if (fmt === "PDF") await initPDF();
     else if (fmt === "EPUB") initEPUB();
+    else if (fmt === "TXT" || fmt === "MD") await initText(fmt);
     else initUnsupported();
   } catch (e) {
     // Tipicamente: sin conexion y este libro no se guardo para offline.
@@ -553,6 +558,7 @@ async function initPDF() {
   // Solo el modo scroll re-escala al cambiar el ancho; si se cambia a otro
   // modo hay que soltar el handler viejo para no redibujar un viewer oculto.
   _scrollRerender = null;
+  _flipRebuild = null;
   _capturePosition = null;
   if (viewMode === "scroll")  await initPDFScroll();
   else if (viewMode === "page")   await initPDFPage();
@@ -592,6 +598,7 @@ function scheduleScrollRerender(delay) {
   clearTimeout(_scrollResizeTimer);
   _scrollResizeTimer = setTimeout(() => {
     if (_scrollRerender) _scrollRerender();
+    else if (_flipRebuild) _flipRebuild();
   }, delay == null ? 200 : delay);
 }
 
@@ -842,29 +849,80 @@ async function initPDFPage() {
   window._pdfPageGo = go;
 }
 
+// ── Modos de voltear hoja (libro y doble pagina) ─────────────────────────────
+// StPageFlip muestra cada hoja al tamaño exacto del marco y, en reposo, sin
+// ninguna transformacion: si el marco tiene la proporcion real del PDF y el
+// canvas los pixeles reales de la pantalla, la hoja se ve 1:1. Antes el marco
+// era A4 fijo y el canvas se estiraba para llenarlo (borroso y deformado en
+// cualquier PDF que no fuera A4), y no se volvia a dibujar al cambiar la
+// ventana o el zoom del navegador.
+
+// Lo setean los modos de voltear hoja; scheduleScrollRerender lo llama al
+// cambiar la ventana o entrar/salir de fullscreen.
+let _flipRebuild = null;
+
+async function flipPageSize(maxW, maxH) {
+  const vp0 = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+  const ratio = vp0.height / vp0.width;
+  const pageW = Math.floor(Math.min(maxW, maxH / ratio));
+  return { pageW, pageH: Math.floor(pageW * ratio) };
+}
+
+// Dibuja la hoja entera dentro del marco sin deformarla: si una hoja tiene
+// otra proporcion que la primera, queda centrada en vez de estirada.
+async function renderFlipPage(page, pageW, pageH) {
+  const vp0 = page.getViewport({ scale: 1 });
+  const s = Math.min(pageW / vp0.width, pageH / vp0.height);
+  const cssW = Math.floor(vp0.width * s), cssH = Math.floor(vp0.height * s);
+  // En vivo y no la constante DPR: el zoom del navegador lo cambia.
+  const dpr = window.devicePixelRatio || 1;
+  const c = document.createElement("canvas");
+  c.width  = Math.round(cssW * dpr);
+  c.height = Math.round(cssH * dpr);
+  c.style.cssText = "display:block;width:" + cssW + "px;height:" + cssH + "px;margin:" +
+    Math.floor((pageH - cssH) / 2) + "px auto 0;";
+  const vp = page.getViewport({ scale: c.width / vp0.width });
+  await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+  return c;
+}
+
+// destroy() de StPageFlip saca del DOM el contenedor que se le paso, asi que
+// para volver a armar el modo hay que crearlo de nuevo.
+function freshFlipContainer(wrapId, id) {
+  const old = document.getElementById(id);
+  if (old) old.remove();
+  const el = document.createElement("div");
+  el.id = id;
+  document.getElementById(wrapId).appendChild(el);
+  return el;
+}
+
+// Rearma el modo solo si de verdad cambio el lugar disponible o la densidad
+// de pixeles (el teclado o la barra de direcciones tambien disparan resize).
+function flipRebuilder(wrap, init) {
+  const key = () => wrap.clientWidth + "x" + wrap.clientHeight + "@" + (window.devicePixelRatio || 1);
+  const built = key();
+  return () => { if (key() !== built) init(); };
+}
+
 // ── BOOK MODE (StPageFlip) ────────────────────────────────────────────────────
 async function initPDFBook() {
   const viewer = document.getElementById("pdfBookViewer");
   viewer.style.display = "flex";
   const wrap = document.getElementById("bookFlipWrap");
+  if (pageFlipInstance) { try { pageFlipInstance.destroy(); } catch(e){} pageFlipInstance = null; }
   await new Promise(r => setTimeout(r, 80));
-  const W = wrap.clientWidth, H = wrap.clientHeight - 48;
-  const pageW = Math.floor(Math.min(W / 2, H * 0.7));
-  const pageH = Math.floor(pageW * 1.41);
+  const { pageW, pageH } = await flipPageSize(wrap.clientWidth / 2, wrap.clientHeight - 48);
   const loadedPages = {};
 
   async function getPageCanvas(num) {
     if (loadedPages[num]) return loadedPages[num];
-    const c = document.createElement("canvas");
-    const page = await pdfDoc.getPage(num);
-    await renderPageToCanvas(page, c, pageW, pageH);
-    c.style.width = pageW + "px"; c.style.height = pageH + "px";
+    const c = await renderFlipPage(await pdfDoc.getPage(num), pageW, pageH);
     loadedPages[num] = c;
     return c;
   }
 
-  const container = document.getElementById("bookPagesContainer");
-  container.innerHTML = "";
+  const container = freshFlipContainer("bookFlipWrap", "bookPagesContainer");
   container.style.width = pageW + "px"; container.style.height = pageH + "px";
   const pages = [];
 
@@ -911,6 +969,7 @@ async function initPDFBook() {
   document.getElementById("bookNext").onclick = () => pageFlipInstance.flipNext();
   document.getElementById("bookPageInfo").textContent = pdfPage + " / " + pdfTotal;
   window._bookFlip = pageFlipInstance;
+  _flipRebuild = flipRebuilder(wrap, initPDFBook);
 }
 
 // ── SPREAD MODE (StPageFlip doble pagina) ────────────────────────────────────
@@ -926,11 +985,9 @@ async function initPDFSpread() {
 
   const W = Math.max(wrap.clientWidth  - 32, 400);
   const H = Math.max(wrap.clientHeight - 60, 300);
-  const pageW = Math.floor(Math.min(W / 2 - 4, H * 0.72));
-  const pageH = Math.floor(pageW * 1.414); // A4 ratio
+  const { pageW, pageH } = await flipPageSize(W / 2 - 4, H);
 
-  const container = document.getElementById("bookPagesContainerSpread");
-  container.innerHTML = "";
+  const container = freshFlipContainer("spreadWrap", "bookPagesContainerSpread");
   container.style.cssText = "position:relative;width:" + pageW + "px;height:" + pageH + "px;";
 
   const pageDivs = [];
@@ -951,15 +1008,7 @@ async function initPDFSpread() {
     rendered.add(pageNum);
     const div = pageDivs[pageNum - 1];
     try {
-      const page = await pdfDoc.getPage(pageNum);
-      const vp0  = page.getViewport({ scale: 1 });
-      const scale = Math.min(pageW / vp0.width, pageH / vp0.height) * DPR;
-      const vp = page.getViewport({ scale });
-      const c = document.createElement("canvas");
-      c.width  = Math.floor(vp.width);
-      c.height = Math.floor(vp.height);
-      c.style.cssText = "width:100%;height:100%;display:block;";
-      await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      const c = await renderFlipPage(await pdfDoc.getPage(pageNum), pageW, pageH);
       div.innerHTML = "";
       div.appendChild(c);
     } catch(e) { console.warn("spread render error p" + pageNum, e); }
@@ -1017,7 +1066,12 @@ async function initPDFSpread() {
   input.onkeydown = e => { if (e.key === "Enter") document.getElementById("spreadGo").click(); };
   window._spreadFlip = dir => dir > 0 ? pf.flipNext() : pf.flipPrev();
 
-  // Auto-ocultar footer
+  _flipRebuild = flipRebuilder(wrap, initPDFSpread);
+
+  // Auto-ocultar footer. Una sola vez: el modo se rearma al cambiar la ventana
+  // y los listeners se irian acumulando.
+  if (viewer.dataset.footerBound) return;
+  viewer.dataset.footerBound = "1";
   const footer = document.getElementById("pdfSpreadFooter");
   let hideT = null;
   function showF() {
@@ -1049,6 +1103,82 @@ function initEPUB() {
   };
 }
 
+// ── TXT / Markdown ────────────────────────────────────────────────────────────
+// Se lee como una pagina: scroll continuo, sin paginas. El progreso es el
+// porcentaje scrolleado, el mismo campo que usa el EPUB, asi la tarjeta de la
+// biblioteca lo muestra sin cambios. Letra, tamaño y tema son preferencias del
+// dispositivo (no del libro) y valen para todos los textos.
+const TEXT_PREFS_KEY = "bs_text_prefs";
+const TEXT_FONTS = [["serif", "Serif"], ["sans-serif", "Sans"], ["monospace", "Mono"]];
+// Lo setea initText; lo usan los bookmarks.
+let _text = null;
+
+async function initText(fmt) {
+  const viewer = document.getElementById("textViewer");
+  const wrap   = document.getElementById("textWrap");
+  const body   = document.getElementById("textBody");
+  viewer.style.display = "flex";
+
+  // Mismo criterio que el modo scroll del PDF: en mobile scrollea el
+  // documento (ver initPDFScroll), en desktop el contenedor.
+  const docScroll = window.matchMedia("(max-width: 640px)").matches;
+  document.documentElement.classList.toggle("doc-scroll", docScroll);
+  const scroller = docScroll ? window : wrap;
+  const maxTop = () => docScroll
+    ? document.documentElement.scrollHeight - window.innerHeight
+    : wrap.scrollHeight - wrap.clientHeight;
+  const pct  = () => { const m = maxTop(); return m > 0 ? Math.min(1, Math.max(0, (docScroll ? window.scrollY : wrap.scrollTop) / m)) : 0; };
+  const goTo = p => { const y = Math.round(p * maxTop()); if (docScroll) window.scrollTo(0, y); else wrap.scrollTop = y; };
+
+  const res = await fetch("/api/books/" + bookId + "/file");
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const buf = await res.arrayBuffer();
+  // UTF-8 si es valido; si no, casi seguro es un .txt viejo de Windows.
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); }
+  catch { text = new TextDecoder("windows-1252").decode(buf); }
+
+  if (fmt === "MD") { body.classList.add("md"); body.innerHTML = MdLite.render(text); }
+  else body.textContent = text;
+
+  let prefs = {};
+  try { prefs = JSON.parse(localStorage.getItem(TEXT_PREFS_KEY)) || {}; } catch {}
+  prefs = { font: prefs.font || "serif", size: prefs.size || 18, theme: prefs.theme || "dark" };
+
+  // keepPos: al cambiar la letra cambia el alto del texto; sin esto saltaria
+  // a otra parte del libro.
+  function apply(keepPos) {
+    const antes = keepPos ? pct() : null;
+    document.documentElement.dataset.textTheme = prefs.theme;
+    body.style.fontFamily = prefs.font;
+    body.style.fontSize = prefs.size + "px";
+    document.getElementById("textFont").textContent = TEXT_FONTS.find(f => f[0] === prefs.font)[1];
+    document.getElementById("textSize").textContent = prefs.size;
+    document.querySelectorAll(".text-theme").forEach(b => b.classList.toggle("active", b.dataset.theme === prefs.theme));
+    try { localStorage.setItem(TEXT_PREFS_KEY, JSON.stringify(prefs)); } catch {}
+    if (antes != null) goTo(antes);
+  }
+  document.getElementById("textFont").onclick = () => {
+    const i = TEXT_FONTS.findIndex(f => f[0] === prefs.font);
+    prefs.font = TEXT_FONTS[(i + 1) % TEXT_FONTS.length][0]; apply(true);
+  };
+  document.getElementById("textSmaller").onclick = () => { prefs.size = Math.max(12, prefs.size - 2); apply(true); };
+  document.getElementById("textBigger").onclick  = () => { prefs.size = Math.min(32, prefs.size + 2); apply(true); };
+  document.querySelectorAll(".text-theme").forEach(b => b.onclick = () => { prefs.theme = b.dataset.theme; apply(false); });
+  apply(false);
+
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const prog = await fetchProgress();
+  if (prog.percentage) goTo(prog.percentage);
+
+  const save = () => saveProgress({ percentage: Math.round(pct() * 10000) / 10000 });
+  let t = null;
+  scroller.addEventListener("scroll", () => { clearTimeout(t); t = setTimeout(save, 400); }, { passive: true });
+  // Al salir del lector (volver, cambiar de app) se guarda sin esperar.
+  _capturePosition = save;
+  _text = { pct, goTo };
+}
+
 function initUnsupported() {
   document.documentElement.classList.remove("doc-scroll");
   document.getElementById("unsupportedViewer").style.display = "flex";
@@ -1068,8 +1198,12 @@ function saveProgress(data) {
 // Lista en memoria: la usan el drawer de escritorio y los paneles de mobile.
 let _bookmarks = [];
 const _bmPos = bm => (typeof bm.position === "string" ? JSON.parse(bm.position) : bm.position) || {};
+// En PDF la posicion es una pagina; en TXT/Markdown, un porcentaje.
+const _bmLabel = pos => pos.page ? "Pag " + pos.page : pos.pct != null ? Math.round(pos.pct * 100) + "%" : "";
+const _bmHere = () => pdfDoc ? { page: pdfPage } : _text ? { pct: Math.round(_text.pct() * 10000) / 10000 } : {};
 
 function irABookmark(pos) {
+  if (pos.pct != null && _text) { _text.goTo(pos.pct); return; }
   if (!pos.page) return;
   if (viewMode === "scroll" && window._scrollGoPage) window._scrollGoPage(pos.page);
   else if (viewMode === "page" && window._pdfPageGo) window._pdfPageGo(pos.page - pdfPage);
@@ -1090,11 +1224,11 @@ async function loadBookmarks() {
   _bookmarks.forEach(bm => {
     const li = document.createElement("li"); li.className = "bm-item";
     const pos = _bmPos(bm);
-    li.innerHTML = "<div><div class='bm-label'></div><div class='bm-page'>Pag " + (pos.page||"?") + "</div></div>" +
+    li.innerHTML = "<div><div class='bm-label'></div><div class='bm-page'>" + (_bmLabel(pos) || "?") + "</div></div>" +
       "<button class='bm-del'><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M18 6 6 18M6 6l12 12'/></svg></button>";
     li.querySelector(".bm-label").textContent = bm.label || "Bookmark";
     li.querySelector(".bm-del").onclick = e => { e.stopPropagation(); borrarBookmark(bm.id); };
-    if (pos.page) li.onclick = e => { if (!e.target.closest(".bm-del")) irABookmark(pos); };
+    if (pos.page || pos.pct != null) li.onclick = e => { if (!e.target.closest(".bm-del")) irABookmark(pos); };
     ul.appendChild(li);
   });
 }
@@ -1102,7 +1236,7 @@ async function loadBookmarks() {
 // Sin argumento lee el modal de escritorio; la barra de mobile pasa su texto.
 async function saveBookmark(texto) {
   const label    = (typeof texto === "string" ? texto : document.getElementById("bmNameInput").value).trim();
-  const position = pdfDoc ? { page: pdfPage } : {};
+  const position = _bmHere();
   await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, position })
   });
@@ -1183,7 +1317,7 @@ function bindAll() {
 
   // Search
   document.getElementById("btnSearch").onclick = () => toggleSearchBar();
-  document.getElementById("btnSearchClose").onclick     = () => toggleSearchBar(false);
+  document.getElementById("btnSearchClose").onclick     = () => { toggleSearchBar(false); if (_text) searchInText(""); };
   document.getElementById("searchTextInput").onkeydown  = e => { if (e.key === "Enter") searchInPDF(e.target.value); };
   document.getElementById("btnSearchNext").onclick      = () => navigateSearch(1);
   document.getElementById("btnSearchPrev").onclick      = () => navigateSearch(-1);
@@ -1278,7 +1412,49 @@ function bindAll() {
 }
 
 // ── Search en PDF ─────────────────────────────────────────────────────────────
+// En TXT/Markdown se busca en el texto ya dibujado: cada coincidencia queda
+// marcada y las flechas saltan entre ellas. searchMatches guarda los <mark>.
+function searchInText(query) {
+  const body = document.getElementById("textBody");
+  body.querySelectorAll("mark.tx-hit").forEach(m => m.replaceWith(m.textContent));
+  body.normalize();
+  searchMatches = []; searchIdx = 0;
+  const el = document.getElementById("searchResults");
+  const q = query.trim().toLowerCase();
+  if (!q) { el.textContent = ""; return; }
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const low = node.data.toLowerCase(), at = [];
+    for (let i = low.indexOf(q); i !== -1 && searchMatches.length + at.length < 1000; i = low.indexOf(q, i + q.length)) at.push(i);
+    // De atras para adelante, asi cortar el nodo no corre los indices que faltan.
+    const marks = [];
+    for (let k = at.length - 1; k >= 0; k--) {
+      const hit = node.splitText(at[k]);
+      hit.splitText(q.length);
+      const m = document.createElement("mark");
+      m.className = "tx-hit";
+      hit.replaceWith(m); m.appendChild(hit);
+      marks.unshift(m);
+    }
+    searchMatches.push(...marks);
+  }
+  if (!searchMatches.length) { el.textContent = "Sin resultados"; return; }
+  showTextHit(0);
+}
+
+function showTextHit(i) {
+  searchMatches.forEach(m => m.classList.remove("active"));
+  searchIdx = i;
+  const m = searchMatches[i];
+  m.classList.add("active");
+  m.scrollIntoView({ block: "center" });
+  document.getElementById("searchResults").textContent = (i + 1) + "/" + searchMatches.length;
+}
+
 async function searchInPDF(query) {
+  if (_text) return searchInText(query);
   if (!pdfDoc || !query.trim()) return;
   searchMatches = []; searchIdx = 0;
   const el = document.getElementById("searchResults");
@@ -1297,6 +1473,7 @@ async function searchInPDF(query) {
 
 async function navigateSearch(dir) {
   if (!searchMatches.length) return;
+  if (_text) return showTextHit((searchIdx + dir + searchMatches.length) % searchMatches.length);
   searchIdx = (searchIdx + dir + searchMatches.length) % searchMatches.length;
   pdfPage = searchMatches[searchIdx];
   document.getElementById("searchResults").textContent = (searchIdx+1) + "/" + searchMatches.length;
