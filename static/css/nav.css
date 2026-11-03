@@ -101,9 +101,12 @@
 /* Paneles, buscador y arbol: hasta v1.14 eran solo de mobile. Desde v1.15 el
    lector de escritorio usa la misma pildora (abajo, centrada), asi que estas
    piezas valen en cualquier ancho; reader.css ajusta las medidas para PC. */
+  /* Transparente a proposito: atrapa el toque afuera para cerrar el panel,
+     pero no oscurece lo de atras (el panel es algo flotante, como la
+     pildora de la que sale). */
   .nav-sheet-backdrop {
     position: fixed; inset: 0; z-index: 160;
-    background: rgba(0,0,0,.5);
+    background: transparent;
     opacity: 0; transition: opacity .22s var(--nav-ease);
   }
   .nav-sheet-backdrop.open { opacity: 1; }
@@ -116,8 +119,9 @@
     display: flex; flex-direction: column; overflow: hidden;
     border-radius: 28px;
     background: color-mix(in srgb, var(--surface) 96%, transparent);
-    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    /* Sin fondo oscurecido, la sombra es lo que lo despega de lo de atras. */
+    box-shadow: 0 22px 60px rgba(0,0,0,.6), 0 4px 14px rgba(0,0,0,.4);
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
     backdrop-filter: blur(20px) saturate(1.4);
     clip-path: inset(calc(100% - var(--nav-bar-height)) 0px 0px 0px round 999px);
@@ -125,9 +129,12 @@
     transition: clip-path .32s var(--nav-ease), -webkit-clip-path .32s var(--nav-ease);
     will-change: clip-path;
   }
+  /* Abierto, el recorte se agranda 80px para afuera: si no, cortaria la
+     sombra (clip-path recorta todo lo que esta fuera). La forma del panel la
+     sigue dando su border-radius. */
   .nav-sheet.open {
-    clip-path: inset(0px round 28px);
-    -webkit-clip-path: inset(0px round 28px);
+    clip-path: inset(-80px round 108px);
+    -webkit-clip-path: inset(-80px round 108px);
   }
 
   /* El padding inferior reserva el alto de la barra: esa franja es literalmente

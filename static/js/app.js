@@ -324,19 +324,6 @@ function makeViewHead() {
   if (!c) return null;
   head.className = "view-head col-head";
 
-  const trail = ancestorsOf(c.id).slice(0, -1);
-  if (trail.length) {
-    const crumbs = document.createElement("div");
-    crumbs.className = "col-crumbs";
-    trail.forEach(id => {
-      const b = document.createElement("button");
-      b.textContent = colById(id).name;
-      b.onclick = () => openCollection(id);
-      crumbs.appendChild(b);
-      crumbs.appendChild(Object.assign(document.createElement("span"), { textContent: "›" }));
-    });
-    head.appendChild(crumbs);
-  }
   head.appendChild(Object.assign(document.createElement("div"), { className: "view-head-title", textContent: c.name }));
   if (c.is_temp) head.appendChild(Object.assign(document.createElement("p"), {
     className: "view-head-note", textContent: "Lo que dejes aca se va a la papelera a los 30 dias." }));
@@ -345,41 +332,49 @@ function makeViewHead() {
 }
 
 // ── Topbar flotante de la coleccion (celu) ───────────────────────────────────
-// "‹ <carpeta de arriba>" para subir, y despues las subcarpetas, deslizables.
-// Siempre visible mientras se esta en la coleccion; solo aparece si hay algo
-// para mostrar. En la PC no se ve (lo hacen el sidebar y la topbar).
+// La ruta escrita como en el disco: "Ciberseguridad / Redes /", cada tramo
+// toca para ir ahi (eso es subir), la carpeta actual resaltada, y despues de
+// la ultima barra las subcarpetas para entrar. Desliza de costado. Siempre
+// visible mientras se esta en la coleccion; solo aparece si hay a donde ir.
 function renderLibTopNav() {
   const bar = document.getElementById("libTopNav");
   const box = document.getElementById("libTopNavScroll");
   if (!bar) return;
   const c = activeColId != null && !offlineView && !trashView ? colById(activeColId) : null;
-  const padre = c && c.parent_id != null ? colById(c.parent_id) : null;
   const kids = c ? childrenOf(c.id) : [];
-  const mostrar = !!c && (padre || kids.length);
+  const mostrar = !!c && (c.parent_id != null || kids.length > 0);
   bar.hidden = !mostrar;
-  document.body.classList.toggle("con-topnav", !!mostrar);
+  document.body.classList.toggle("con-topnav", mostrar);
   if (!mostrar) return;
   box.innerHTML = "";
-  if (padre) {
-    const up = document.createElement("button");
-    up.className = "ltn-item ltn-up";
-    up.title = "Subir a " + padre.name;
-    up.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>';
-    up.appendChild(Object.assign(document.createElement("span"), { textContent: padre.name }));
-    up.onclick = () => openCollection(padre.id);
-    box.appendChild(up);
-    if (kids.length) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-sep" }));
-  }
-  kids.forEach(k => {
+  const barra = () => box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
+  let actual = null;
+  ancestorsOf(c.id).forEach((id, i) => {
+    if (i) barra();
     const b = document.createElement("button");
-    b.className = "ltn-item";
-    b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
-    b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
-    b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
-    b.onclick = () => openCollection(k.id);
+    b.className = "ltn-crumb" + (id === c.id ? " current" : "");
+    b.textContent = colById(id).name;
+    if (id === c.id) { b.setAttribute("aria-current", "page"); actual = b; }
+    else b.onclick = () => openCollection(id);
     box.appendChild(b);
   });
-  box.scrollLeft = 0;
+  if (kids.length) {
+    barra();
+    kids.forEach(k => {
+      const b = document.createElement("button");
+      b.className = "ltn-item";
+      b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
+      b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
+      b.onclick = () => openCollection(k.id);
+      box.appendChild(b);
+    });
+  }
+  // Arranca desde el principio de la ruta; solo si la carpeta actual quedaria
+  // fuera de la vista (ruta larga) se desliza lo justo para mostrarla.
+  requestAnimationFrame(() => {
+    const fin = actual ? actual.offsetLeft + actual.offsetWidth + 28 : 0;
+    box.scrollLeft = Math.max(0, fin - box.clientWidth);
+  });
 }
 
 // ── Books ─────────────────────────────────────────────────────────────────────

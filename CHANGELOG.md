@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.15.1 — El libro a pantalla completa
+
+### Cambiado
+- **El libro ocupa toda la pantalla y la pildora flota encima** (PC). En Doble pagina habia un margen abajo del alto de la pildora que se veia como una franja negra; ya no esta. En Scroll y en los textos queda un espacio solo al final, para poder bajar la ultima hoja por encima de la pildora.
+- **Doble clic en el fondo (fuera de las hojas) esconde la pildora y otro doble clic la trae**, en cualquier vista, como el doble tap del celu. Sobre las hojas no hace nada (ahi es para seleccionar palabras). El boton de pantalla completa vuelve a ser solo la pantalla completa del navegador; la pildora ya no se esconde sola con el mouse quieto.
+- **Lupa con forma de pildora** (la lupa y la franja) y **solo del ancho del texto**: toma la columna donde hay texto en esa pagina (con un poco de margen), no el papel en blanco de los costados, imantada en horizontal; sin texto (un escaneo), un recorte fijo. Deja aire a los costados para que los extremos redondos no corten letras.
+- **Editar el titulo es una transicion**: tocando el titulo o el lapiz, el mismo texto se vuelve editable en el lugar, aparece la pildora del campo alrededor (fondo y borde de acento) y el lapiz se transforma en el tilde. Enter o salir guarda; Escape vuelve atras.
+- **Ningun panel oscurece el fondo**, en la PC ni en el celu (lector y biblioteca): son flotantes, como la pildora. La sombra los despega de lo de atras; antes no se veia porque el recorte de la animacion la cortaba.
+- **Topbar de carpetas (celu): la ruta escrita como en el disco**, `Ciberseguridad / Redes /`, con aire alrededor de las barras; cada tramo lleva a esa carpeta (eso es subir), la actual resaltada, y despues de la ultima barra las subcarpetas para entrar. Reemplaza al boton "‹ subir" y a la ruta que habia arriba del titulo.
+
+### Notas
+- `VERSION` del service worker: `v30` → `v31`.
+
 ## v1.15 — El lector en una pildora (PC y celu)
 
 ### Cambiado

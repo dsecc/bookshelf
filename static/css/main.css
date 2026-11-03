@@ -85,29 +85,34 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .trash-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
 .trash-head .view-head-title { display: none; }
 .trash-head .view-head-note { flex: 1; margin: 0; min-width: 12rem; }
-.col-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .35rem; font-size: .8rem; color: var(--text-muted); }
-.col-crumbs button { background: none; border: none; color: var(--accent); font: inherit; padding: .45rem 0; cursor: pointer; }
-/* Topbar flotante de la coleccion (celu): "‹ subir" + subcarpetas deslizables.
-   El vidrio y la posicion son los de .top-nav (nav.css). */
+/* Topbar flotante de la coleccion (celu): la ruta "Ciberseguridad / Redes /"
+   y las subcarpetas, deslizables. El vidrio y la posicion son los de .top-nav
+   (nav.css). */
 .lib-top-nav .ltn-scroll {
-  display: flex; align-items: center; gap: 6px; width: 100%; height: 100%;
-  overflow-x: auto; scrollbar-width: none; padding: 0 4px;
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+  display: flex; align-items: center; gap: 2px; width: 100%; height: 100%;
+  overflow-x: auto; scrollbar-width: none; padding: 0 10px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
 }
 .lib-top-nav .ltn-scroll::-webkit-scrollbar { display: none; }
+.ltn-crumb {
+  flex-shrink: 0; height: 40px; padding: 0 .45rem; border: none; background: none; border-radius: 999px;
+  color: var(--text-dim); font: inherit; font-size: .9rem; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ltn-crumb:active { background: var(--nav-active-bg); }
+.ltn-crumb.current { color: var(--text); font-weight: 650; cursor: default; }
+/* Las barras con aire alrededor: se lee como una ruta, pero moderna. */
+.ltn-slash { flex-shrink: 0; padding: 0 .4rem; color: color-mix(in srgb, var(--text) 28%, transparent); font-size: .95rem; font-weight: 300; }
 .ltn-item {
-  flex-shrink: 0; height: 40px; padding: 0 .95rem; border-radius: 999px;
-  display: inline-flex; align-items: center; gap: .45rem;
-  border: none; background: color-mix(in srgb, var(--text) 6%, transparent);
-  color: var(--text); font: inherit; font-size: .86rem; white-space: nowrap; cursor: pointer;
+  flex-shrink: 0; height: 36px; padding: 0 .85rem; margin-right: 4px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .4rem;
+  border: none; background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text); font: inherit; font-size: .85rem; white-space: nowrap; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .ltn-item:active { background: var(--nav-active-bg); }
-.ltn-item svg { color: var(--text-dim); flex-shrink: 0; }
-.ltn-item .pill-count { font-size: .74rem; color: var(--text-muted); }
-.ltn-up { background: none; padding: 0 .7rem 0 .45rem; color: var(--text-dim); }
-.ltn-sep { flex-shrink: 0; width: 1px; height: 22px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+.ltn-item .pill-count { font-size: .72rem; color: var(--text-muted); }
 
 /* Dias que le quedan (Temporal / papelera). Arriba a la izquierda: la
    derecha es de la insignia de "sin conexion". */

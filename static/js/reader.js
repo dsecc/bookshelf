@@ -65,46 +65,49 @@ function openInfoSheet() {
     const der = _el("div", "info-col");
     cols.append(izq, der);
 
-    // Titulo: texto con un lapicito. El lapiz lo vuelve campo; Enter o salir
-    // del campo guarda, Escape cancela.
+    // Titulo: el mismo texto se vuelve editable en el lugar (tocandolo o con
+    // el lapiz). La transicion es CSS: aparece la pildora del campo alrededor
+    // y el lapiz se transforma en el tilde. Enter o salir guarda; Escape
+    // vuelve atras.
     const tit = _el("div", "info-title");
-    const pintarTitulo = () => {
-      tit.innerHTML = "";
-      tit.appendChild(_el("span", "info-title-text", currentBook ? currentBook.title : ""));
-      const lapiz = _el("button", "info-icon-btn");
-      lapiz.innerHTML = RN_ICO.pencil;
-      lapiz.title = "Cambiar el nombre";
-      lapiz.setAttribute("aria-label", "Cambiar el nombre");
-      lapiz.onclick = editarTitulo;
-      tit.appendChild(lapiz);
+    const txt = _el("span", "info-title-text", currentBook ? currentBook.title : "");
+    const btn = _el("button", "info-icon-btn info-title-btn");
+    btn.innerHTML = '<span class="ico-edit">' + RN_ICO.pencil + '</span><span class="ico-ok">' + RN_ICO.check + '</span>';
+    btn.title = "Cambiar el nombre";
+    btn.setAttribute("aria-label", "Cambiar el nombre");
+    tit.append(txt, btn);
+    let editando = false, recienGuardado = false;
+    const editar = () => {
+      if (editando) return;
+      editando = true;
+      tit.classList.add("editing");
+      txt.contentEditable = "plaintext-only";
+      if (txt.contentEditable !== "plaintext-only") txt.contentEditable = "true";
+      txt.spellcheck = false;
+      txt.focus();
+      const r = document.createRange(); r.selectNodeContents(txt);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      btn.title = "Guardar nombre"; btn.setAttribute("aria-label", "Guardar nombre");
     };
-    const editarTitulo = () => {
-      tit.innerHTML = "";
-      const campo = _el("div", "nav-sheet-field info-title-edit");
-      const inp = document.createElement("input");
-      inp.value = currentBook.title;
-      inp.setAttribute("aria-label", "Nombre del libro");
-      const ok = _el("button");
-      ok.innerHTML = RN_ICO.check;
-      ok.setAttribute("aria-label", "Guardar nombre");
-      let hecho = false;
-      const guardar = async () => {
-        if (hecho) return; hecho = true;
-        await renameBook(inp.value);
-        pintarTitulo();
-      };
-      inp.onkeydown = e => {
-        if (e.key === "Enter") guardar();
-        if (e.key === "Escape") { hecho = true; e.stopPropagation(); pintarTitulo(); }
-      };
-      // mousedown y no click: si no, el blur del campo guarda antes.
-      ok.onmousedown = e => { e.preventDefault(); guardar(); };
-      inp.onblur = guardar;
-      campo.append(inp, ok);
-      tit.appendChild(campo);
-      inp.focus(); inp.select();
+    const terminar = async guardar => {
+      if (!editando) return;
+      editando = false;
+      txt.contentEditable = "false";
+      tit.classList.remove("editing");
+      btn.title = "Cambiar el nombre"; btn.setAttribute("aria-label", "Cambiar el nombre");
+      const nuevo = txt.textContent.replace(/\s+/g, " ").trim();
+      if (guardar && nuevo && nuevo !== currentBook.title) await renameBook(nuevo);
+      txt.textContent = currentBook.title;
     };
-    pintarTitulo();
+    txt.onclick = editar;
+    // mousedown y no click: si no, el blur del texto guarda antes.
+    btn.onmousedown = e => { if (editando) { e.preventDefault(); recienGuardado = true; terminar(true); } };
+    btn.onclick = () => { if (recienGuardado) { recienGuardado = false; return; } editar(); };
+    txt.onkeydown = e => {
+      if (e.key === "Enter") { e.preventDefault(); terminar(true); }
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); terminar(false); }
+    };
+    txt.onblur = () => terminar(true);
     izq.appendChild(tit);
 
     // Modo de lectura: solo PDF, y solo en la PC (en el celu siempre scroll).
@@ -412,8 +415,8 @@ function initKeyboardOffset() {
 
 // Esconder las pildoras para leer sin nada encima: la de abajo se va hacia
 // abajo y la topbar flotante (si hay) hacia arriba, con la opacidad
-// acompanando. En el celu lo dispara el doble tap; en la PC, el mouse quieto
-// en pantalla completa.
+// acompanando. En el celu lo dispara el doble tap; en la PC, el doble clic en
+// el fondo.
 let _rnHidden = false;
 function setReaderNavHidden(ocultar) {
   if (ocultar === _rnHidden) return;
@@ -1330,7 +1333,7 @@ function bindAll() {
   // Fullscreen
   document.addEventListener("fullscreenchange",       onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
-  initIdleHide();
+  initBackgroundToggle();
 
   document.getElementById("btnDownloadUnsupported").onclick = downloadBook;
 
@@ -1522,8 +1525,8 @@ document.addEventListener("touchend", function(e) {
 
 // ── Pantalla completa ─────────────────────────────────────────────────────────
 // En el celu el lector ya arranca a pantalla completa (la pildora se esconde
-// con doble tap). En la PC: pantalla completa del navegador, y la pildora se
-// va sola con el mouse quieto y vuelve al moverlo.
+// con doble tap). En la PC: pantalla completa del navegador (sin la barra de
+// Chrome); la pildora se esconde con doble clic en el fondo.
 function enterFullscreen() {
   const el = document.documentElement;
   if (el.requestFullscreen)            el.requestFullscreen().catch(()=>{});
@@ -1531,7 +1534,6 @@ function enterFullscreen() {
   document.body.classList.add("reader-fullscreen");
   isFullscreen = true;
   updateFullscreenBtn();
-  idleKick();
   // La hoja ahora tiene mas lugar: re-escalar (esperar a que aplique el CSS).
   scheduleScrollRerender(320);
 }
@@ -1542,7 +1544,6 @@ function exitFullscreen() {
   document.body.classList.remove("reader-fullscreen");
   isFullscreen = false;
   updateFullscreenBtn();
-  setReaderNavHidden(false);
   scheduleScrollRerender(320);
 }
 
@@ -1564,22 +1565,19 @@ function updateFullscreenBtn() {
   btn.title = inFs ? "Salir de pantalla completa (F)" : "Pantalla completa (F)";
 }
 
-// Mouse quieto en pantalla completa: la pildora se va a los 2,5 s. No se va
-// si el mouse esta encima de ella o hay algo abierto (panel, buscador).
-let _idleTimer = null;
-function idleKick() {
-  clearTimeout(_idleTimer);
-  if (!isFullscreen || esMovil()) return;
-  setReaderNavHidden(false);
-  _idleTimer = setTimeout(() => {
-    const abierto = document.getElementById("navSheet") ||
-      document.querySelector(".nav-search.open") || document.querySelector("#readerNav:hover");
-    if (abierto) idleKick(); else setReaderNavHidden(true);
-  }, 2500);
-}
-function initIdleHide() {
-  document.addEventListener("mousemove", idleKick, { passive: true });
-  document.addEventListener("keydown", idleKick);
+// PC: doble clic en el FONDO (fuera de las hojas, en cualquier vista) esconde
+// la pildora, y otro doble clic la trae. Sobre las hojas no hace nada: ahi el
+// doble clic es para seleccionar palabras. El EPUB se dibuja en un iframe, asi
+// que lo que pasa adentro ni llega aca.
+const _HOJA = "canvas, .textLayer, .search-hl, .spread-page-item, .text-body, #epubArea";
+const _UI = ".bottom-nav, .top-nav, .nav-sheet, .nav-sheet-backdrop, .nav-search, .epub-arrow, button, a, input, #magnifierLens";
+function initBackgroundToggle() {
+  document.addEventListener("dblclick", e => {
+    if (esMovil() || magnifierActive) return;
+    if (e.target.closest(_UI) || e.target.closest(_HOJA)) return;
+    window.getSelection()?.removeAllRanges();
+    _toggleReaderNav();
+  });
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
@@ -1714,6 +1712,31 @@ function _hiResFor(page, scale) {
   return null;
 }
 
+// Donde hay texto en la pagina, como fraccion del ancho [desde, hasta]: la
+// franja de la lupa toma solo esa columna (con un poco de margen), no el
+// papel en blanco de los costados. Sin texto (un escaneo), un recorte fijo.
+const _textBounds = new Map();
+function _boundsFor(page) {
+  if (_textBounds.has(page)) return _textBounds.get(page);
+  _textBounds.set(page, null);
+  Promise.all([pdfDoc.getPage(page), pageText(page)]).then(([p, tc]) => {
+    const vp = p.getViewport({ scale: 1 });
+    let min = Infinity, max = -Infinity;
+    tc.items.forEach(it => {
+      if (!it.str || !it.str.trim()) return;
+      const tx = pdfjsLib.Util.transform(vp.transform, it.transform);
+      min = Math.min(min, tx[4]);
+      max = Math.max(max, tx[4] + it.width);
+    });
+    const pad = 0.025;
+    _textBounds.set(page, isFinite(min) && max > min
+      ? [Math.max(0, min / vp.width - pad), Math.min(1, max / vp.width + pad)]
+      : [0.08, 0.92]);
+    if (magnifierActive && _lensLast) drawLens(_lensLast.x, _lensLast.y);
+  }).catch(() => _textBounds.set(page, [0.08, 0.92]));
+  return null;
+}
+
 function drawLens(mx, my) {
   const lens = document.getElementById("magnifierLens");
   const cur  = document.getElementById("magnifierCursor");
@@ -1724,17 +1747,25 @@ function drawLens(mx, my) {
   const dpr = window.devicePixelRatio || 1;
   const maxW = window.innerWidth - 32;
 
-  // Zoom 2x si entra; si la pagina es muy ancha, menos (nunca menos de 1.4x),
-  // y si ni asi entra, la franja se acota alrededor del mouse.
-  const Z = Math.max(1.4, Math.min(2, maxW / rect.width));
-  const capW = Math.min(rect.width, maxW / Z);
+  // Franja: la columna de texto de la pagina (imantada en horizontal), de
+  // _lensCapH de alto centrada en el mouse.
+  const b = (pdfDoc && _boundsFor(page)) || [0.08, 0.92];
+  const colL = rect.left + rect.width * b[0], colW = rect.width * (b[1] - b[0]);
   const capH = Math.min(_lensCapH, rect.height);
-  const capX = Math.max(rect.left, Math.min(mx - capW / 2, rect.right - capW));
+  // Los extremos de la pildora son redondos: se deja aire a los costados
+  // para que no corten las primeras y ultimas letras.
+  const aire = capH * 0.5;
+  // Zoom 2x si entra; si no, menos (nunca menos de 1.4x), y si ni asi entra,
+  // la franja se acota alrededor del mouse.
+  const Z = Math.max(1.4, Math.min(2, maxW / (colW + 2 * aire)));
+  const capW = Math.max(40, Math.min(colW, maxW / Z - 2 * aire));
+  const capX = Math.max(colL, Math.min(mx - capW / 2, colL + colW - capW));
   const capY = Math.max(rect.top, Math.min(my - capH / 2, rect.bottom - capH));
-  const lensW = capW * Z, lensH = capH * Z;
+  const padX = aire * Z;
+  const lensW = capW * Z + 2 * padX, lensH = capH * Z;
 
   cur.style.display = "block";
-  cur.style.cssText += ";left:" + capX + "px;top:" + capY + "px;width:" + capW + "px;height:" + capH + "px;";
+  cur.style.cssText += ";left:" + (capX - aire) + "px;top:" + capY + "px;width:" + (capW + 2 * aire) + "px;height:" + capH + "px;";
 
   let lx = capX + capW / 2 - lensW / 2;
   lx = Math.max(16, Math.min(lx, window.innerWidth - 16 - lensW));
@@ -1751,7 +1782,8 @@ function drawLens(mx, my) {
   ctx.fillRect(0, 0, cw, ch);
 
   // Fuente: la pagina en alta resolucion (escala redondeada para reusarla);
-  // mientras se dibuja, el canvas de pantalla.
+  // mientras se dibuja, el canvas de pantalla. Se toma tambien el aire de los
+  // costados, asi la pildora no muestra bandas blancas vacias.
   let src = canvas;
   if (pdfDoc) {
     const hi = _hiResFor(page, _lensScale(page, rect.width * Z * dpr));
@@ -1759,7 +1791,7 @@ function drawLens(mx, my) {
   }
   const kx = src.width / rect.width, ky = src.height / rect.height;
   try {
-    ctx.drawImage(src, (capX - rect.left) * kx, (capY - rect.top) * ky, capW * kx, capH * ky, 0, 0, cw, ch);
+    ctx.drawImage(src, (capX - aire - rect.left) * kx, (capY - rect.top) * ky, (capW + 2 * aire) * kx, capH * ky, 0, 0, cw, ch);
   } catch {}
 }
 
