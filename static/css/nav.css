@@ -420,3 +420,25 @@
   .nav-sheet, .nav-sheet.open { transition: none; animation: none; }
 }
 
+/* Selector de coleccion (colPicker): el arbol con su propio scroll. */
+.col-tree { overflow-y: auto; max-height: 44vh; scrollbar-width: thin; }
+.col-tree .nav-sheet-row .row-count { color: var(--accent); }
+
+/* Subir (en el celu, el contenido del modal se muda al panel): con la
+   estetica de las pildoras, no rectangulos. */
+.nav-sheet .drop-zone {
+  margin: 0 .35rem .9rem; padding: 1.6rem 1rem; border-radius: 26px;
+  border: 1.5px dashed color-mix(in srgb, var(--text) 20%, transparent);
+  background: var(--glass-fill); color: var(--text-dim);
+  display: flex; flex-direction: column; align-items: center; gap: .35rem;
+}
+.nav-sheet .drop-zone svg { color: var(--text-dim); }
+.nav-sheet .drop-zone.dragover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.nav-sheet #uploadProgress { margin: 0 .6rem .9rem !important; }
+.nav-sheet .upload-col-select { display: none; }
+.nav-sheet .btn-primary.full {
+  display: block; width: calc(100% - .7rem); margin: .7rem .35rem .2rem;
+  height: 46px; padding: 0; border-radius: 999px; font-size: .92rem;
+}
+.nav-sheet .btn-primary.full:active { background: var(--accent-hover); }
+

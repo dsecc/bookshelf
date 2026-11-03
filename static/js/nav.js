@@ -155,3 +155,70 @@ function treeClose(el) {
   if (_treeQuieto()) { el.remove(); return; }
   _treeAnimar(el, { h: el.scrollHeight, o: 1 }, { h: 0, o: 0 }, () => el.remove());
 }
+
+// ── Selector de coleccion (arbol) ────────────────────────────────────────────
+// El arbol de la hoja de colecciones como selector: arranca desplegado solo el
+// camino hasta la elegida; tocar una la elige y, si tiene subcarpetas, las
+// despliega (animado); la flechita despliega o pliega sin elegir. Lo usan el
+// panel de info del lector (mover el libro) y el de subir (a donde va).
+// marked: id a etiquetar como "actual". Devuelve { el, value }.
+function colPicker({ collections, selected, marked, onChange }) {
+  const ico = d => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' + d + '</svg>';
+  const ICO_FOLDER = ico('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>');
+  const ICO_TEMP = ico('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>');
+  const ICO_CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 6 15 12 9 18"/></svg>';
+  const arbol = colTree(collections);
+  const byId = id => collections.find(c => c.id === id);
+  const hijas = id => arbol.filter(x => x.c.parent_id === id).map(x => x.c);
+  const camino = id => { const out = []; for (let c = byId(id); c; c = c.parent_id != null ? byId(c.parent_id) : null) out.unshift(c.id); return out; };
+  const abiertas = new Set(camino(selected));
+  const api = { el: document.createElement("div"), value: selected };
+  api.el.className = "nav-tree col-tree";
+
+  const build = (parent, cols) => cols.forEach(c => {
+    const kids = hijas(c.id);
+    const node = document.createElement("div");
+    node.className = "tree-node";
+    const rowWrap = document.createElement("div");
+    rowWrap.className = "tree-row";
+    let chev = null;
+    const sub = () => { const s = document.createElement("div"); s.className = "tree-children"; build(s, kids); return s; };
+    const toggle = () => {
+      if (abiertas.has(c.id)) {
+        abiertas.delete(c.id);
+        const s = node.querySelector(":scope > .tree-children:not(.closing)");
+        if (s) { s.classList.add("closing"); treeClose(s); }
+      } else {
+        abiertas.add(c.id);
+        const s = sub(); node.appendChild(s); treeOpen(s);
+      }
+      if (chev) chev.classList.toggle("open", abiertas.has(c.id));
+    };
+    const row = navSheetRow({
+      label: c.name, icon: c.is_temp ? ICO_TEMP : ICO_FOLDER,
+      detail: c.id === marked ? "actual" : undefined,
+      active: c.id === api.value,
+      onClick: () => {
+        api.value = c.id;
+        api.el.querySelectorAll(".nav-sheet-row.active").forEach(r => r.classList.remove("active"));
+        row.classList.add("active");
+        if (kids.length && !abiertas.has(c.id)) toggle();
+        if (onChange) onChange(c.id, c);
+      },
+    });
+    rowWrap.appendChild(row);
+    if (kids.length) {
+      chev = document.createElement("button");
+      chev.className = "tree-chev" + (abiertas.has(c.id) ? " open" : "");
+      chev.innerHTML = ICO_CHEV;
+      chev.setAttribute("aria-label", "Desplegar " + c.name);
+      chev.onclick = toggle;
+      rowWrap.appendChild(chev);
+    }
+    node.appendChild(rowWrap);
+    if (kids.length && abiertas.has(c.id)) node.appendChild(sub());
+    parent.appendChild(node);
+  });
+  build(api.el, arbol.filter(x => x.depth === 0).map(x => x.c));
+  return api;
+}

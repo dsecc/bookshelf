@@ -1,6 +1,6 @@
 # Spec: el sistema de pildoras
 
-Estado a v1.15.6. Es la base para v1.16, donde la interfaz de PC pasa a ser la
+Estado a v1.15.7. Es la base para v1.16, donde la interfaz de PC pasa a ser la
 del celu.
 
 ## 1. Idea
@@ -123,6 +123,7 @@ cerrar. No oscurece.
 | Campo | `.nav-sheet-field` | input en pildora, 16px (si no, iOS hace zoom), boton circular de acento |
 | Segmentado | `.nav-sheet-seg` + `.vm-btn` | pildora con opciones; la activa con `--nav-active-bg` |
 | Arbol | `.nav-tree` + `.tree-node/.tree-row/.tree-children` + `.tree-chev` | trazo curvo tipo Obsidian; desplegar/plegar animado (`treeOpen`/`treeClose`) |
+| Selector de coleccion | `colPicker({collections, selected, marked, onChange})` | el arbol como selector: arranca en el camino de la elegida, tocar elige y despliega; lo usan Info (lector) y Subir |
 | Nota | `.nav-sheet-note` | texto explicativo chico |
 | Vacio | `.nav-sheet-empty` | |
 
@@ -175,7 +176,7 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 | Pantalla | Plataforma | Disparador | Pieza | Contenido |
 |---|---|---|---|---|
 | Biblioteca | celu | Colecciones | panel | Todos, Sin conexion, Papelera, arbol de colecciones (flechita despliega sin cerrar), + Nueva |
-| Biblioteca | celu | Subir | panel | contenido del modal de subida mudado al panel |
+| Biblioteca | celu | Subir | panel | zona de arrastrar (vidrio), arbol de coleccion (`colPicker`), boton pildora |
 | Biblioteca | celu | Mas (tres rayitas) | panel, sin titulo | Notificaciones, Informacion, Ajustes, Cerrar sesion |
 | Biblioteca | celu | Mas → Notificaciones | panel | lista del modal mudada al panel |
 | Biblioteca | celu | tocar un libro en la Papelera | panel | Restaurar / Eliminar definitivamente |

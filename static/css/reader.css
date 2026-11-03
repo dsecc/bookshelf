@@ -189,7 +189,6 @@ html[data-text-theme] body { background: var(--tx-bg); }
 .nav-sheet-seg.info-modes { grid-template-columns: repeat(2, 1fr); }
 .info-modes .vm-btn { flex-direction: row; gap: .5rem; padding: .55rem .5rem; font-size: .8rem; }
 .col-picker { display: flex; flex-direction: column; }
-.col-picker .nav-tree { overflow-y: auto; max-height: 44vh; scrollbar-width: thin; }
 .col-picker .nav-sheet-row .row-count { color: var(--accent); }
 .col-picker-foot { padding: .6rem .35rem .2rem; }
 .col-picker-save {
@@ -349,7 +348,7 @@ html[data-text-theme] body { background: var(--tx-bg); }
   .nav-sheet-seg .vm-btn:hover:not(.active) { color: var(--text); }
   .nav-sheet-field input { font-size: .95rem; }
   .info-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.75rem; padding: 0 .4rem; }
-  .col-picker .nav-tree { max-height: 52vh; }
+  .col-tree { max-height: 52vh; }
   .nav-search { --search-tuck: 26px; height: calc(48px + var(--search-tuck)); padding-left: 1.25rem; }
   .nav-search input { font-size: .95rem; }
   .nav-search .r-btn { width: 34px; height: 34px; }

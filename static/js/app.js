@@ -1311,7 +1311,13 @@ function openUploadSheet() {
   const header = inner.querySelector(".modal-header");
   const movidos = [...inner.children].filter(el => el !== header);
   const sel = document.getElementById("uploadCollection");
-  if (sel) sel.value = "";
+  // A donde va: arranca en la coleccion donde se esta parado (o la raiz). El
+  // select nativo queda escondido y el arbol lo mantiene al dia (doUpload lo
+  // sigue leyendo de ahi).
+  const raiz = collections.find(c => c.is_root);
+  const actual = !offlineView && !trashView && colById(activeColId) ? activeColId : (raiz && raiz.id);
+  if (sel) sel.value = actual != null ? String(actual) : "";
+  const picker = colPicker({ collections, selected: actual, onChange: id => { if (sel) sel.value = String(id); } });
 
   openNavSheet(body => {
     const head = document.createElement("div");
@@ -1319,6 +1325,9 @@ function openUploadSheet() {
     head.innerHTML = "<span>Subir libro</span>";
     body.appendChild(head);
     movidos.forEach(el => body.appendChild(el));
+    const boton = document.getElementById("btnDoUpload");
+    body.insertBefore(Object.assign(document.createElement("div"), { className: "nav-sheet-section", textContent: "Coleccion" }), boton);
+    body.insertBefore(picker.el, boton);
   }, () => {
     // Siguen referenciados aunque el panel ya no este en el DOM.
     movidos.forEach(el => inner.appendChild(el));

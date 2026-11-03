@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.15.7 — Subir, con la estetica de las pildoras
+
+### Cambiado
+- **Subir libros en el celu**: la zona de arrastrar archivos es redondeada y de vidrio, el boton Subir es una pildora, y **la coleccion se elige con el arbol** (el mismo de la hoja de colecciones y del panel de info del lector) en lugar del selector nativo. Arranca en la coleccion donde se esta parado (o la raiz); tocar una la elige y despliega sus subcarpetas.
+- El arbol selector es ahora una pieza compartida (`colPicker`, nav.js): la usan el panel de info del lector (mover el libro) y el de subir.
+- `VERSION` del service worker: `v34` → `v35`.
+
 ## v1.15.6 — Pantalla de inicio y la topbar que dice donde estas
 
 ### Agregado

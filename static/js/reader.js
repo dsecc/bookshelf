@@ -160,75 +160,25 @@ function openInfoSheet() {
   }, () => { if (quitarOffline) quitarOffline(); });
 }
 
-// Selector de coleccion con el arbol de la biblioteca: arranca desplegado solo
-// el camino hasta donde esta el libro. Tocar una la elige y despliega sus
-// subcarpetas (animado); Guardar mueve el libro.
+// Coleccion: el arbol compartido (colPicker, nav.js) arrancando en donde esta
+// el libro; el boton de abajo lo mueve a la elegida.
 function buildColPicker() {
   const wrap = _el("div", "col-picker");
-  const tree = _el("div", "nav-tree");
   const pie = _el("div", "col-picker-foot");
-  const btn = _el("button", "col-picker-save", "Mover aca");
+  const btn = _el("button", "col-picker-save");
   pie.appendChild(btn);
-
   const byId = id => collections.find(c => c.id === id);
-  const hijas = id => colTree(collections).filter(x => x.c.parent_id === id).map(x => x.c);
-  const camino = id => { const out = []; for (let c = byId(id); c; c = c.parent_id != null ? byId(c.parent_id) : null) out.unshift(c.id); return out; };
   const actual = currentBook.collection_id;
-  const abiertas = new Set(camino(actual));
-  let elegida = actual;
-
   const pintarPie = () => {
-    const c = byId(elegida);
-    const cambia = elegida !== actual;
+    const c = byId(picker.value);
+    const cambia = picker.value !== actual;
     btn.disabled = !cambia;
     btn.textContent = cambia ? "Mover a " + (c ? c.name : "") : "Esta en " + ((byId(actual) || {}).name || "Sin coleccion");
   };
-
-  const build = (parent, cols) => cols.forEach(c => {
-    const kids = hijas(c.id);
-    const node = _el("div", "tree-node");
-    const rowWrap = _el("div", "tree-row");
-    const row = navSheetRow({
-      label: c.name, icon: c.is_temp ? RN_ICO.clock : RN_ICO.folder,
-      detail: c.id === actual ? "actual" : undefined,
-      active: c.id === elegida,
-      onClick: () => {
-        elegida = c.id;
-        tree.querySelectorAll(".nav-sheet-row.active").forEach(r => r.classList.remove("active"));
-        row.classList.add("active");
-        // Elegir una con subcarpetas las despliega (si ya estaban, quedan).
-        if (kids.length && !abiertas.has(c.id)) toggle();
-        pintarPie();
-      },
-    });
-    rowWrap.appendChild(row);
-    const sub = () => { const s = _el("div", "tree-children"); build(s, kids); return s; };
-    let chev = null;
-    const toggle = () => {
-      if (abiertas.has(c.id)) {
-        abiertas.delete(c.id);
-        const s = node.querySelector(":scope > .tree-children:not(.closing)");
-        if (s) { s.classList.add("closing"); treeClose(s); }
-      } else {
-        abiertas.add(c.id);
-        const s = sub(); node.appendChild(s); treeOpen(s);
-      }
-      if (chev) chev.classList.toggle("open", abiertas.has(c.id));
-    };
-    if (kids.length) {
-      chev = _el("button", "tree-chev" + (abiertas.has(c.id) ? " open" : ""));
-      chev.innerHTML = RN_ICO.chev;
-      chev.setAttribute("aria-label", "Desplegar " + c.name);
-      chev.onclick = toggle;
-      rowWrap.appendChild(chev);
-    }
-    node.appendChild(rowWrap);
-    if (kids.length && abiertas.has(c.id)) node.appendChild(sub());
-    parent.appendChild(node);
-  });
-  build(tree, colTree(collections).filter(x => x.depth === 0).map(x => x.c));
+  const picker = colPicker({ collections, selected: actual, marked: actual, onChange: pintarPie });
 
   btn.onclick = async () => {
+    const elegida = picker.value;
     if (elegida === actual) return;
     btn.disabled = true;
     const res = await fetch("/api/books/" + bookId, {
@@ -241,7 +191,7 @@ function buildColPicker() {
     closeNavSheet();
   };
   pintarPie();
-  wrap.append(tree, pie);
+  wrap.append(picker.el, pie);
   return wrap;
 }
 
