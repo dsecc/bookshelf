@@ -26,23 +26,42 @@
   --nav-ease: cubic-bezier(.4,0,.2,1);
 }
 
-.bottom-nav { display: none; }
+/* La pildora: vidrio flotante anclado abajo. La estetica vale en cualquier
+   ancho (el lector la usa tambien en la PC, ver reader.css); en la biblioteca
+   solo se ve en el celu. La topbar flotante es su gemela, anclada arriba. */
+.bottom-nav, .top-nav {
+  position: fixed; z-index: 150;
+  left: var(--nav-bar-side); right: var(--nav-bar-side);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+.bottom-nav {
+  display: none;
+  bottom: var(--nav-bar-bottom);
+  height: var(--nav-bar-height);
+  align-items: stretch;
+  overflow: hidden;
+}
+/* Topbar flotante: solo en el celu y solo cuando hace falta (sin [hidden]).
+   Mismo vidrio y borde que la pildora; debajo de la hora y la bateria. */
+:root { --top-nav-top: calc(env(safe-area-inset-top, 0px) + 8px); --top-nav-h: 52px; }
+.top-nav { display: none; }
 
 @media (max-width: 640px) {
-  .bottom-nav {
-    display: flex;
-    position: fixed; z-index: 150;
-    left: var(--nav-bar-side); right: var(--nav-bar-side);
-    bottom: var(--nav-bar-bottom);
-    height: var(--nav-bar-height);
-    border-radius: 999px;
-    align-items: stretch;
-    overflow: hidden;
-    background: color-mix(in srgb, var(--surface) 78%, transparent);
-    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    backdrop-filter: blur(20px) saturate(1.4);
+  .bottom-nav { display: flex; }
+  /* De costado el notch/camara queda a un lado: las pildoras no se meten ahi. */
+  .bottom-nav, .top-nav {
+    left: max(var(--nav-bar-side), calc(env(safe-area-inset-left, 0px) + 8px));
+    right: max(var(--nav-bar-side), calc(env(safe-area-inset-right, 0px) + 8px));
+  }
+  .top-nav:not([hidden]) {
+    display: flex; align-items: center;
+    top: var(--top-nav-top); height: var(--top-nav-h);
+    padding: 0 6px; overflow: hidden;
   }
 
   /* Resaltado deslizante detras del item activo. Reemplaza al subrayado: una
@@ -79,7 +98,9 @@
 
    Sin alto fijo: crece a lo que pida el contenido. El max-height es solo un
    resguardo para que nunca tape el status bar. */
-@media (max-width: 640px) {
+/* Paneles, buscador y arbol: hasta v1.14 eran solo de mobile. Desde v1.15 el
+   lector de escritorio usa la misma pildora (abajo, centrada), asi que estas
+   piezas valen en cualquier ancho; reader.css ajusta las medidas para PC. */
   .nav-sheet-backdrop {
     position: fixed; inset: 0; z-index: 160;
     background: rgba(0,0,0,.5);
@@ -308,4 +329,20 @@
   .nav-search .bm-bar-save:active { background: var(--accent-hover); }
   .search-results-count { font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
 
+/* ── Arbol de colecciones (sidebar, panel de colecciones y panel del lector) ──
+   Cada hija se une a la de arriba con un codo curvo, como Obsidian. El codo
+   va en la fila; el tramo vertical que sigue hasta la proxima hermana va en
+   el nodo, asi atraviesa tambien las nietas desplegadas en el medio. */
+:root { --tree-line: #4d4d4d; }
+.tree-children { list-style: none; }
+.tree-children > .tree-node { position: relative; }
+.tree-children > .tree-node:not(:last-child)::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  border-left: 1.5px solid var(--tree-line); pointer-events: none;
+}
+.tree-children > .tree-node > .tree-row { position: relative; }
+.tree-children > .tree-node > .tree-row::before {
+  content: ""; position: absolute; left: 0; top: 0; height: 50%; width: .6rem;
+  border-left: 1.5px solid var(--tree-line); border-bottom: 1.5px solid var(--tree-line);
+  border-bottom-left-radius: 7px; pointer-events: none;
 }

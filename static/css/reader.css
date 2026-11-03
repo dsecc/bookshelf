@@ -23,104 +23,22 @@ body {
 @keyframes slideUpSheet { from{transform:translateY(100%)} to{transform:translateY(0)} }
 @keyframes ripple  { to{transform:scale(3);opacity:0} }
 
-/* ── Topbar ── */
-/* position+z-index explicitos: el text layer del PDF (con transforms y
-   posiciones en %) a veces termina pintando por encima de sus propios
-   limites y se roba los clics de la topbar/controles si estos quedan en
-   el mismo nivel de stacking (auto). Con esto siempre ganan. */
-.reader-topbar {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  flex-shrink: 0; position: relative; z-index: 20;
-  /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar
-     tiene que bajar los iconos para que no queden debajo del notch. */
-  padding-top: env(safe-area-inset-top);
-}
-.reader-topbar-inner { padding: 0 .75rem; height: var(--topbar-h); display: flex; align-items: center; gap: .4rem; }
+[hidden] { display: none !important; }
 
-/* Mobile: topbar fixed para que al ocultarse no deje espacio */
-@media (max-width: 640px) {
-  .reader-topbar {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 50;
-    /* 52px es la fila de iconos; la safe area del notch se SUMA. Con
-       box-sizing:border-box, ponerla dentro de los 52px dejaba la fila
-       sin alto util y pintaba una banda opaca sobre el libro. */
-    height: calc(52px + env(safe-area-inset-top, 0px));
-  }
-  /* Compensar el espacio que deja la topbar fixed */
-  body > div.layout, body {
-    padding-top: 0;
-  }
-  /* El primer viewer necesita espacio para no quedar debajo de la topbar */
-  .viewer { margin-top: 0; }
-  /* El body usa dvh, el viewer ocupa el resto */
-  #pdfScrollViewer, #pdfPageViewer, #epubViewer, #unsupportedViewer, #pdfBookViewer, #pdfSpreadViewer, #textViewer {
-    padding-top: 0;
-  }
-}
-.reader-title { flex: 1; font-size: .85rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
-.reader-actions { display: flex; gap: .05rem; flex-shrink: 0; }
-
-/* Search bar reader */
-/* Buscador del lector en DESKTOP, donde vive dentro de la topbar.
-   Acotado a desktop a proposito: reader.css carga despues de nav.css y estas
-   reglas tienen la misma especificidad que .nav-search, asi que en mobile le
-   ganaban y el buscador del lector terminaba distinto al de la biblioteca —
-   con otro padding, otro fondo, y la fuente en .85rem, que ademas revivia el
-   zoom de iOS al enfocar. Los dos buscadores tienen que ser el mismo. */
-@media (min-width: 641px) {
-  .search-bar-reader { display: flex; align-items: center; gap: .4rem; padding: .35rem .75rem; border-top: 1px solid var(--border); background: var(--surface2); }
-  .search-bar-reader input { flex:1; background:none; border:none; outline:none; color:var(--text); font-size:.85rem; }
-  .search-bar-reader input::placeholder { color:var(--text-muted); }
-  .search-results-count { font-size:.75rem; color:var(--text-muted); white-space:nowrap; }
-}
-
-/* ── Buttons ── */
+/* ── Botones sueltos ── */
 .r-btn {
   background: transparent; border: none; cursor: pointer;
-  color: var(--text-dim); padding: .35rem; border-radius: 6px;
+  color: var(--text-dim); padding: .35rem; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
-  transition: background .15s, color .15s, transform .12s;
-  text-decoration: none; position: relative; overflow: hidden; flex-shrink: 0;
+  transition: background .15s, color .15s;
+  text-decoration: none; position: relative; flex-shrink: 0;
 }
-.r-btn:hover { background: var(--surface2); color: var(--text); transform: scale(1.08); }
-.r-btn:active { transform: scale(.93); }
+.r-btn:hover { background: var(--nav-active-bg); color: var(--text); }
+.r-btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 999px; padding: .55rem 1.1rem; font-size: .88rem; font-weight: 500; cursor: pointer; transition: background .15s; }
+.r-btn-primary:hover { background: var(--accent-hover); }
 
-.r-btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: .45rem .9rem; font-size: .85rem; font-weight: 500; cursor: pointer; transition: background .15s, transform .12s; }
-.r-btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
-.r-btn-primary:active { transform: scale(.96); }
-.r-btn-primary.full { width: 100%; padding: .55rem; }
-
-.r-btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .45rem .9rem; font-size: .85rem; cursor: pointer; }
-.r-btn-secondary:hover { background: var(--surface3); }
-.r-btn-secondary.full { width: 100%; }
-
-.r-btn-accent { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: .4rem .5rem; cursor: pointer; display: flex; align-items: center; }
-.r-btn-accent:hover { background: var(--accent-hover); }
-
-.btn-danger-reader { background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; padding: .45rem .9rem; font-size: .85rem; font-weight: 500; cursor: pointer; transition: all .15s; }
-.btn-danger-reader:hover { background: var(--danger); color: #fff; }
-.btn-danger-reader.full { width: 100%; }
-
-.btn-share-wa { width:100%; background:#25D366; color:#fff; border:none; border-radius:6px; padding:.5rem .9rem; font-size:.85rem; font-weight:500; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:.5rem; }
-.btn-share-wa:hover { background:#20b858; }
-
-/* ── Highlight toolbar ── */
-.highlight-toolbar {
-  position: fixed; z-index: 300; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: .35rem .5rem; display: flex; gap: .3rem; align-items: center;
-  box-shadow: 0 4px 16px rgba(0,0,0,.4); animation: popIn .2s ease;
-}
-.hl-color { width:20px; height:20px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition: transform .15s; }
-.hl-color:hover { transform: scale(1.2); }
-.hl-color.selected { border-color: #fff; transform: scale(1.15); }
-
-/* ── Viewers ── */
+/* ── Visores ── */
 .viewer { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
-
-/* PDF Scroll */
 #pdfScrollWrap {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   display: flex; flex-direction: column;
@@ -133,76 +51,28 @@ body {
 #pdfScrollWrap [data-page] { display: flex; justify-content: center; width: 100%; }
 #pdfScrollWrap canvas { box-shadow: 0 4px 24px rgba(0,0,0,.5); display: block; }
 
-/* PDF Page */
-.pdf-page-wrap {
-  flex: 1; overflow: hidden; position: relative;
-  display: flex; align-items: center; justify-content: center;
-  background: #0d0d0d; min-height: 0;
-}
-#pdfPageCanvas { box-shadow: 0 4px 32px rgba(0,0,0,.6); max-width: calc(100% - 80px); max-height: 100%; display: block; }
-
-.page-arrow-btn {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  background: rgba(20,20,20,.65); border: 1px solid rgba(255,255,255,.08);
-  color: rgba(255,255,255,.6); border-radius: 50%;
-  width: 40px; height: 40px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; backdrop-filter: blur(6px);
-  transition: background .15s, color .15s, transform .15s; z-index: 10;
-}
-.page-arrow-left  { left: .75rem; }
-.page-arrow-right { right: .75rem; }
-.page-arrow-btn:hover  { background: rgba(124,111,247,.5); color: #fff; transform: translateY(-50%) scale(1.1); }
-.page-arrow-btn:active { transform: translateY(-50%) scale(.93); }
-
-/* Footer page mode */
-.page-footer-controls {
-  background: var(--surface); border-top: 1px solid var(--border);
-  padding: .4rem .85rem;
-  display: flex; align-items: center; justify-content: center;
-  gap: .4rem; flex-wrap: wrap; font-size: .82rem; color: var(--text-dim);
-  flex-shrink: 0; transition: opacity .3s ease, transform .3s ease;
-  position: relative; z-index: 20;
-}
-.page-footer-controls.hidden { opacity: 0; transform: translateY(6px); pointer-events: none; }
-
-/* PDF Controls (scroll/book) */
-.pdf-controls {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: .4rem .85rem; display: flex; align-items: center; gap: .4rem;
-  flex-wrap: wrap; font-size: .82rem; flex-shrink: 0; color: var(--text-dim);
-  position: relative; z-index: 20;
-}
-.ctrl-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .25rem .6rem; border-radius: 5px; cursor: pointer; font-size: .8rem; transition: background .15s; }
-.ctrl-btn:hover { background: var(--surface3); }
-.pdf-controls input[type=number] { width: 50px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .25rem .4rem; border-radius: 5px; text-align: center; font-size: .8rem; }
-.ctrl-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .25rem .4rem; border-radius: 5px; font-size: .8rem; }
-
-/* PDF Book flip */
-.book-flip-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; overflow: hidden; min-height: 0; }
-#bookPagesContainer { position: relative; }
-.book-page-item { background: #f5f0e8; overflow: hidden; }
-.book-controls { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: .5rem; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; font-size: .85rem; color: var(--text-dim); }
-
-/* Spread mode */
-.spread-flip-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; overflow: hidden; padding: .5rem; min-height: 0; align-self: stretch; }
+.spread-flip-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; overflow: hidden; padding: .75rem; min-height: 0; align-self: stretch; }
 #bookPagesContainerSpread { position: relative; margin: 0 auto; }
 /* El canvas trae su tamaño exacto (renderFlipPage): estirarlo al marco lo
    dejaba borroso. */
 .spread-page-item { overflow: hidden; }
 
-/* EPUB */
-.epub-viewer { position: relative; background: #fff; }
-.epub-arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(0,0,0,.5); border: none; color: #fff; font-size: 1.8rem; padding: .3rem .6rem; cursor: pointer; border-radius: 4px; transition: background .15s; }
-.epub-arrow-left  { left: .5rem; }
-.epub-arrow-right { right: .5rem; }
-.epub-arrow:hover { background: rgba(124,111,247,.7); }
+.epub-viewer { position: relative; background: var(--tx-bg, #fff); }
 #epubArea { width: 100%; height: 100%; }
-.epub-controls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(20,20,20,.9); border-top: 1px solid var(--border); padding: .4rem .85rem; display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: .8rem; color: var(--text-dim); backdrop-filter: blur(8px); }
-.epub-controls label { display: flex; align-items: center; gap: .35rem; }
-.epub-controls select, .epub-controls input[type=range] { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .2rem .35rem; border-radius: 5px; }
+/* Flechas de pasar pagina: circulos de vidrio, como la pildora. */
+.epub-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+  width: 44px; height: 44px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  color: var(--text-dim); cursor: pointer; transition: color .15s, background .15s;
+}
+.epub-arrow:hover { color: var(--text); background: color-mix(in srgb, var(--surface2) 85%, transparent); }
+.epub-arrow-left  { left: 1rem; }
+.epub-arrow-right { right: 1rem; }
 
-/* Unsupported */
 /* ── TXT / Markdown ─────────────────────────────────────────────────────────
    Los colores salen de variables que cambia el tema elegido (data-text-theme
    en <html>, lo pone initText). Los mismos tres temas que el EPUB. */
@@ -211,24 +81,6 @@ html[data-text-theme="sepia"] { --tx-bg: #f4ecd8; --tx-fg: #3b2a1a; --tx-soft: #
 html[data-text-theme="light"] { --tx-bg: #ffffff; --tx-fg: #1a1a1a; --tx-soft: #666666; --tx-line: #e2e2e2; --tx-code: #f2f2f2; }
 html[data-text-theme] body { background: var(--tx-bg); }
 #textWrap { flex: 1; overflow-y: auto; min-height: 0; background: var(--tx-bg); color: var(--tx-fg); }
-
-.text-toolbar {
-  max-width: 46rem; margin: 0 auto; padding: .85rem 1.5rem 0;
-  display: flex; align-items: center; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;
-}
-.text-tb-group { display: flex; align-items: center; gap: .35rem; }
-.text-tb-btn {
-  min-width: 2.5rem; height: 2.25rem; padding: 0 .75rem; border-radius: 8px;
-  border: 1px solid var(--tx-line); background: transparent; color: var(--tx-fg);
-  font: inherit; font-size: .85rem; cursor: pointer;
-}
-.text-tb-btn:hover { background: var(--tx-code); }
-.text-tb-size { min-width: 1.75rem; text-align: center; font-size: .8rem; color: var(--tx-soft); font-variant-numeric: tabular-nums; }
-.text-theme { width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 2px solid var(--tx-line); cursor: pointer; padding: 0; }
-.text-theme[data-theme="dark"]  { background: #0d0d0d; }
-.text-theme[data-theme="sepia"] { background: #f4ecd8; }
-.text-theme[data-theme="light"] { background: #ffffff; }
-.text-theme.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
 .text-body { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1.5rem 4rem; line-height: 1.7; overflow-wrap: anywhere; }
 .text-body:not(.md) { white-space: pre-wrap; }
@@ -268,108 +120,67 @@ html[data-text-theme] body { background: var(--tx-bg); }
 
 .unsupported-msg { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; color: var(--text-muted); text-align: center; }
 
-/* ── Side Panels ── */
-.side-panel {
-  position: fixed; right: 0; top: var(--topbar-h); bottom: 0;
-  width: 290px;
-  background: var(--surface); border-left: 1px solid var(--border);
-  z-index: 100; display: flex; flex-direction: column;
-  transform: translateX(100%);
-  transition: transform .25s cubic-bezier(.4,0,.2,1);
+
+/* Coincidencias de la busqueda en el PDF (paintSearchHits): recuadros sobre
+   el canvas, con la posicion de cada trozo de texto. */
+.search-hl { position: absolute; pointer-events: none; z-index: 3; }
+.search-hl span { position: absolute; background: rgba(251,191,36,.35); border-radius: 2px; mix-blend-mode: multiply; }
+.search-hl.current span { background: rgba(251,191,36,.6); box-shadow: 0 0 0 1px rgba(217,119,6,.55); }
+
+/* ── Controles de texto: letra, tamaño y tema (TXT, MD, EPUB) ──────────────
+   Viven en la pildora (PC) o en la topbar flotante (celu): colores de la app,
+   no del tema del texto. */
+.text-ctl { display: flex; align-items: center; gap: 10px; }
+.tc-group { display: flex; align-items: center; gap: 2px; }
+.tc-btn {
+  height: 36px; min-width: 36px; padding: 0 .65rem; border-radius: 999px;
+  border: none; background: none; color: var(--text-dim);
+  font: inherit; font-size: .84rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.side-panel.open { transform: translateX(0); }
-.panel-header { padding: .75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); font-size: .85rem; font-weight: 600; flex-shrink: 0; }
-.panel-body { padding: 1rem; overflow-y: auto; flex: 1; }
-.panel-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: .35rem; }
-.panel-rename { display: flex; gap: .4rem; align-items: center; }
-.panel-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: .4rem .6rem; color: var(--text); font-size: .85rem; outline: none; transition: border-color .15s; }
-.panel-input:focus { border-color: var(--accent); }
-.panel-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .45rem .65rem; border-radius: 6px; font-size: .85rem; outline: none; margin-top: .35rem; }
-.panel-divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
-.panel-list { flex: 1; overflow-y: auto; list-style: none; padding: .4rem; }
-.bm-item { padding: .5rem .65rem; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: .5rem; transition: background .15s; }
-.bm-item:hover { background: var(--surface2); }
-.bm-label { font-size: .85rem; color: var(--text); }
-.bm-page { font-size: .72rem; color: var(--text-muted); }
-.bm-del { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: .2rem; border-radius: 4px; display: flex; }
-.bm-del:hover { color: var(--danger); background: rgba(192,57,43,.1); }
-
-/* View mode selector */
-.view-mode-selector { display: flex; gap: .4rem; margin-top: .35rem; }
-.vm-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .5rem .3rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim); cursor: pointer; font-size: .72rem; transition: all .15s; }
-.vm-btn:hover { border-color: var(--accent); color: var(--text); }
-.vm-btn.active { border-color: var(--accent); background: rgba(124,111,247,.12); color: var(--accent); }
-
-/* ── Modals ── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; backdrop-filter: blur(4px); animation: fadeIn .2s ease; }
-.modal-sm { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; width: 100%; max-width: 340px; padding: 1.25rem; animation: popIn .25s ease; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.modal-header h2 { font-size: .95rem; font-weight: 600; }
-.form-group { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem; }
-.form-group label { font-size: .75rem; color: var(--text-muted); }
-.form-group input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: .45rem .75rem; color: var(--text); font-size: .88rem; outline: none; }
-.form-group input:focus { border-color: var(--accent); }
-
-/* ── Fullscreen ── */
-.reader-topbar { transition: transform .25s ease, opacity .25s ease; }
-
-body.reader-fullscreen .reader-topbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+.tc-btn:hover, .tc-btn:active { background: var(--nav-active-bg); color: var(--text); }
+.tc-font { min-width: 4.2rem; background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.tc-a { font-family: Georgia, "Times New Roman", serif; font-weight: 600; line-height: 1; }
+.tc-a-sm { font-size: .8rem; }
+.tc-a-lg { font-size: 1.15rem; }
+.tc-size { min-width: 1.7rem; text-align: center; font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tc-themes { gap: 8px; padding-left: 4px; }
+.text-theme {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 1.5px solid color-mix(in srgb, var(--text) 25%, transparent);
+  transition: box-shadow .15s;
 }
-body.reader-fullscreen .page-footer-controls {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
-  background: rgba(13,13,13,.92); backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(255,255,255,.08);
+.text-theme[data-theme="dark"]  { background: #0d0d0d; }
+.text-theme[data-theme="sepia"] { background: #f4ecd8; }
+.text-theme[data-theme="light"] { background: #ffffff; }
+.text-theme.active { border-color: transparent; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+
+/* ── Panel de info y ajustes ── */
+.info-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; }
+.info-title { display: flex; align-items: center; gap: .4rem; padding: .1rem .75rem .5rem; min-height: 44px; }
+.info-title-text { font-size: 1.02rem; font-weight: 600; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
+.info-title-edit { flex: 1; padding: 0; }
+.info-icon-btn {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px;
+  border: none; background: none; color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
-body.reader-fullscreen .page-arrow-btn { display: none; }
-
-/* ── Fullscreen en mobile: hoja de borde a borde ──
-   En iOS no existe fullscreen nativo para HTML (solo <video>), asi que el
-   maximo aprovechamiento sale de combinar viewport-fit=cover (deja pasar el
-   contenido por debajo de la hora/bateria, como los PDF nativos) con sacar
-   todo el padding, el gap y las sombras. */
-@media (max-width: 640px) {
-  body.reader-fullscreen #pdfScrollWrap { padding: 0; gap: 2px; }
-  body.reader-fullscreen #pdfScrollWrap canvas { box-shadow: none; border-radius: 0; }
-  body.reader-fullscreen #pdfScrollViewer .pdf-controls { display: none; }
+.info-icon-btn:hover, .info-icon-btn:active { background: var(--nav-active-bg); color: var(--text); }
+.nav-sheet-seg.info-modes { grid-template-columns: repeat(2, 1fr); }
+.info-modes .vm-btn { flex-direction: row; gap: .5rem; padding: .55rem .5rem; font-size: .8rem; }
+.col-picker { display: flex; flex-direction: column; }
+.col-picker .nav-tree { overflow-y: auto; max-height: 44vh; scrollbar-width: thin; }
+.col-picker .nav-sheet-row .row-count { color: var(--accent); }
+.col-picker-foot { padding: .6rem .35rem .2rem; }
+.col-picker-save {
+  width: 100%; height: 42px; border-radius: 999px; border: none;
+  background: var(--accent); color: #fff; font: inherit; font-size: .88rem; font-weight: 500;
+  cursor: pointer; transition: background .15s;
 }
-
-/* En mobile el lector ya arranca a pantalla completa (ver init() en
-   reader.js), asi que el boton de fullscreen no tiene nada que alternar:
-   se oculta. La topbar se muestra y se esconde con doble tap. */
-@media (max-width: 640px) {
-  #btnFullscreen { display: none; }
-}
-
-/* ── La navbar reemplaza a la topbar en mobile ─────────────────────────────
-   La fila de iconos de la topbar se va: sus herramientas viven ahora en la
-   pildora de abajo y en sus dos paneles. La topbar en si NO se oculta del
-   todo porque la barra de busqueda cuelga de ella en el DOM (moverla romperia
-   el layout de desktop); queda como contenedor transparente, sin fondo ni
-   alto, visible solo cuando la busqueda esta abierta. */
-@media (max-width: 640px) {
-  .reader-topbar {
-    background: none;
-    border-bottom: none;
-    height: auto;
-    box-shadow: none;
-    pointer-events: none;
-  }
-  .reader-topbar-inner { display: none; }
-  /* La barra sube con el teclado para no quedar tapada. */
-  .bottom-nav { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
-  .nav-sheet  { bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px)); }
-
-  /* En mobile se lee siempre en scroll continuo: los otros modos (pagina,
-     libro, doble) estan pensados para pantalla grande y en un telefono solo
-     agregan una decision que nadie quiere tomar. El selector se va. */
-  #viewModeSelector { display: none; }
-
-  /* El final del contenido tiene que poder despejar la pildora: se superpone
-     a proposito (se ve pasar por detras), pero sin esto los ultimos ~88px
-     quedan atrapados abajo, imposibles de scrollear. */
-  html.doc-scroll #pdfScrollWrap { padding-bottom: var(--nav-space); }
-}
+.col-picker-save:hover:not(:disabled) { background: var(--accent-hover); }
+.col-picker-save:disabled { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text-muted); cursor: default; }
 
 /* ── Scroll del documento en mobile (modo scroll de PDF) ───────────────────
    iOS recorta el pintado de un contenedor con overflow propio al viewport,
@@ -410,94 +221,126 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
     padding-top: env(safe-area-inset-top);
     padding-bottom: var(--nav-space);
   }
-  .text-toolbar { padding: .75rem 1rem 0; justify-content: space-between; gap: .5rem; }
-  .text-tb-btn { height: 2.75rem; min-width: 2.75rem; }
-  .text-theme { width: 2.1rem; height: 2.1rem; }
+  /* Con la topbar flotante (ajustes de letra) el texto arranca debajo. */
+  html.doc-scroll body.con-topnav #textWrap { padding-top: calc(var(--top-nav-top) + var(--top-nav-h) + 14px); }
   .text-body { padding: 1rem 1.1rem 2rem; }
 }
 
+/* En el celu el lector va de borde a borde (ya arranca en pantalla completa):
+   sin padding, gap ni sombras. */
+@media (max-width: 640px) {
+  body.reader-fullscreen #pdfScrollWrap { padding: 0; gap: 2px; }
+  body.reader-fullscreen #pdfScrollWrap canvas { box-shadow: none; border-radius: 0; }
+  #pdfScrollWrap { padding: .35rem .25rem; gap: 8px; }
+  .epub-arrow { width: 40px; height: 40px; }
+  .epub-arrow-left  { left: .5rem; }
+  .epub-arrow-right { right: .5rem; }
+  /* En el celu la pildora tiene solo lo esencial; el resto es de la PC. */
+  .reader-nav .rn-group { display: contents; }
+  .reader-nav .rn-desk { display: none !important; }
+  .top-nav .text-ctl { width: 100%; justify-content: space-between; gap: 4px; }
+  .top-nav .tc-btn { height: 40px; min-width: 40px; }
+  .top-nav .text-theme { width: 26px; height: 26px; }
+}
+
+/* ── PC: la pildora abajo, centrada, con todo ───────────────────────────────
+   Misma pieza que la del celu (nav.css), con medidas de escritorio: mas
+   baja, con tope de ancho, botones de 42px con hover. Los paneles y el
+   buscador que salen de ella usan las mismas variables, asi que se acomodan
+   solos al ancho de la pildora. */
+@media (min-width: 641px) {
+  :root {
+    --nav-bar-height: 58px;
+    --nav-bar-bottom: 18px;
+    --rp-w: min(1080px, calc(100vw - 48px));
+    --nav-bar-side: calc((100vw - var(--rp-w)) / 2);
+    --nav-space: calc(var(--nav-bar-height) + var(--nav-bar-bottom) + 14px);
+  }
+  #readerNav {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center; gap: 10px; padding: 0 8px;
+  }
+  .reader-nav .bn-indicator { display: none; }
+  .reader-nav .rn-group { display: flex; align-items: center; min-width: 0; gap: 2px; }
+  .reader-nav .rn-left   { justify-self: start; width: 100%; }
+  .reader-nav .rn-center { justify-self: center; gap: 8px; }
+  .reader-nav .rn-right  { justify-self: end; }
+  .reader-nav .bn-item {
+    flex: none; width: 42px; height: 42px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: none; color: var(--text-dim); cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .reader-nav .bn-item svg { width: 21px; height: 21px; }
+  .reader-nav .bn-item:hover { background: var(--nav-active-bg); color: var(--text); }
+  .reader-nav .bn-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .rn-title {
+    font-size: .88rem; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 0 .5rem 0 .25rem; min-width: 0;
+  }
+
+  /* Paginador: una pildora dentro de la pildora. El numero se edita en el
+     lugar (Enter va a esa pagina): no hay boton "Ir". */
+  .rn-pager {
+    display: flex; align-items: center; gap: 2px; height: 42px; padding: 3px;
+    border-radius: 999px; background: color-mix(in srgb, var(--text) 6%, transparent);
+  }
+  .rn-btn {
+    width: 36px; height: 36px; border-radius: 999px; border: none; background: none;
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s;
+  }
+  .rn-btn:hover { background: var(--nav-active-bg); color: var(--text); }
+  .rn-page { display: flex; align-items: baseline; gap: .35rem; padding: 0 .4rem; cursor: text; font-variant-numeric: tabular-nums; }
+  .rn-page input {
+    width: 3ch; min-width: 2ch; padding: 2px 0; text-align: right;
+    background: transparent; border: none; border-bottom: 1.5px solid transparent;
+    color: var(--text); font: inherit; font-size: .92rem; font-weight: 600; outline: none;
+    transition: border-color .15s;
+  }
+  .rn-page input:hover { border-bottom-color: color-mix(in srgb, var(--text) 20%, transparent); }
+  .rn-page input:focus { border-bottom-color: var(--accent); }
+  .rn-total { font-size: .85rem; color: var(--text-muted); white-space: nowrap; }
+  .rn-zoom { display: flex; align-items: center; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid color-mix(in srgb, var(--text) 10%, transparent); }
+  .rn-zoom-label {
+    min-width: 3.5rem; height: 36px; border: none; background: none; border-radius: 999px;
+    color: var(--text); font: inherit; font-size: .82rem; cursor: pointer; font-variant-numeric: tabular-nums;
+  }
+  .rn-zoom-label:hover { background: var(--nav-active-bg); }
+
+  /* El contenido despeja la pildora (en scroll puede pasar por detras). */
+  #pdfScrollWrap { padding-bottom: var(--nav-space); }
+  #pdfSpreadViewer, #epubViewer { padding-bottom: var(--nav-space); }
+  #textWrap { padding-bottom: var(--nav-space); }
+
+  /* Paneles y buscador con medidas de PC: filas mas bajas y hover. */
+  .nav-sheet { max-height: min(80vh, 760px); }
+  .nav-sheet-body { padding: 1.1rem .9rem var(--nav-bar-height); }
+  .nav-sheet-row { min-height: 40px; padding: .45rem .8rem; font-size: .86rem; }
+  .nav-sheet-row:hover { background: var(--nav-active-bg); color: var(--text); }
+  .nav-sheet-row:hover svg { color: var(--text); }
+  .nav-sheet-row.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .nav-sheet-row.danger:hover svg { color: var(--danger); }
+  .nav-sheet-del:hover { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+  .tree-chev { width: 36px; height: 36px; }
+  .tree-chev:hover { background: var(--nav-active-bg); color: var(--text); }
+  .nav-sheet-seg .vm-btn { cursor: pointer; }
+  .nav-sheet-seg .vm-btn:hover:not(.active) { color: var(--text); }
+  .nav-sheet-field input { font-size: .95rem; }
+  .info-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.75rem; padding: 0 .4rem; }
+  .col-picker .nav-tree { max-height: 52vh; }
+  .nav-search { --search-tuck: 26px; height: calc(48px + var(--search-tuck)); padding-left: 1.25rem; }
+  .nav-search input { font-size: .95rem; }
+  .nav-search .r-btn { width: 34px; height: 34px; }
+  .nav-search .r-btn:hover { background: var(--nav-active-bg); color: var(--text); }
+}
+
 /* ── Toast ── */
+/* Siempre por encima de la pildora (y de lo que crece de ella). */
 .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: .5rem 1.1rem; border-radius: 99px; font-size: .82rem; opacity: 0; transition: all .25s; z-index: 999; pointer-events: none; white-space: nowrap; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ── Mobile ── */
-@media (max-width: 640px) {
-  /* Topbar */
-  .reader-topbar-inner { padding: 0 .4rem; gap: .1rem; height: 52px; }
-  .reader-title { font-size: .78rem; }
-  .reader-actions .r-btn { padding: .38rem; }
-  .reader-actions .r-btn svg { width: 18px; height: 18px; }
-
-  /* Side panels: lateral derecho, ancho contenido, nunca full screen */
-  .side-panel {
-    width: 88vw !important;
-    max-width: 320px !important;
-    top: 52px !important;
-  }
-
-  /* Scroll */
-  /* En una pantalla chica cada px de ancho cuenta: padding minimo. */
-  #pdfScrollWrap { padding: .35rem .25rem; gap: 8px; }
-
-  /* Page mode flechas abajo */
-  .page-arrow-btn {
-    top: auto !important; transform: none !important;
-    bottom: .75rem;
-    width: 44px; height: 44px;
-  }
-  .page-arrow-left  { left: 1rem; }
-  .page-arrow-right { right: 1rem; }
-  .page-arrow-btn:hover  { transform: none !important; }
-  .page-arrow-btn:active { transform: scale(.92) !important; }
-
-  /* Controls compactos */
-  .pdf-controls { padding: .3rem .4rem; gap: .2rem; font-size: .74rem; }
-  .ctrl-btn { padding: .2rem .4rem; font-size: .74rem; }
-  .ctrl-select { font-size: .74rem; }
-  .pdf-controls input[type=number] { width: 38px; }
-  .page-footer-controls { padding: .3rem .4rem; gap: .25rem; font-size: .76rem; }
-
-  /* EPUB */
-  .epub-arrow { font-size: 1.6rem; padding: .3rem .5rem; }
-  .epub-controls { gap: .6rem; padding: .3rem .5rem; font-size: .76rem; }
-
-  /* Modales como sheets */
-  .modal-overlay { align-items: flex-end; padding: 0; }
-  .modal-sm { border-radius: 16px 16px 0 0; max-width: 100%; width: 100%; padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom)); animation: slideUpSheet .25s ease both; }
-
-  /* Ocultar modos no utiles en mobile */
-  .vm-btn[data-mode="spread"], .vm-btn[data-mode="book"] { display: none; }
-
-  /* Toast sobre posible nav */
-  .toast { bottom: 1rem; }
-}
-
-/* Mobile: barra de controles scroll pegada a topbar, se mueve junto */
-@media (max-width: 640px) {
-  /* Hacer que el pdf-controls del scroll sea fixed debajo de topbar */
-  #pdfScrollViewer .pdf-controls {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    justify-content: center;
-    gap: .75rem;
-    padding: .5rem .75rem;
-    font-size: .82rem;
-  }
-  /* Simplificar controles: solo mostrar lo esencial */
-  #pdfScrollViewer .pdf-controls .ctrl-btn { 
-    padding: .3rem .65rem; 
-    font-size: .85rem;
-    border-radius: 8px;
-  }
-  #pdfScrollViewer .pdf-controls input[type=number] {
-    width: 44px;
-    font-size: .82rem;
-    text-align: center;
-  }
-  /* Ocultar el select de zoom en mobile — ocupa espacio innecesario */
-  #pdfScrollViewer .pdf-controls #pdfScrollZoom { display: none; }
-}
 
 /* ── PDF Text Layer (seleccion de texto) ── */
 .pdf-page-container {
@@ -534,43 +377,25 @@ body.reader-fullscreen .page-arrow-btn { display: none; }
   color: transparent;
 }
 
-/* ── Lupa (Magnifier) ── */
+/* ── Lupa ── */
 #magnifierLens {
-  position: fixed;
-  width: 280px;
-  height: 200px;
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  box-shadow: 0 4px 24px rgba(0,0,0,.7), 0 0 0 1px rgba(124,111,247,.3);
-  pointer-events: none;
-  z-index: 500;
-  overflow: hidden;
-  display: none;
-  background: #1a1a1a;
+  position: fixed; display: none; pointer-events: none; z-index: 500;
+  border-radius: 14px; overflow: hidden; background: #fff;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent);
 }
-#magnifierLens canvas {
-  position: absolute;
-  top: 0; left: 0;
+#magnifierLens canvas { display: block; }
+.lens-hint {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  background: rgba(13,13,13,.82); color: #e2e2e2; font-size: .72rem;
+  padding: .28rem .7rem; border-radius: 999px; white-space: nowrap;
+  opacity: 0; transition: opacity .25s;
 }
+.lens-hint.show { opacity: 1; }
 #magnifierCursor {
-  position: fixed;
-  border: 2px solid var(--accent);
-  border-radius: 3px;
-  pointer-events: none;
-  z-index: 499;
-  display: none;
-  box-shadow: 0 0 0 1px rgba(0,0,0,.5);
-  background: rgba(124,111,247,.08);
+  position: fixed; display: none; pointer-events: none; z-index: 499;
+  border: 1.5px solid var(--accent); border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
-/* Cuando la lupa esta activa, ocultar cursor en el viewer */
-body.magnifier-active #pdfSpreadViewer {
-  cursor: none;
-}
-/* Boton lupa activo */
-#btnMagnifier.active {
-  color: var(--accent);
-  background: rgba(124,111,247,.12);
-}
-
-/* La barra de bookmark es solo de mobile; en escritorio sigue el modal. */
-@media (min-width: 641px) { .bm-bar { display: none; } }
+body.magnifier-active #pdfScrollWrap,
+body.magnifier-active #spreadWrap { cursor: none; }
+.toast, .toast.show { bottom: calc(var(--nav-space) + .25rem); }

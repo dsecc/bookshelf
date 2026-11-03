@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.15 — El lector en una pildora (PC y celu)
+
+### Cambiado
+- **Lector en la PC: una sola pildora abajo, centrada, con todo** (la misma pieza que en el celu, con medidas de escritorio: 58 px de alto, tope de 1080 px de ancho, botones de 42 px con hover). Volver y titulo a la izquierda; en el medio la pagina (el numero se edita en el lugar: Enter va a esa pagina, ya no hay boton "Ir") con anterior/siguiente y el zoom en Scroll; a la derecha buscar, bookmarks, lupa, pantalla completa e info. No queda nada arriba: toda la pantalla es para el libro. Antes habia una topbar de lado a lado con 9 iconos y cinco barras de controles distintas, una por modo.
+- **Info y ajustes crece desde la pildora** (como en el celu), en dos columnas en la PC: titulo con un lapicito para editarlo; modo de lectura (Scroll o Doble pagina); Guardar sin conexion, Enviar a otro usuario, Descargar, Compartir y Eliminar como filas; y la coleccion con **un arbol propio** (no el selector nativo): arranca desplegado solo el camino hasta donde esta el libro, tocar una coleccion la elige y despliega sus subcarpetas, y el boton la mueve. Lo mismo en el celu, en una columna.
+- **Enviar a otro usuario y Eliminar** tambien son paneles que crecen de la pildora (antes, ventanas con un selector nativo).
+- **Bookmarks:** un solo boton. En la PC abre la lista (con *Nuevo bookmark* abajo, que abre la barra para escribir); en el celu, el menu de siempre.
+- **Buscar** sale de atras de la pildora, igual en PC y celu.
+- **Solo dos modos de lectura: Scroll y Doble pagina.** Los libros guardados en Pagina o Libro abren en Scroll.
+- **Pantalla completa (PC):** con el mouse quieto 2,5 s se va la pildora; vuelve al moverlo (no se va si el mouse esta encima o hay algo abierto).
+- **Lupa (PC, Scroll y Doble):** toma una franja del ancho de la pagina bajo el mouse, de unos 3 renglones, y la muestra ampliada (2x, o menos si la pagina es muy ancha) desde la pagina dibujada en alta resolucion. Mas o menos renglones con la ruedita (en Scroll, Shift + ruedita, que la ruedita sola scrollea) o con + y -. Antes era un cuadradito de 280x200 sobre el canvas estirado, y solo en Doble.
+- **Letra, tamaño y tema** de TXT, Markdown y EPUB son los mismos controles: en la PC van en la pildora (en lugar de la pagina); en el celu, en una **topbar flotante** gemela de la pildora, anclada debajo del notch, que se esconde junto con la de abajo con el doble tap.
+- **Biblioteca en el celu:** dentro de una coleccion, la misma topbar flotante lleva "‹ <carpeta de arriba>" y las subcarpetas, deslizables. Siempre visible mientras se esta ahi; solo aparece si hay algo para mostrar.
+- Icono de Info: una ruedita (PC y celu). Mismos iconos en las dos.
+- Las pildoras respetan los margenes laterales del notch con el telefono de costado.
+
+### Quitado
+- Subrayar (no se podia usar), *Compartir por WhatsApp* (queda Compartir), los modos Pagina y Libro.
+
+### Corregido
+- **El lector de EPUB nunca abria ningun libro.** La URL del archivo no termina en `.epub` y epub.js la tomaba por un libro descomprimido: pedia `/file/META-INF/container.xml` y quedaba en blanco. Ahora abre, con el porcentaje en la pildora.
+- **Buscar en un PDF no marcaba la palabra**, solo saltaba a la pagina. Ahora la marca (todas las de la pagina, la actual mas fuerte), en Scroll y en Doble, con la posicion medida con la tipografia del PDF. Enter con la misma busqueda va a la siguiente.
+- **En Doble, al abrir en una pagina impar la hoja de la izquierda quedaba en blanco** (solo se dibujaban la actual y la siguiente).
+- Cambiar de modo guarda antes la posicion: el modo nuevo abre donde se estaba.
+
+### Notas
+- `VERSION` del service worker: `v28` → `v30`.
+- Verificado en Chromium (1440x900 y 390x844): paginador, zoom, busqueda marcada (Scroll y Doble), bookmarks, info (titulo, modo, mover de coleccion por el arbol, enviar, eliminar, sin conexion), lupa (Doble: 524 px de pagina -> lupa de 1048x144; Scroll: 900 px -> 1408x113 a 1,56x; Shift + ruedita no scrollea), pantalla completa con el mouse quieto, TXT/MD/EPUB en las dos pantallas, doble tap, topbar de subcarpetas, leer sin conexion (MD y PDF) y el progreso entre dispositivos (sigue ganando lo mas avanzado).
+
 ## v1.14.2 — Gana lo más avanzado
 
 ### Cambiado

@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.14.2** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.15** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -98,7 +98,7 @@ Dos formas, usá la que te resulte más cómoda:
 
 ## Enviar libros entre usuarios
 
-Desde el lector (panel de info, botón "Enviar a otro usuario") podés mandarle cualquier libro a otra cuenta del servidor. Al destinatario le aparece una notificación — 🔔 en el topbar de la biblioteca, con contador de las que no vio — y al abrirla ve la portada, el título y quién se lo mandó, con la opción de aceptarlo eligiendo o creando una colección.
+Desde el lector (Info y ajustes → "Enviar a otro usuario") podés mandarle cualquier libro a otra cuenta del servidor. Al destinatario le aparece una notificación — 🔔 en el topbar de la biblioteca, con contador de las que no vio — y al abrirla ve la portada, el título y quién se lo mandó, con la opción de aceptarlo eligiendo o creando una colección.
 
 El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca antes: si nunca lo acepta, no se duplicó nada en disco. Cerrar la notificación sin aceptar solo la marca como "vista" (deja de sumar al contador) — se puede volver a abrir y aceptar cuando quieras. Cualquier notificación, la hayas visto o no, aceptado o no, se borra sola a los 7 días de haberse recibido, para no acumular basura en el servidor.
 
@@ -126,7 +126,7 @@ El certificado es de Let's Encrypt, así que iOS y Android lo confían sin insta
 
 Si ya tenías la app instalada apuntando a la IP por HTTP, **borrá el ícono viejo y volvé a agregarla desde la dirección HTTPS**: es otro origen, con otro almacén de caché, así que la instalación vieja no sirve.
 
-Dentro del lector, el botón **"Guardar sin conexión"** descarga ese libro al dispositivo. Los libros guardados quedan listados en la sección **"Sin conexión"** de la biblioteca y se marcan con un ícono en la portada. Solo se guarda lo que elegís: nada se descarga solo, para no llenarte el teléfono.
+Dentro del lector, **Info y ajustes → "Guardar sin conexión"** descarga ese libro al dispositivo. Los libros guardados quedan listados en la sección **"Sin conexión"** de la biblioteca y se marcan con un ícono en la portada. Solo se guarda lo que elegís: nada se descarga solo, para no llenarte el teléfono.
 
 La app en sí (la biblioteca, las portadas y el lector) queda cacheada después de la primera visita con conexión, así que abre igual sin internet — lo único que necesita estar guardado explícitamente es el archivo de cada libro.
 
@@ -135,8 +135,8 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 > En iPhone, para que la hoja aproveche toda la pantalla (incluso por debajo de la hora y la batería, como en los PDF nativos) hay que abrirla **instalada desde la pantalla de inicio**: Safari siempre muestra su propia barra. Si ya la tenías instalada de antes, borrá el ícono y volvé a agregarla para que tome la configuración nueva.
 
 ## Formatos soportados
-- **PDF** — lector completo con zoom y navegación por páginas
-- **EPUB** — lector con fuente, tamaño y tema ajustable
+- **PDF** — modos Scroll y Doble página, zoom, búsqueda que marca la palabra, lupa de renglones (PC) y bookmarks
+- **EPUB** — lector con fuente, tamaño y tema (los mismos controles que TXT y Markdown)
 - **TXT y Markdown (.md)** — lector con fuente, tamaño, tema, búsqueda y bookmarks. El Markdown se dibuja con un renderizador propio (`static/js/mdlite.js`) que escapa todo el HTML: un `.md` compartido no puede ejecutar nada
 - **MOBI, CBZ, CBR, DJVU, FB2** — descarga directa
 

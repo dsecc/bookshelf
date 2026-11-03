@@ -1,7 +1,7 @@
 services:
   bookshelf:
     build: .
-    image: bookshelf:1.14
+    image: bookshelf:1.15
     container_name: bookshelf
     restart: unless-stopped
     # Corre como el usuario del servidor (santino, 1000), no como root: asi las

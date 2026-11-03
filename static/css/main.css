@@ -64,23 +64,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .col-item .col-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-count { margin-left: auto; font-size: .7rem; color: var(--text-muted); }
 
-/* ── Arbol de colecciones (sidebar, y el panel de colecciones en el celu) ──
-   Cada hija se une a la de arriba con un codo curvo, como Obsidian. El codo
-   va en la fila; el tramo vertical que sigue hasta la proxima hermana va en
-   el nodo, asi atraviesa tambien las nietas desplegadas en el medio. */
-:root { --tree-line: #4d4d4d; }
-.tree-children { list-style: none; }
-.tree-children > .tree-node { position: relative; }
-.tree-children > .tree-node:not(:last-child)::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
-  border-left: 1.5px solid var(--tree-line); pointer-events: none;
-}
-.tree-children > .tree-node > .tree-row { position: relative; }
-.tree-children > .tree-node > .tree-row::before {
-  content: ""; position: absolute; left: 0; top: 0; height: 50%; width: .6rem;
-  border-left: 1.5px solid var(--tree-line); border-bottom: 1.5px solid var(--tree-line);
-  border-bottom-left-radius: 7px; pointer-events: none;
-}
+/* Trazo curvo del arbol: en nav.css (lo usan tambien el panel del lector). */
 .col-list .tree-children { margin-left: 2.05rem; }
 .col-list .tree-children .tree-children { margin-left: 1.3rem; }
 .col-list .tree-children > .tree-node > .col-item { padding-left: 1rem; }
@@ -103,21 +87,27 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .trash-head .view-head-note { flex: 1; margin: 0; min-width: 12rem; }
 .col-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .35rem; font-size: .8rem; color: var(--text-muted); }
 .col-crumbs button { background: none; border: none; color: var(--accent); font: inherit; padding: .45rem 0; cursor: pointer; }
-.subcol-pills {
-  display: flex; gap: .5rem; overflow-x: auto; scrollbar-width: none;
-  margin: .8rem -.75rem 0; padding: 0 .75rem .1rem;
+/* Topbar flotante de la coleccion (celu): "‹ subir" + subcarpetas deslizables.
+   El vidrio y la posicion son los de .top-nav (nav.css). */
+.lib-top-nav .ltn-scroll {
+  display: flex; align-items: center; gap: 6px; width: 100%; height: 100%;
+  overflow-x: auto; scrollbar-width: none; padding: 0 4px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
 }
-.subcol-pills::-webkit-scrollbar { display: none; }
-.subcol-pill {
-  display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0;
-  height: 2.6rem; padding: 0 1rem; border-radius: 999px;
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text); font-size: .86rem; cursor: pointer;
+.lib-top-nav .ltn-scroll::-webkit-scrollbar { display: none; }
+.ltn-item {
+  flex-shrink: 0; height: 40px; padding: 0 .95rem; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .45rem;
+  border: none; background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text); font: inherit; font-size: .86rem; white-space: nowrap; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.subcol-pill:active { background: var(--surface3); }
-.subcol-pill svg { color: var(--text-dim); flex-shrink: 0; }
-.subcol-pill .pill-count { font-size: .74rem; color: var(--text-muted); }
+.ltn-item:active { background: var(--nav-active-bg); }
+.ltn-item svg { color: var(--text-dim); flex-shrink: 0; }
+.ltn-item .pill-count { font-size: .74rem; color: var(--text-muted); }
+.ltn-up { background: none; padding: 0 .7rem 0 .45rem; color: var(--text-dim); }
+.ltn-sep { flex-shrink: 0; width: 1px; height: 22px; background: color-mix(in srgb, var(--text) 12%, transparent); }
 
 /* Dias que le quedan (Temporal / papelera). Arriba a la izquierda: la
    derecha es de la insignia de "sin conexion". */
@@ -635,6 +625,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .books-row .book-card { width: 110px; }
   .books-grid { gap: .9rem .6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .col-head { display: block; }
+  /* Con la topbar flotante el titulo de marca se va (ocuparia el mismo lugar)
+     y el contenido arranca debajo de ella. */
+  body.con-topnav .lib-hero { display: none; }
+  body.con-topnav .content { padding-top: calc(var(--top-nav-top) + var(--top-nav-h) + 14px); }
   .trash-head .view-head-title { display: block; width: 100%; }
   .trash-head .btn-danger { min-height: 44px; }
   .book-cover { border-radius: 5px; }

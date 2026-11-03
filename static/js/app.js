@@ -341,26 +341,50 @@ function makeViewHead() {
   if (c.is_temp) head.appendChild(Object.assign(document.createElement("p"), {
     className: "view-head-note", textContent: "Lo que dejes aca se va a la papelera a los 30 dias." }));
 
-  const kids = childrenOf(c.id);
-  if (kids.length) {
-    const pills = document.createElement("div");
-    pills.className = "subcol-pills";
-    kids.forEach(k => {
-      const b = document.createElement("button");
-      b.className = "subcol-pill";
-      b.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
-      b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
-      b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
-      b.onclick = () => openCollection(k.id);
-      pills.appendChild(b);
-    });
-    head.appendChild(pills);
-  }
   return head;
+}
+
+// ── Topbar flotante de la coleccion (celu) ───────────────────────────────────
+// "‹ <carpeta de arriba>" para subir, y despues las subcarpetas, deslizables.
+// Siempre visible mientras se esta en la coleccion; solo aparece si hay algo
+// para mostrar. En la PC no se ve (lo hacen el sidebar y la topbar).
+function renderLibTopNav() {
+  const bar = document.getElementById("libTopNav");
+  const box = document.getElementById("libTopNavScroll");
+  if (!bar) return;
+  const c = activeColId != null && !offlineView && !trashView ? colById(activeColId) : null;
+  const padre = c && c.parent_id != null ? colById(c.parent_id) : null;
+  const kids = c ? childrenOf(c.id) : [];
+  const mostrar = !!c && (padre || kids.length);
+  bar.hidden = !mostrar;
+  document.body.classList.toggle("con-topnav", !!mostrar);
+  if (!mostrar) return;
+  box.innerHTML = "";
+  if (padre) {
+    const up = document.createElement("button");
+    up.className = "ltn-item ltn-up";
+    up.title = "Subir a " + padre.name;
+    up.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>';
+    up.appendChild(Object.assign(document.createElement("span"), { textContent: padre.name }));
+    up.onclick = () => openCollection(padre.id);
+    box.appendChild(up);
+    if (kids.length) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-sep" }));
+  }
+  kids.forEach(k => {
+    const b = document.createElement("button");
+    b.className = "ltn-item";
+    b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+    b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
+    b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
+    b.onclick = () => openCollection(k.id);
+    box.appendChild(b);
+  });
+  box.scrollLeft = 0;
 }
 
 // ── Books ─────────────────────────────────────────────────────────────────────
 function renderBooks(filter) {
+  renderLibTopNav();
   filter = (filter || "").toLowerCase();
   const container = document.getElementById("booksContainer");
   const empty = document.getElementById("emptyState");
@@ -666,6 +690,12 @@ function vistaActual() {
 }
 
 function setView(view) {
+  // La topbar de la coleccion es de la vista de libros.
+  if (view !== "biblioteca") {
+    const t = document.getElementById("libTopNav");
+    if (t) t.hidden = true;
+    document.body.classList.remove("con-topnav");
+  }
   document.getElementById("viewBiblioteca").style.display = view === "biblioteca" ? "" : "none";
   document.getElementById("viewAbout").style.display     = view === "about"       ? "" : "none";
   document.getElementById("viewSettings").style.display  = view === "settings"    ? "" : "none";
