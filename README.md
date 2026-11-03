@@ -4,6 +4,31 @@
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
+<p align="center">
+  <img src="docs/capturas/pc-inicio.jpg" alt="Biblioteca en la PC: los libros arriba de todo, la ruta flotando arriba y la píldora con las herramientas abajo" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/capturas/celu-colecciones.jpg" alt="Celu: el panel de colecciones bajando desde la topbar, con un lápiz al lado de cada carpeta" width="32%">
+  &nbsp;
+  <img src="docs/capturas/celu-ajustes.jpg" alt="Celu: Últimos leídos arriba y el panel de Ajustes estirado desde la píldora" width="32%">
+</p>
+
+<p align="center">
+  <img src="docs/capturas/pc-ajustes.jpg" alt="PC: el panel de Ajustes con Papelera, Releer biblioteca, contraseña, cerrar sesión y la tarjeta de créditos" width="100%">
+</p>
+
+## Cómo se usa
+
+Celu y PC comparten la misma interfaz: **dos barras de vidrio flotando sobre los libros** (ver [docs/pildoras.md](docs/pildoras.md)).
+
+- **Arriba, la ruta** (`/`, `/ Ciberseguridad / Malware`). Cada tramo lleva ahí; tocar la barra en cualquier otro lado la ensancha y baja el **panel de colecciones**: el árbol de carpetas, *+ Nueva* y un **lápiz al lado de cada carpeta** para renombrarla en el lugar.
+- **Abajo, la píldora**. En la PC: Biblioteca, Sin conexión, Buscar, Subir, Notificaciones y Ajustes. En el celu: Biblioteca, Buscar, Subir y *Más* (Notificaciones y Ajustes). Todo lo que se abre crece desde la píldora, sin ventanas.
+- **Ajustes**: Papelera, Releer biblioteca, Cambiar contraseña, Cerrar sesión y la versión.
+- **El inicio**: los libros arrancan arriba de todo. *Últimos leídos* es la primera hilera en la PC; en el celu llena la primera pantalla (en un iPhone 12 mini, tres filas de dos). Después, una hilera por colección (alfabético, *Temporal* siempre última), sin títulos: el nombre lo dice una **etiqueta vertical a la izquierda** que se arrastra arriba o abajo y, tocándola, entra a esa colección.
+- **En la PC**, la rueda del mouse sobre una hilera la corre de costado en la mitad derecha de la pantalla y baja la página en la izquierda.
+- **El teclado** (celu) sube la barra en la que estás escribiendo, sin mover la página de atrás.
+
 > ⚠️ **Este proyecto está pensado para correr en una red privada (LAN / VPN / servidor casero), no para exponerse directamente a internet.** El login es intencionalmente simple (usuario + contraseña, sin límite de intentos, sin 2FA) para mantener el proyecto liviano. Si igual querés exponerlo a internet, ponelo detrás de un proxy con HTTPS y considerá capas de seguridad adicionales (esto no viene "blindado" para ese escenario).
 
 ## Instalación
@@ -52,7 +77,7 @@ uploads/2/
 ```
 
 - Al abrir una colección se ven sus libros **y los de todas sus subcarpetas**; al entrar a una subcarpeta se filtra a lo suyo.
-- Se pueden **dejar archivos a mano** (por SSH) en cualquier carpeta y después tocar **Ajustes → Releer biblioteca** (también se relee sola al arrancar). Un archivo movido o renombrado a mano **conserva su progreso, bookmarks y copia offline**: se reconoce por su contenido. Si el releer haría desaparecer más de la mitad de la biblioteca (la carpeta no está montada, por ejemplo), no toca nada.
+- Se pueden **dejar archivos a mano** (por SSH) en cualquier carpeta y después tocar **Ajustes → Releer biblioteca** (en el celu, *Más → Ajustes*) (también se relee sola al arrancar). Un archivo movido o renombrado a mano **conserva su progreso, bookmarks y copia offline**: se reconoce por su contenido. Si el releer haría desaparecer más de la mitad de la biblioteca (la carpeta no está montada, por ejemplo), no toca nada.
 - Se ignoran los archivos ocultos, los temporales (`~$`, `.part`, `.crdownload`) y los symlinks.
 - La base de datos es un índice: guarda los ids, el progreso y los metadatos. Al pasar de v1.13 a v1.14, el primer arranque mueve cada archivo a la carpeta de su colección (y deja una copia de la base en `data/bookshelf.db.pre-v1.14`).
 
@@ -81,7 +106,7 @@ En una instalación nueva (clonada desde cero, sin datos previos) solo se crea a
 
 ### Cambiar la contrasena propia
 
-Cada usuario la cambia desde **Ajustes**, sin depender del admin. Se pide la actual ademas de la nueva: sin eso, cualquiera con la sesion abierta en un telefono desbloqueado podria dejar al dueno afuera de su cuenta. El reseteo del admin (`/admin` o `./manage.sh reset-password`) sigue sin pedirla, porque existe para cuando el usuario ya no la sabe.
+Cada usuario la cambia desde **Ajustes → Cambiar contraseña**, sin depender del admin. Se pide la actual ademas de la nueva: sin eso, cualquiera con la sesion abierta en un telefono desbloqueado podria dejar al dueno afuera de su cuenta. El reseteo del admin (`/admin` o `./manage.sh reset-password`) sigue sin pedirla, porque existe para cuando el usuario ya no la sabe.
 
 ### Crear usuarios
 
@@ -98,7 +123,7 @@ Dos formas, usá la que te resulte más cómoda:
 
 ## Enviar libros entre usuarios
 
-Desde el lector (Info y ajustes → "Enviar a otro usuario") podés mandarle cualquier libro a otra cuenta del servidor. Al destinatario le aparece una notificación — 🔔 en el topbar de la biblioteca, con contador de las que no vio — y al abrirla ve la portada, el título y quién se lo mandó, con la opción de aceptarlo eligiendo o creando una colección.
+Desde el lector (Info y ajustes → "Enviar a otro usuario") podés mandarle cualquier libro a otra cuenta del servidor. Al destinatario le aparece una notificación — 🔔 en la píldora de la biblioteca (en el celu, dentro de *Más*), con contador de las que no vio — y al abrirla ve la portada, el título y quién se lo mandó, con la opción de aceptarlo eligiendo o creando una colección.
 
 El archivo recién se copia a la biblioteca del destinatario al aceptar, nunca antes: si nunca lo acepta, no se duplicó nada en disco. Cerrar la notificación sin aceptar solo la marca como "vista" (deja de sumar al contador) — se puede volver a abrir y aceptar cuando quieras. Cualquier notificación, la hayas visto o no, aceptado o no, se borra sola a los 7 días de haberse recibido, para no acumular basura en el servidor.
 
@@ -151,6 +176,8 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 - 🔖 Bookmarks con nombre
 - 📍 Progreso que te sigue entre dispositivos (abre en lo más avanzado que leíste, en cualquiera), también sin conexión (se sincroniza solo al volver internet)
 - ⬇️ Descarga directa de archivos
-- 🔗 Compartir link + WhatsApp
+- 🔗 Compartir link
+- ✏️ Renombrar carpetas desde el panel de colecciones
+- 🫧 Interfaz de vidrio con dos barras flotantes, igual en el celu y en la PC
 - 📱 PWA instalable en el teléfono
 - 🔍 Búsqueda de libros
