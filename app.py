@@ -1,12 +1,11 @@
 
-import os, sqlite3, json, hashlib, io, shutil, secrets
+import os, sqlite3, json, hashlib, io, shutil, secrets, unicodedata, fcntl, contextlib, threading
 from functools import wraps
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from flask import (
     Flask, request, jsonify, send_from_directory, render_template, abort,
     send_file, session, redirect, url_for, flash, get_flashed_messages
 )
-from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -17,6 +16,13 @@ SECRET_KEY_PATH = "/app/data/secret_key"
 ALLOWED_EXTENSIONS = {"pdf","epub","mobi","cbz","cbr","djvu","fb2","txt","md","doc","docx"}
 DEFAULT_COLLECTION_NAME = "Sin coleccion"
 SHARE_CLEANUP_DAYS = 7
+# Las colecciones son carpetas dentro de uploads/<usuario>/ (ver "Biblioteca
+# en disco" mas abajo). Temporal y la papelera tambien son carpetas.
+TEMP_COLLECTION_NAME = "Temporal"
+TRASH_DIRNAME = ".papelera"
+TEMP_DAYS = 30
+TRASH_DAYS = 30
+LIBRARY_LOCK_PATH = "/app/data/library.lock"
 
 import time as _time
 STATIC_VER = str(int(_time.time()))
@@ -57,13 +63,6 @@ def user_covers_dir(user_id):
     os.makedirs(d, exist_ok=True)
     return d
 
-def ensure_default_collection(conn, user_id):
-    row = conn.execute("SELECT id FROM collections WHERE user_id=? AND name=?", (user_id, DEFAULT_COLLECTION_NAME)).fetchone()
-    if row:
-        return row["id"]
-    conn.execute("INSERT INTO collections (name, user_id) VALUES (?,?)", (DEFAULT_COLLECTION_NAME, user_id))
-    return conn.execute("SELECT id FROM collections WHERE user_id=? AND name=?", (user_id, DEFAULT_COLLECTION_NAME)).fetchone()["id"]
-
 def migrate_collections_table(conn):
     # La tabla original tenia UNIQUE(name) global; con multiusuario el nombre
     # solo debe ser unico por usuario, asi que se recrea con esa constraint.
@@ -84,6 +83,466 @@ def migrate_collections_table(conn):
     """)
     conn.commit()
 
+# ---------------------------------------------------------------------------
+# Biblioteca en disco
+# ---------------------------------------------------------------------------
+# Las carpetas mandan, como en Obsidian: cada coleccion es una carpeta dentro
+# de uploads/<usuario>/ y puede tener subcarpetas. Los archivos sueltos en la
+# raiz son "Sin coleccion". La DB es un indice: guarda el id de cada libro (del
+# que cuelgan progreso, bookmarks, portada y las copias offline del telefono),
+# su ruta relativa (books.relpath, siempre con "/" y en NFC) y metadatos.
+#
+# Todo lo que se hace desde la app toca el disco y despues el indice. Lo que se
+# hace a mano (por SSH) se incorpora con "Releer biblioteca" (rescan_library),
+# que reconcilia el disco contra el indice sin perder ids.
+#
+# Temporal/ es una coleccion mas, pero lo que entra ahi se va a la papelera a
+# los TEMP_DAYS dias. .papelera/ guarda lo eliminado (con su ruta original
+# adentro) TRASH_DAYS dias y despues se borra.
+
+def nfc(s):
+    return unicodedata.normalize("NFC", s)
+
+def clean_name(name):
+    """Nombre usable para una carpeta o un archivo. Conserva acentos y
+    espacios (secure_filename los destruye: "Programación" -> "Programacion");
+    saca separadores, caracteres de control y los que Windows no acepta, y los
+    puntos de los bordes (un nombre no puede quedar oculto ni ser "..").
+    Devuelve "" si no queda nada."""
+    name = nfc(name or "").replace("/", " ").replace("\\", " ")
+    name = "".join(ch for ch in name if ch >= " " and ch not in '<>:"|?*\x7f')
+    return " ".join(name.split()).strip(" .")[:120]
+
+def join_rel(*parts):
+    return "/".join(p for p in parts if p)
+
+def parent_rel(rel):
+    return rel.rsplit("/", 1)[0] if "/" in rel else ""
+
+def is_trash_rel(rel):
+    return bool(rel) and (rel == TRASH_DIRNAME or rel.startswith(TRASH_DIRNAME + "/"))
+
+def is_temp_rel(rel):
+    """Un libro (ruta de archivo) que esta en Temporal o en una subcarpeta."""
+    return bool(rel) and rel.startswith(TEMP_COLLECTION_NAME + "/")
+
+def rel_to_abs(uid, rel):
+    root = user_upload_dir(uid)
+    if not rel:
+        return root
+    p = os.path.normpath(os.path.join(root, *rel.split("/")))
+    if not p.startswith(root + os.sep):
+        raise ValueError("Ruta fuera de la biblioteca: " + rel)
+    return p
+
+def now_sql():
+    # Mismo formato que CURRENT_TIMESTAMP de SQLite (UTC), para comparar.
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+def file_hash(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def unique_rel(conn, uid, folder_rel, filename, ignore_id=None):
+    """Ruta libre para filename dentro de folder_rel: ni en disco ni en el
+    indice (una fila puede apuntar a un archivo que ya no esta)."""
+    base, ext = os.path.splitext(filename)
+    n = 1
+    rel = join_rel(folder_rel, filename)
+    while True:
+        row = conn.execute("SELECT id FROM books WHERE user_id=? AND relpath=?", (uid, rel)).fetchone()
+        if not os.path.lexists(rel_to_abs(uid, rel)) and (not row or row["id"] == ignore_id):
+            return rel
+        rel = join_rel(folder_rel, f"{base} ({n}){ext}")
+        n += 1
+
+_lock_state = threading.local()
+
+@contextlib.contextmanager
+def library_lock():
+    """Serializa todo lo que mueve archivos o reescribe el indice. Gunicorn
+    corre 2 workers: sin esto un releer y una subida simultaneos podian
+    indexar el mismo archivo dos veces. Reentrante dentro del mismo hilo."""
+    depth = getattr(_lock_state, "depth", 0)
+    if depth:
+        _lock_state.depth = depth + 1
+        try:
+            yield
+        finally:
+            _lock_state.depth -= 1
+        return
+    os.makedirs(os.path.dirname(LIBRARY_LOCK_PATH), exist_ok=True)
+    with open(LIBRARY_LOCK_PATH, "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        _lock_state.depth = 1
+        try:
+            yield
+        finally:
+            _lock_state.depth = 0
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+def ensure_folder_collection(conn, uid, folder_rel):
+    """Id de la coleccion de esa carpeta, creando la carpeta y las filas que
+    falten (tambien las de las carpetas de arriba)."""
+    row = conn.execute("SELECT id FROM collections WHERE user_id=? AND path=?", (uid, folder_rel)).fetchone()
+    if row:
+        return row["id"]
+    if not folder_rel:
+        cur = conn.execute("INSERT INTO collections (name, user_id, path, parent_id) VALUES (?,?,'',NULL)",
+                           (DEFAULT_COLLECTION_NAME, uid))
+        return cur.lastrowid
+    parent = parent_rel(folder_rel)
+    parent_id = ensure_folder_collection(conn, uid, parent) if parent else None
+    os.makedirs(rel_to_abs(uid, folder_rel), exist_ok=True)
+    cur = conn.execute("INSERT INTO collections (name, user_id, path, parent_id) VALUES (?,?,?,?)",
+                       (folder_rel.rsplit("/", 1)[-1], uid, folder_rel, parent_id))
+    return cur.lastrowid
+
+def ensure_default_collection(conn, user_id):
+    """Deja lista la biblioteca de un usuario: la raiz ("Sin coleccion") y
+    Temporal. Devuelve el id de la raiz."""
+    root_id = ensure_folder_collection(conn, user_id, "")
+    ensure_folder_collection(conn, user_id, TEMP_COLLECTION_NAME)
+    return root_id
+
+def place_book(conn, uid, book_id, new_rel):
+    """Actualiza en el indice la ubicacion de un libro cuyo archivo YA esta en
+    new_rel: ruta, coleccion, y los relojes de Temporal y de la papelera."""
+    old = conn.execute("SELECT relpath, temp_since, deleted_at, deleted_from FROM books WHERE id=?", (book_id,)).fetchone()
+    old_rel = old["relpath"] or ""
+    now = now_sql()
+    if is_trash_rel(new_rel):
+        col_id, temp_since = None, None
+        deleted_at = old["deleted_at"] or now
+        # Al eliminar desde la app se conserva de donde vino; si alguien lo
+        # metio a mano en .papelera/, la ruta de adentro hace de original.
+        deleted_from = old["deleted_from"] or (old_rel if old_rel and not is_trash_rel(old_rel)
+                                               else new_rel[len(TRASH_DIRNAME) + 1:])
+    else:
+        col_id = ensure_folder_collection(conn, uid, parent_rel(new_rel))
+        deleted_at = deleted_from = None
+        if not is_temp_rel(new_rel):
+            temp_since = None
+        elif is_temp_rel(old_rel) and old["temp_since"]:
+            temp_since = old["temp_since"]  # se movio dentro de Temporal: el reloj sigue
+        else:
+            temp_since = now
+    conn.execute(
+        "UPDATE books SET relpath=?, filepath=?, filename=?, collection_id=?, temp_since=?, deleted_at=?, deleted_from=? WHERE id=?",
+        (new_rel, rel_to_abs(uid, new_rel), new_rel.rsplit("/", 1)[-1], col_id, temp_since, deleted_at, deleted_from, book_id))
+
+def move_book_file(conn, uid, book, folder_rel, filename=None):
+    """Mueve el archivo de un libro a otra carpeta (o le cambia el nombre) y
+    actualiza el indice. Devuelve la ruta nueva."""
+    src = rel_to_abs(uid, book["relpath"])
+    new_rel = unique_rel(conn, uid, folder_rel, filename or book["filename"], ignore_id=book["id"])
+    if new_rel != book["relpath"]:
+        dst = rel_to_abs(uid, new_rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        os.rename(src, dst)
+    place_book(conn, uid, book["id"], new_rel)
+    return new_rel
+
+def insert_book(conn, uid, rel, title=None, **meta):
+    """Indexa un archivo que ya esta en rel. Portada y paginas quedan
+    pendientes (has_cover=-1) salvo que vengan en meta: se generan la primera
+    vez que se pide la portada (ensure_book_meta)."""
+    filename = rel.rsplit("/", 1)[-1]
+    path = rel_to_abs(uid, rel)
+    st = os.stat(path)
+    if title is None:
+        title = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")
+    cur = conn.execute(
+        "INSERT INTO books (title, filename, filepath, format, size, file_mtime, content_hash, cover_color, "
+        "has_cover, page_count, view_mode, user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (title, filename, path, filename.rsplit(".", 1)[1].upper(), st.st_size, int(st.st_mtime),
+         meta.get("content_hash") or file_hash(path), meta.get("cover_color") or get_cover_color(filename),
+         meta.get("has_cover", -1), meta.get("page_count", 0), meta.get("view_mode", "scroll"), uid))
+    place_book(conn, uid, cur.lastrowid, rel)
+    return cur.lastrowid
+
+def count_pages(path, fmt):
+    try:
+        if fmt == "PDF":
+            import fitz
+            with fitz.open(path) as doc:
+                return doc.page_count
+        if fmt == "EPUB":
+            import zipfile
+            with zipfile.ZipFile(path) as z:
+                return max(len([n for n in z.namelist() if n.endswith((".html", ".xhtml", ".htm"))]), 1)
+    except Exception:
+        pass
+    return 0
+
+def ensure_book_meta(conn, book):
+    """Genera portada y cantidad de paginas si estaban pendientes."""
+    if book["has_cover"] != -1:
+        return
+    path = rel_to_abs(book["user_id"], book["relpath"])
+    has_cover = 1 if extract_cover(path, book["id"], book["format"], book["user_id"]) else 0
+    conn.execute("UPDATE books SET has_cover=?, page_count=? WHERE id=?",
+                 (has_cover, count_pages(path, book["format"]), book["id"]))
+    conn.commit()
+
+def drop_cover(uid, book_id):
+    try: os.remove(os.path.join(user_covers_dir(uid), str(book_id) + ".jpg"))
+    except OSError: pass
+
+def purge_book(conn, uid, book):
+    """Borrado definitivo: archivo, portada y todo lo que cuelga del id."""
+    try: os.remove(rel_to_abs(uid, book["relpath"]))
+    except (OSError, ValueError): pass
+    drop_cover(uid, book["id"])
+    for table in ("progress", "bookmarks", "highlights"):
+        conn.execute(f"DELETE FROM {table} WHERE book_id=?", (book["id"],))
+    conn.execute("DELETE FROM book_shares WHERE book_id=? AND status='pending'", (book["id"],))
+    conn.execute("DELETE FROM books WHERE id=?", (book["id"],))
+
+def trash_book(conn, uid, book):
+    """Manda un libro a la papelera, conservando su ruta adentro para poder
+    restaurarlo donde estaba. Progreso y bookmarks se quedan (vuelven con el)."""
+    move_book_file(conn, uid, book, join_rel(TRASH_DIRNAME, parent_rel(book["relpath"])))
+    # Igual que antes al borrar: un envio pendiente no puede aceptarse si el
+    # libro ya no esta en la biblioteca de quien lo mando.
+    conn.execute("DELETE FROM book_shares WHERE book_id=? AND status='pending'", (book["id"],))
+
+def restore_book(conn, uid, book):
+    """Vuelve a la carpeta original; si ya no existe, se recrea."""
+    dest = book["deleted_from"] or book["filename"]
+    return move_book_file(conn, uid, book, parent_rel(dest), dest.rsplit("/", 1)[-1])
+
+def sweep_library(conn, uid):
+    """Vence la papelera y Temporal. Corre al pedir la biblioteca: no hay
+    cron, y con 2 workers un hilo de fondo correria duplicado."""
+    with library_lock():
+        for b in conn.execute("SELECT * FROM books WHERE user_id=? AND deleted_at IS NOT NULL "
+                              "AND deleted_at < datetime('now', ?)", (uid, f"-{TRASH_DAYS} days")).fetchall():
+            purge_book(conn, uid, b)
+        for b in conn.execute("SELECT * FROM books WHERE user_id=? AND deleted_at IS NULL AND temp_since IS NOT NULL "
+                              "AND temp_since < datetime('now', ?)", (uid, f"-{TEMP_DAYS} days")).fetchall():
+            try: trash_book(conn, uid, b)
+            except OSError as e: print("No se pudo mandar a la papelera", b["relpath"], e)
+        conn.commit()
+
+# ── Releer la biblioteca ──────────────────────────────────────────────────────
+class ScanAborted(Exception):
+    pass
+
+IGNORED_FILES = {"thumbs.db", "desktop.ini"}
+PARTIAL_SUFFIXES = (".part", ".crdownload", ".download", ".tmp", ".swp")
+
+def _normalize_name(dirpath, name):
+    """Nombres en NFC tambien en el disco: un Mac escribe NFD, y la ruta
+    guardada en el indice no coincidiria byte a byte con la del archivo."""
+    fixed = nfc(name)
+    if fixed != name and not os.path.lexists(os.path.join(dirpath, fixed)):
+        try:
+            os.rename(os.path.join(dirpath, name), os.path.join(dirpath, fixed))
+            return fixed
+        except OSError:
+            return None
+    return fixed if fixed == name else None
+
+def walk_library(uid):
+    """Archivos legibles ({relpath: (size, mtime)}) y carpetas de la
+    biblioteca. No sigue symlinks (uno a /etc no puede terminar servido) e
+    ignora lo oculto, salvo la papelera, y los archivos a medio copiar."""
+    root = user_upload_dir(uid)
+    files, folders = {}, set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel_dir = os.path.relpath(dirpath, root).replace(os.sep, "/")
+        rel_dir = "" if rel_dir == "." else rel_dir
+        keep = []
+        for d in dirnames:
+            if os.path.islink(os.path.join(dirpath, d)):
+                continue
+            if d.startswith(".") and not (rel_dir == "" and d == TRASH_DIRNAME):
+                continue
+            d = _normalize_name(dirpath, d)
+            if d:
+                keep.append(d)
+        dirnames[:] = keep
+        if rel_dir and not is_trash_rel(rel_dir):
+            folders.add(rel_dir)
+        for fn in filenames:
+            low = fn.lower()
+            if (fn.startswith(".") or fn.startswith("~$") or low in IGNORED_FILES
+                    or low.endswith(PARTIAL_SUFFIXES) or not allowed_file(fn)
+                    or os.path.islink(os.path.join(dirpath, fn))):
+                continue
+            fn = _normalize_name(dirpath, fn)
+            if not fn:
+                continue
+            try:
+                fn.encode("utf-8")
+                st = os.stat(os.path.join(dirpath, fn))
+            except (UnicodeEncodeError, OSError):
+                continue
+            files[join_rel(rel_dir, fn)] = (st.st_size, int(st.st_mtime))
+    return files, folders
+
+def rescan_library(conn, uid):
+    """Reconcilia el disco con el indice. Un libro conserva su id si sigue en
+    la misma ruta o si aparece en otra con el mismo contenido (se movio o se
+    renombro a mano): asi no pierde progreso, bookmarks ni la copia offline.
+    Aborta sin tocar nada si desapareceria mas de la mitad de la biblioteca
+    (tipicamente: la carpeta no esta montada)."""
+    with library_lock():
+        root = user_upload_dir(uid)
+        os.makedirs(rel_to_abs(uid, TEMP_COLLECTION_NAME), exist_ok=True)
+        files, folders = walk_library(uid)
+        rows = conn.execute("SELECT * FROM books WHERE user_id=?", (uid,)).fetchall()
+        by_rel = {r["relpath"]: r for r in rows}
+
+        changed = [r for r in rows if r["relpath"] in files
+                   and files[r["relpath"]] != (r["size"], r["file_mtime"])]
+        missing = [r for r in rows if r["relpath"] not in files]
+        new = sorted(rel for rel in files if rel not in by_rel)
+
+        by_hash = {}
+        for r in missing:
+            if r["content_hash"]:
+                by_hash.setdefault(r["content_hash"], []).append(r)
+        moved, added = [], []
+        for rel in new:
+            h = file_hash(rel_to_abs(uid, rel))
+            cands = by_hash.get(h)
+            if cands:
+                moved.append((cands.pop(0), rel))
+            else:
+                added.append((rel, h))
+        moved_ids = {r["id"] for r, _ in moved}
+        gone = [r for r in missing if r["id"] not in moved_ids]
+
+        if len(rows) >= 4 and len(gone) > len(rows) / 2:
+            raise ScanAborted(
+                f"Desaparecerian {len(gone)} de {len(rows)} libros: no se toco nada. "
+                f"Revisa que la carpeta {root} este en su lugar.")
+
+        for r in changed:
+            size, mtime = files[r["relpath"]]
+            conn.execute("UPDATE books SET size=?, file_mtime=?, content_hash=?, has_cover=-1, page_count=0 WHERE id=?",
+                         (size, mtime, file_hash(rel_to_abs(uid, r["relpath"])), r["id"]))
+            drop_cover(uid, r["id"])
+        for r, rel in moved:
+            size, mtime = files[rel]
+            conn.execute("UPDATE books SET size=?, file_mtime=? WHERE id=?", (size, mtime, r["id"]))
+            place_book(conn, uid, r["id"], rel)
+        for rel, h in added:
+            insert_book(conn, uid, rel, content_hash=h)
+        for r in gone:
+            purge_book(conn, uid, r)
+
+        for f in sorted(folders):
+            ensure_folder_collection(conn, uid, f)
+        stale = conn.execute("SELECT id, path FROM collections WHERE user_id=? AND path NOT IN ('', ?)",
+                             (uid, TEMP_COLLECTION_NAME)).fetchall()
+        for c in stale:
+            if c["path"] not in folders:
+                conn.execute("DELETE FROM collections WHERE id=?", (c["id"],))
+        ensure_default_collection(conn, uid)
+        conn.commit()
+        return {"nuevos": len(added), "movidos": len(moved), "actualizados": len(changed), "quitados": len(gone)}
+
+# ── Migracion a carpetas (v1.14) ──────────────────────────────────────────────
+def migrate_collections_to_folders(conn):
+    """Hasta v1.13 las colecciones eran solo filas (nombre unico por usuario)
+    y los archivos estaban todos sueltos en uploads/<usuario>/. Se agrega la
+    ruta de cada coleccion y se rehace la tabla, porque ahora dos subcarpetas
+    distintas pueden llamarse igual."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(collections)").fetchall()]
+    if "path" in cols:
+        return
+    try:
+        shutil.copy2(DB_PATH, DB_PATH + ".pre-v1.14")
+    except OSError as e:
+        print("No se pudo copiar la DB antes de migrar:", e)
+    conn.execute("""
+        CREATE TABLE collections_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            user_id INTEGER,
+            path TEXT NOT NULL DEFAULT '',
+            parent_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, path)
+        )""")
+    rows = conn.execute("SELECT * FROM collections ORDER BY id").fetchall()
+    names = {}
+    for r in rows:
+        names.setdefault(r["user_id"], set()).add(r["name"])
+    used = {}
+    for r in rows:
+        uid = r["user_id"]
+        taken = used.setdefault(uid, set())
+        if r["name"] == DEFAULT_COLLECTION_NAME:
+            path = ""
+        else:
+            name = r["name"]
+            # Pedido del usuario: su coleccion "Temporales" pasa a ser la
+            # coleccion temporal (si no tenia ya una "Temporal").
+            if name == "Temporales" and TEMP_COLLECTION_NAME not in names[uid]:
+                name = TEMP_COLLECTION_NAME
+            path = clean_name(name) or f"Coleccion {r['id']}"
+            while path.casefold() in taken:
+                path = f"{path} ({r['id']})"
+        if path.casefold() in taken:
+            continue  # una segunda "Sin coleccion": sus libros caen en la raiz
+        taken.add(path.casefold())
+        conn.execute("INSERT INTO collections_new (id, name, user_id, path, parent_id, created_at) VALUES (?,?,?,?,NULL,?)",
+                     (r["id"], path or DEFAULT_COLLECTION_NAME, uid, path, r["created_at"]))
+        # La carpeta se crea aunque la coleccion este vacia: si no, el releer
+        # no la encuentra en disco y la da de baja.
+        if path and uid is not None:
+            os.makedirs(rel_to_abs(uid, path), exist_ok=True)
+    conn.execute("DROP TABLE collections")
+    conn.execute("ALTER TABLE collections_new RENAME TO collections")
+    conn.commit()
+
+def migrate_books_to_folders(conn):
+    """Mueve cada archivo a la carpeta de su coleccion. Libro por libro y con
+    commit en cada uno: si se corta a la mitad, el proximo arranque sigue
+    desde donde quedo (los que faltan tienen relpath NULL)."""
+    rows = conn.execute("SELECT * FROM books WHERE relpath IS NULL ORDER BY id").fetchall()
+    for b in rows:
+        uid = b["user_id"]
+        col = conn.execute("SELECT path FROM collections WHERE id=? AND user_id=?", (b["collection_id"], uid)).fetchone()
+        folder = col["path"] if col else ""
+        # El layout viejo era plano: el archivo se busca en la carpeta del
+        # usuario por su nombre, sin confiar en la ruta absoluta guardada (y
+        # sin tocar nunca nada fuera de esa carpeta).
+        name = os.path.basename(b["filepath"] or "") or b["filename"]
+        src = rel_to_abs(uid, name)
+        target = join_rel(folder, name)
+        if os.path.isfile(src):
+            st = os.stat(src)
+            conn.execute("UPDATE books SET content_hash=?, size=?, file_mtime=? WHERE id=?",
+                         (file_hash(src), st.st_size, int(st.st_mtime), b["id"]))
+            if target == name:
+                rel = name  # "Sin coleccion": ya esta donde tiene que estar
+            else:
+                rel = unique_rel(conn, uid, folder, name)
+                dst = rel_to_abs(uid, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                os.rename(src, dst)
+        elif os.path.exists(rel_to_abs(uid, target)):
+            # Un arranque anterior lo movio y se corto antes del commit.
+            rel = target
+            path = rel_to_abs(uid, rel)
+            st = os.stat(path)
+            conn.execute("UPDATE books SET content_hash=?, size=?, file_mtime=? WHERE id=?",
+                         (file_hash(path), st.st_size, int(st.st_mtime), b["id"]))
+        else:
+            # El archivo ya no existia: queda indexado donde deberia estar y
+            # el releer lo saca (con su freno si fueran demasiados).
+            rel = target
+        place_book(conn, uid, b["id"], rel)
+        conn.commit()
+
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -99,8 +558,12 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS collections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            name TEXT NOT NULL,
+            user_id INTEGER,
+            path TEXT NOT NULL DEFAULT '',
+            parent_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, path)
         );
         CREATE TABLE IF NOT EXISTS books (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +627,13 @@ def init_db():
         'ALTER TABLE books ADD COLUMN view_mode TEXT DEFAULT "scroll"',
         'ALTER TABLE books ADD COLUMN user_id INTEGER',
         'ALTER TABLE book_shares ADD COLUMN seen INTEGER DEFAULT 0',
+        # v1.14: biblioteca en carpetas
+        'ALTER TABLE books ADD COLUMN relpath TEXT',
+        'ALTER TABLE books ADD COLUMN content_hash TEXT',
+        'ALTER TABLE books ADD COLUMN file_mtime INTEGER',
+        'ALTER TABLE books ADD COLUMN temp_since TIMESTAMP',
+        'ALTER TABLE books ADD COLUMN deleted_at TIMESTAMP',
+        'ALTER TABLE books ADD COLUMN deleted_from TEXT',
     ]:
         try:
             conn.execute(migration)
@@ -185,6 +655,26 @@ def init_db():
         conn.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (?,?,1)",
                      ("admin", generate_password_hash("admin123")))
         conn.commit()
+
+    with library_lock():
+        migrate_collections_to_folders(conn)
+        migrate_books_to_folders(conn)
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_books_relpath ON books(user_id, relpath)")
+        conn.commit()
+    except sqlite3.IntegrityError as e:
+        print("Indice de rutas no creado (rutas repetidas):", e)
+
+    # Al arrancar se relee la biblioteca de cada usuario: incorpora lo que se
+    # haya dejado a mano mientras la app estaba apagada.
+    for u in conn.execute("SELECT id FROM users WHERE is_admin=0").fetchall():
+        ensure_default_collection(conn, u["id"])
+        conn.commit()
+        try:
+            print("Biblioteca", u["id"], rescan_library(conn, u["id"]))
+        except ScanAborted as e:
+            print("Releer biblioteca", u["id"], "abortado:", e)
+        sweep_library(conn, u["id"])
 
     conn.close()
 
@@ -211,8 +701,11 @@ def admin_required(view):
 def current_user_id():
     return session["user_id"]
 
-def get_owned_book(conn, book_id):
-    return conn.execute("SELECT * FROM books WHERE id=? AND user_id=?", (book_id, current_user_id())).fetchone()
+def get_owned_book(conn, book_id, include_trash=False):
+    # Lo que esta en la papelera no existe para el resto de la app (lector,
+    # progreso, compartir): solo para la papelera y su portada.
+    trash = "" if include_trash else " AND deleted_at IS NULL"
+    return conn.execute("SELECT * FROM books WHERE id=? AND user_id=?" + trash, (book_id, current_user_id())).fetchone()
 
 def get_owned_share(conn, share_id):
     return conn.execute("SELECT * FROM book_shares WHERE id=? AND to_user_id=?", (share_id, current_user_id())).fetchone()
@@ -424,88 +917,171 @@ def reader(book_id):
     if not book: abort(404)
     return render_template("reader.html", book_id=book_id)
 
+def owned_collection(conn, col_id):
+    return conn.execute("SELECT * FROM collections WHERE id=? AND user_id=?", (col_id, current_user_id())).fetchone()
+
+def collection_error(conn, parent_path, name, except_id=None):
+    """Mensaje de error si name no sirve como carpeta dentro de parent_path."""
+    if not name:
+        return "Nombre invalido"
+    # Sin distinguir mayusculas: desde Windows o un Mac "Redes" y "redes"
+    # serian la misma carpeta.
+    for c in conn.execute("SELECT id, path FROM collections WHERE user_id=?", (current_user_id(),)).fetchall():
+        if c["id"] != except_id and c["path"] and parent_rel(c["path"]) == parent_path \
+                and c["path"].rsplit("/", 1)[-1].casefold() == name.casefold():
+            return "Ya existe una coleccion con ese nombre ahi"
+    if os.path.lexists(rel_to_abs(current_user_id(), join_rel(parent_path, name))) and except_id is None:
+        return "Ya hay un archivo o carpeta con ese nombre ahi"
+    return None
+
 @app.route("/api/collections", methods=["GET"])
 @login_required
 def get_collections():
+    uid = current_user_id()
     conn = get_db()
-    cols = conn.execute(
-        "SELECT c.*, COUNT(b.id) as book_count FROM collections c LEFT JOIN books b ON b.collection_id=c.id AND b.user_id=c.user_id "
-        "WHERE c.user_id=? GROUP BY c.id ORDER BY c.name", (current_user_id(),)
-    ).fetchall()
+    with library_lock():
+        ensure_default_collection(conn, uid)
+        conn.commit()
+    sweep_library(conn, uid)
+    cols = [dict(r) for r in conn.execute(
+        "SELECT id, name, path, parent_id, created_at FROM collections WHERE user_id=?", (uid,)).fetchall()]
+    direct = dict(conn.execute(
+        "SELECT collection_id, COUNT(*) FROM books WHERE user_id=? AND deleted_at IS NULL GROUP BY collection_id",
+        (uid,)).fetchall())
+    trash_count = conn.execute("SELECT COUNT(*) FROM books WHERE user_id=? AND deleted_at IS NOT NULL", (uid,)).fetchone()[0]
     conn.close()
-    return jsonify([dict(r) for r in cols])
+    for c in cols:
+        p = c["path"]
+        c["is_root"] = p == ""
+        c["is_temp"] = p == TEMP_COLLECTION_NAME
+        c["direct_count"] = direct.get(c["id"], 0)
+        # book_count es recursivo: una coleccion cuenta lo de sus subcarpetas.
+        c["book_count"] = c["direct_count"] if not p else sum(
+            direct.get(d["id"], 0) for d in cols if d["path"] == p or d["path"].startswith(p + "/"))
+        c["trash_count"] = trash_count
+    cols.sort(key=lambda c: c["path"].casefold())
+    return jsonify(cols)
 
 @app.route("/api/collections", methods=["POST"])
 @login_required
 def create_collection():
-    data = request.json
-    name = data.get("name","").strip()
-    if not name: return jsonify({"error":"Nombre requerido"}), 400
+    data = request.json or {}
+    name = clean_name(data.get("name", ""))
+    uid = current_user_id()
     conn = get_db()
-    try:
-        conn.execute("INSERT INTO collections (name, user_id) VALUES (?,?)", (name, current_user_id()))
+    parent_path = ""
+    if data.get("parent_id"):
+        parent = owned_collection(conn, data["parent_id"])
+        if not parent:
+            conn.close(); return jsonify({"error": "La coleccion de arriba no existe"}), 404
+        parent_path = parent["path"]
+    with library_lock():
+        err = collection_error(conn, parent_path, name)
+        if err:
+            conn.close(); return jsonify({"error": err}), 409 if name else 400
+        col_id = ensure_folder_collection(conn, uid, join_rel(parent_path, name))
         conn.commit()
-        col = conn.execute("SELECT * FROM collections WHERE name=? AND user_id=?", (name, current_user_id())).fetchone()
-        conn.close()
-        return jsonify(dict(col)), 201
-    except:
-        conn.close()
-        return jsonify({"error":"Ya existe"}), 409
+        col = conn.execute("SELECT * FROM collections WHERE id=?", (col_id,)).fetchone()
+    conn.close()
+    return jsonify(dict(col)), 201
 
 @app.route("/api/collections/<int:col_id>", methods=["DELETE"])
 @login_required
 def delete_collection(col_id):
+    # Solo carpetas vacias: lo que tiene libros se vacia primero (o a mano).
+    uid = current_user_id()
     conn = get_db()
-    col = conn.execute("SELECT * FROM collections WHERE id=? AND user_id=?", (col_id, current_user_id())).fetchone()
+    col = owned_collection(conn, col_id)
     if not col:
         conn.close(); abort(404)
-    if col["name"] == DEFAULT_COLLECTION_NAME:
-        conn.close()
-        return jsonify({"error":"No se puede borrar"}), 400
-    default_col_id = ensure_default_collection(conn, current_user_id())
-    conn.execute("UPDATE books SET collection_id=? WHERE collection_id=? AND user_id=?", (default_col_id, col_id, current_user_id()))
-    conn.execute("DELETE FROM collections WHERE id=? AND user_id=?", (col_id, current_user_id()))
-    conn.commit(); conn.close()
-    return jsonify({"ok":True})
-
+    if col["path"] in ("", TEMP_COLLECTION_NAME):
+        conn.close(); return jsonify({"error": "No se puede borrar"}), 400
+    with library_lock():
+        try:
+            os.rmdir(rel_to_abs(uid, col["path"]))
+        except FileNotFoundError:
+            pass
+        except OSError:
+            conn.close(); return jsonify({"error": "La coleccion no esta vacia"}), 409
+        conn.execute("DELETE FROM collections WHERE id=?", (col_id,))
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 @app.route("/api/collections/<int:col_id>", methods=["PATCH"])
 @login_required
 def rename_collection(col_id):
-    data = request.json
-    name = data.get("name", "").strip()
-    if not name: return jsonify({"error": "Nombre requerido"}), 400
+    """Renombrar = renombrar la carpeta. Arrastra subcarpetas, libros, y la
+    ruta original de lo que esta en la papelera (asi restaura al lugar nuevo)."""
+    data = request.json or {}
+    name = clean_name(data.get("name", ""))
+    uid = current_user_id()
     conn = get_db()
-    col = conn.execute("SELECT * FROM collections WHERE id=? AND user_id=?", (col_id, current_user_id())).fetchone()
+    col = owned_collection(conn, col_id)
     if not col:
         conn.close(); abort(404)
-    try:
-        conn.execute("UPDATE collections SET name=? WHERE id=? AND user_id=?", (name, col_id, current_user_id()))
-        conn.commit()
+    if col["path"] in ("", TEMP_COLLECTION_NAME):
+        conn.close(); return jsonify({"error": "Esta coleccion no se puede renombrar"}), 400
+    old = col["path"]
+    new = join_rel(parent_rel(old), name)
+    with library_lock():
+        err = collection_error(conn, parent_rel(old), name, except_id=col_id)
+        if err:
+            conn.close(); return jsonify({"error": err}), 409 if name else 400
+        if new != old:
+            if os.path.lexists(rel_to_abs(uid, new)) and new.casefold() != old.casefold():
+                conn.close(); return jsonify({"error": "Ya hay un archivo o carpeta con ese nombre ahi"}), 409
+            os.rename(rel_to_abs(uid, old), rel_to_abs(uid, new))
+            moved = lambda p: new + p[len(old):] if p == old or p.startswith(old + "/") else p
+            for c in conn.execute("SELECT id, path FROM collections WHERE user_id=?", (uid,)).fetchall():
+                if moved(c["path"]) != c["path"]:
+                    conn.execute("UPDATE collections SET path=? WHERE id=?", (moved(c["path"]), c["id"]))
+            conn.execute("UPDATE collections SET name=? WHERE id=?", (name, col_id))
+            for b in conn.execute("SELECT id, relpath, deleted_from FROM books WHERE user_id=?", (uid,)).fetchall():
+                rel, frm = moved(b["relpath"] or ""), moved(b["deleted_from"] or "")
+                if rel != (b["relpath"] or "") or frm != (b["deleted_from"] or ""):
+                    conn.execute("UPDATE books SET relpath=?, filepath=?, deleted_from=? WHERE id=?",
+                                 (rel, rel_to_abs(uid, rel), frm or None, b["id"]))
+            conn.commit()
         col = conn.execute("SELECT * FROM collections WHERE id=?", (col_id,)).fetchone()
-        conn.close()
-        return jsonify(dict(col))
-    except:
-        conn.close()
-        return jsonify({"error": "Ya existe ese nombre"}), 409
+    conn.close()
+    return jsonify(dict(col))
+
+def book_json(r):
+    b = dict(r)
+    rel = b.get("relpath") or ""
+    # La biblioteca general agrupa por coleccion de primer nivel.
+    b["group_name"] = rel.split("/", 1)[0] if "/" in rel else DEFAULT_COLLECTION_NAME
+    return b
+
+BOOK_COLUMNS = ("b.*, c.name as collection_name, c.path as collection_path, "
+                f"CASE WHEN b.temp_since IS NOT NULL THEN datetime(b.temp_since, '+{TEMP_DAYS} days') END as temp_expires_at")
 
 @app.route("/api/books", methods=["GET"])
 @login_required
 def get_books():
+    """Con collection_id: esa coleccion y todas sus subcarpetas (la raiz,
+    "Sin coleccion", solo lo suelto). Sin parametro: toda la biblioteca."""
+    uid = current_user_id()
     col_id = request.args.get("collection_id")
     conn = get_db()
+    sweep_library(conn, uid)
+    base = f"SELECT {BOOK_COLUMNS} FROM books b LEFT JOIN collections c ON c.id=b.collection_id WHERE b.user_id=? AND b.deleted_at IS NULL"
     if col_id:
-        books = conn.execute(
-            "SELECT b.*, c.name as collection_name FROM books b LEFT JOIN collections c ON c.id=b.collection_id "
-            "WHERE b.collection_id=? AND b.user_id=? ORDER BY b.title", (col_id, current_user_id())
-        ).fetchall()
+        col = owned_collection(conn, col_id)
+        if not col:
+            conn.close(); return jsonify([])
+        if col["path"]:
+            rows = conn.execute(base + " AND substr(b.relpath, 1, ?) = ?",
+                                (uid, len(col["path"]) + 1, col["path"] + "/")).fetchall()
+        else:
+            rows = conn.execute(base + " AND b.collection_id=?", (uid, col["id"])).fetchall()
     else:
-        books = conn.execute(
-            "SELECT b.*, c.name as collection_name FROM books b LEFT JOIN collections c ON c.id=b.collection_id "
-            "WHERE b.user_id=? ORDER BY c.name, b.title", (current_user_id(),)
-        ).fetchall()
+        rows = conn.execute(base, (uid,)).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in books])
+    books = [book_json(r) for r in rows]
+    books.sort(key=lambda b: (b["group_name"].casefold(), b["title"].casefold()))
+    return jsonify(books)
 
 @app.route("/api/books/upload", methods=["POST"])
 @login_required
@@ -513,57 +1089,22 @@ def upload_book():
     if "file" not in request.files: return jsonify({"error":"No file"}), 400
     file = request.files["file"]
     uid = current_user_id()
-    conn = get_db()
-    collection_id = request.form.get("collection_id")
-    if collection_id:
-        owned_col = conn.execute("SELECT id FROM collections WHERE id=? AND user_id=?", (collection_id, uid)).fetchone()
-        collection_id = owned_col["id"] if owned_col else ensure_default_collection(conn, uid)
-    else:
-        collection_id = ensure_default_collection(conn, uid)
-    conn.commit()
-
-    if not file.filename or not allowed_file(file.filename):
-        conn.close()
+    # Algunos navegadores mandan la ruta entera; solo interesa el nombre.
+    filename = clean_name((file.filename or "").replace("\\", "/").rsplit("/", 1)[-1])
+    if not filename or not allowed_file(filename):
         return jsonify({"error":"Formato no soportado"}), 400
-    filename = secure_filename(file.filename)
-    base, ext = os.path.splitext(filename)
-    upload_dir = user_upload_dir(uid)
-    counter = 1
-    final_path = os.path.join(upload_dir, filename)
-    while os.path.exists(final_path):
-        filename = base + "_" + str(counter) + ext
-        final_path = os.path.join(upload_dir, filename)
-        counter += 1
-    file.save(final_path)
-    size = os.path.getsize(final_path)
-    fmt = filename.rsplit(".",1)[1].upper()
-    title = base.replace("_"," ").replace("-"," ")
-    color = get_cover_color(filename)
-    conn.execute(
-        "INSERT INTO books (title, filename, filepath, format, size, collection_id, cover_color, has_cover, user_id) VALUES (?,?,?,?,?,?,?,0,?)",
-        (title, filename, final_path, fmt, size, collection_id, color, uid)
-    )
-    conn.commit()
-    book = conn.execute("SELECT * FROM books WHERE filename=? AND user_id=?", (filename, uid)).fetchone()
-    book_id = book["id"]
-    has_cover = 1 if extract_cover(final_path, book_id, fmt, uid) else 0
-    page_count = 0
-    if fmt == "PDF":
-        try:
-            import fitz as _fitz
-            _doc = _fitz.open(final_path)
-            page_count = _doc.page_count
-            _doc.close()
-        except: pass
-    elif fmt == "EPUB":
-        try:
-            import zipfile
-            with zipfile.ZipFile(final_path) as z:
-                items = [n for n in z.namelist() if n.endswith(('.html','.xhtml','.htm'))]
-                page_count = max(len(items), 1)
-        except: pass
-    conn.execute("UPDATE books SET has_cover=?, page_count=? WHERE id=?", (has_cover, page_count, book_id))
-    conn.commit()
+    conn = get_db()
+    col = owned_collection(conn, request.form.get("collection_id")) if request.form.get("collection_id") else None
+    folder = col["path"] if col else ""
+    with library_lock():
+        ensure_default_collection(conn, uid)
+        rel = unique_rel(conn, uid, folder, filename)
+        path = rel_to_abs(uid, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        file.save(path)
+        book_id = insert_book(conn, uid, rel)
+        conn.commit()
+    ensure_book_meta(conn, conn.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone())
     book = conn.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
     conn.close()
     return jsonify(dict(book)), 201
@@ -580,42 +1121,34 @@ def get_book(book_id):
 @app.route("/api/books/<int:book_id>", methods=["PATCH"])
 @login_required
 def update_book(book_id):
-    data = request.json
+    data = request.json or {}
+    uid = current_user_id()
     conn = get_db()
-    book = get_owned_book(conn, book_id)
-    if not book:
-        conn.close(); abort(404)
-    if "title" in data:
-        new_title = data["title"].strip()
-        if new_title:
-            # Renombrar archivo en disco
-            old_path = book["filepath"]
-            ext = os.path.splitext(book["filename"])[1]
-            new_filename = secure_filename(new_title + ext)
-            # Evitar colisiones
-            base_fn = new_filename
-            counter = 1
-            upload_dir = user_upload_dir(current_user_id())
-            new_path = os.path.join(upload_dir, new_filename)
-            while os.path.exists(new_path) and new_path != old_path:
-                new_filename = os.path.splitext(base_fn)[0] + "_" + str(counter) + ext
-                new_path = os.path.join(upload_dir, new_filename)
-                counter += 1
-            try:
-                if old_path != new_path:
-                    os.rename(old_path, new_path)
-                    conn.execute("UPDATE books SET title=?, filename=?, filepath=? WHERE id=?", (new_title, new_filename, new_path, book_id))
-                else:
-                    conn.execute("UPDATE books SET title=? WHERE id=?", (new_title, book_id))
-            except Exception as e:
+    with library_lock():
+        book = get_owned_book(conn, book_id)
+        if not book:
+            conn.close(); abort(404)
+        if "title" in data:
+            new_title = data["title"].strip()
+            if new_title:
+                # El nombre del archivo sigue al titulo (en su misma carpeta):
+                # es lo que se ve al entrar a la carpeta por SSH.
                 conn.execute("UPDATE books SET title=? WHERE id=?", (new_title, book_id))
-    if "collection_id" in data:
-        owned_col = conn.execute("SELECT id FROM collections WHERE id=? AND user_id=?", (data["collection_id"], current_user_id())).fetchone()
-        if owned_col:
-            conn.execute("UPDATE books SET collection_id=? WHERE id=?", (owned_col["id"], book_id))
-    if "view_mode" in data:
-        conn.execute("UPDATE books SET view_mode=? WHERE id=?", (data["view_mode"], book_id))
-    conn.commit()
+                base = clean_name(new_title)
+                if base:
+                    try:
+                        move_book_file(conn, uid, book, parent_rel(book["relpath"]),
+                                       base + os.path.splitext(book["filename"])[1])
+                    except OSError as e:
+                        print("No se pudo renombrar el archivo:", e)
+                book = get_owned_book(conn, book_id)
+        if "collection_id" in data:
+            target = owned_collection(conn, data["collection_id"])
+            if target and target["path"] != parent_rel(book["relpath"]):
+                move_book_file(conn, uid, book, target["path"])
+        if "view_mode" in data:
+            conn.execute("UPDATE books SET view_mode=? WHERE id=?", (data["view_mode"], book_id))
+        conn.commit()
     book = conn.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
     conn.close()
     return jsonify(dict(book))
@@ -623,20 +1156,15 @@ def update_book(book_id):
 @app.route("/api/books/<int:book_id>", methods=["DELETE"])
 @login_required
 def delete_book(book_id):
+    # Eliminar manda a la papelera; el borrado definitivo es desde ahi.
+    uid = current_user_id()
     conn = get_db()
-    book = get_owned_book(conn, book_id)
-    if not book: conn.close(); abort(404)
-    try: os.remove(book["filepath"])
-    except: pass
-    cover_path = os.path.join(user_covers_dir(current_user_id()), str(book_id) + ".jpg")
-    try: os.remove(cover_path)
-    except: pass
-    conn.execute("DELETE FROM books WHERE id=?", (book_id,))
-    conn.execute("DELETE FROM progress WHERE book_id=?", (book_id,))
-    conn.execute("DELETE FROM bookmarks WHERE book_id=?", (book_id,))
-    conn.execute("DELETE FROM highlights WHERE book_id=?", (book_id,))
-    conn.execute("DELETE FROM book_shares WHERE book_id=? AND status='pending'", (book_id,))
-    conn.commit(); conn.close()
+    with library_lock():
+        book = get_owned_book(conn, book_id)
+        if not book: conn.close(); abort(404)
+        trash_book(conn, uid, book)
+        conn.commit()
+    conn.close()
     return jsonify({"ok":True})
 
 @app.route("/api/books/<int:book_id>/file")
@@ -647,20 +1175,102 @@ def serve_book_file(book_id):
     conn.close()
     if not book: abort(404)
     download = request.args.get("download","0") == "1"
-    directory = os.path.dirname(book["filepath"])
-    return send_from_directory(directory, book["filename"], as_attachment=download, download_name=book["filename"])
+    path = rel_to_abs(book["user_id"], book["relpath"])
+    if not os.path.isfile(path): abort(404)
+    return send_file(path, as_attachment=download, download_name=book["filename"])
 
 @app.route("/api/books/<int:book_id>/cover")
 @login_required
 def serve_cover(book_id):
+    # Tambien para libros en la papelera, que se muestran con su portada.
     conn = get_db()
-    book = get_owned_book(conn, book_id)
+    book = get_owned_book(conn, book_id, include_trash=True)
+    if not book:
+        conn.close(); abort(404)
+    ensure_book_meta(conn, book)
     conn.close()
-    if not book: abort(404)
     cover_path = os.path.join(user_covers_dir(current_user_id()), str(book_id) + ".jpg")
     if os.path.exists(cover_path):
         return send_file(cover_path, mimetype="image/jpeg")
     abort(404)
+
+# ── Papelera y releer ────────────────────────────────────────────────────────
+@app.route("/api/trash", methods=["GET"])
+@login_required
+def list_trash():
+    uid = current_user_id()
+    conn = get_db()
+    sweep_library(conn, uid)
+    rows = conn.execute(
+        "SELECT b.*, datetime(b.deleted_at, ?) as trash_expires_at FROM books b "
+        "WHERE b.user_id=? AND b.deleted_at IS NOT NULL ORDER BY b.deleted_at DESC",
+        (f"+{TRASH_DAYS} days", uid)).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        b = dict(r)
+        b["original_collection"] = parent_rel(b["deleted_from"] or "") or DEFAULT_COLLECTION_NAME
+        out.append(b)
+    return jsonify(out)
+
+def trashed_book(conn, book_id):
+    return conn.execute("SELECT * FROM books WHERE id=? AND user_id=? AND deleted_at IS NOT NULL",
+                        (book_id, current_user_id())).fetchone()
+
+@app.route("/api/trash/<int:book_id>/restore", methods=["POST"])
+@login_required
+def restore_from_trash(book_id):
+    uid = current_user_id()
+    conn = get_db()
+    with library_lock():
+        book = trashed_book(conn, book_id)
+        if not book:
+            conn.close(); abort(404)
+        rel = restore_book(conn, uid, book)
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "collection": parent_rel(rel) or DEFAULT_COLLECTION_NAME})
+
+@app.route("/api/trash/<int:book_id>", methods=["DELETE"])
+@login_required
+def delete_from_trash(book_id):
+    uid = current_user_id()
+    conn = get_db()
+    with library_lock():
+        book = trashed_book(conn, book_id)
+        if not book:
+            conn.close(); abort(404)
+        purge_book(conn, uid, book)
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/trash", methods=["DELETE"])
+@login_required
+def empty_trash():
+    uid = current_user_id()
+    conn = get_db()
+    with library_lock():
+        rows = conn.execute("SELECT * FROM books WHERE user_id=? AND deleted_at IS NOT NULL", (uid,)).fetchall()
+        for b in rows:
+            purge_book(conn, uid, b)
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "borrados": len(rows)})
+
+@app.route("/api/library/rescan", methods=["POST"])
+@login_required
+def rescan_endpoint():
+    uid = current_user_id()
+    conn = get_db()
+    try:
+        stats = rescan_library(conn, uid)
+    except ScanAborted as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 409
+    sweep_library(conn, uid)
+    conn.close()
+    return jsonify(stats)
 
 @app.route("/api/books/<int:book_id>/progress", methods=["GET","POST"])
 @login_required
@@ -746,7 +1356,7 @@ def recent_books():
     conn = get_db()
     query = ("SELECT b.*, c.name as collection_name, MAX(p.updated_at) as last_read FROM progress p "
               "JOIN books b ON b.id = p.book_id LEFT JOIN collections c ON c.id = b.collection_id "
-              "WHERE b.user_id=? GROUP BY b.id ORDER BY last_read DESC LIMIT ?")
+              "WHERE b.user_id=? AND b.deleted_at IS NULL GROUP BY b.id ORDER BY last_read DESC LIMIT ?")
     rows = conn.execute(query, (current_user_id(), limit)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
@@ -913,7 +1523,7 @@ def accept_notification(share_id):
         return jsonify({"error": "Esta notificacion ya fue resuelta"}), 409
 
     source = conn.execute(
-        "SELECT * FROM books WHERE id=? AND user_id=?", (share["book_id"], share["from_user_id"])
+        "SELECT * FROM books WHERE id=? AND user_id=? AND deleted_at IS NULL", (share["book_id"], share["from_user_id"])
     ).fetchone()
     if not source or not os.path.exists(source["filepath"]):
         conn.execute("UPDATE book_shares SET status='unavailable', resolved_at=CURRENT_TIMESTAMP WHERE id=?", (share_id,))
@@ -921,49 +1531,34 @@ def accept_notification(share_id):
         return jsonify({"error": "Este libro ya no esta disponible"}), 410
 
     uid = current_user_id()
-    collection_id = data.get("collection_id")
-    new_collection_name = (data.get("new_collection_name") or "").strip()
-    if new_collection_name:
-        try:
-            conn.execute("INSERT INTO collections (name, user_id) VALUES (?,?)", (new_collection_name, uid))
-            conn.commit()
-        except sqlite3.IntegrityError:
-            pass
-        col = conn.execute("SELECT id FROM collections WHERE name=? AND user_id=?", (new_collection_name, uid)).fetchone()
-        collection_id = col["id"] if col else None
-    elif collection_id:
-        owned_col = conn.execute("SELECT id FROM collections WHERE id=? AND user_id=?", (collection_id, uid)).fetchone()
-        collection_id = owned_col["id"] if owned_col else None
+    new_collection_name = clean_name(data.get("new_collection_name") or "")
+    with library_lock():
+        if new_collection_name:
+            # Una coleccion nueva de primer nivel (o la que ya se llame asi).
+            existing = [c for c in conn.execute("SELECT id, path FROM collections WHERE user_id=? AND parent_id IS NULL AND path != ''", (uid,)).fetchall()
+                        if c["path"].casefold() == new_collection_name.casefold()]
+            folder = existing[0]["path"] if existing else new_collection_name
+        else:
+            col = owned_collection(conn, data.get("collection_id")) if data.get("collection_id") else None
+            if not col:
+                conn.close()
+                return jsonify({"error": "Elegi una coleccion"}), 400
+            folder = col["path"]
 
-    if not collection_id:
-        conn.close()
-        return jsonify({"error": "Elegi una coleccion"}), 400
+        # Se copia a la carpeta elegida del destinatario.
+        rel = unique_rel(conn, uid, folder, source["filename"])
+        dst = rel_to_abs(uid, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(source["filepath"], dst)
+        new_id = insert_book(conn, uid, rel, title=source["title"], content_hash=source["content_hash"],
+                             cover_color=source["cover_color"], has_cover=source["has_cover"],
+                             page_count=source["page_count"], view_mode=source["view_mode"])
+        conn.commit()
 
-    # Copiar el archivo a la carpeta del destinatario, evitando colisiones de nombre
-    upload_dir = user_upload_dir(uid)
-    filename = source["filename"]
-    base, ext = os.path.splitext(filename)
-    counter = 1
-    final_path = os.path.join(upload_dir, filename)
-    while os.path.exists(final_path):
-        filename = base + "_" + str(counter) + ext
-        final_path = os.path.join(upload_dir, filename)
-        counter += 1
-    shutil.copy2(source["filepath"], final_path)
-
-    conn.execute(
-        "INSERT INTO books (title, filename, filepath, format, size, collection_id, cover_color, has_cover, page_count, view_mode, user_id) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        (source["title"], filename, final_path, source["format"], source["size"], collection_id,
-         source["cover_color"], source["has_cover"], source["page_count"], source["view_mode"], uid)
-    )
-    conn.commit()
-    new_book = conn.execute("SELECT id FROM books WHERE filename=? AND user_id=?", (filename, uid)).fetchone()
-
-    if source["has_cover"]:
+    if source["has_cover"] == 1:
         src_cover = os.path.join(user_covers_dir(share["from_user_id"]), str(source["id"]) + ".jpg")
         if os.path.exists(src_cover):
-            dst_cover = os.path.join(user_covers_dir(uid), str(new_book["id"]) + ".jpg")
+            dst_cover = os.path.join(user_covers_dir(uid), str(new_id) + ".jpg")
             try: shutil.copy2(src_cover, dst_cover)
             except: pass
 

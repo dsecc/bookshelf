@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.13** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.14** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -29,6 +29,32 @@ cd /opt/bookshelf && git pull && docker-compose up -d --build
 Como el repo es público, el servidor **no necesita credenciales de git** para pullear. Solo hace falta autenticarse para pushear, y eso ocurre desde la máquina de desarrollo.
 
 Los datos viven en `./data` y `./uploads` **dentro del checkout**, montados como bind mounts por el `docker-compose.yml`. Están en `.gitignore`, así que `git pull` nunca los toca y reconstruir la imagen no los borra.
+
+El contenedor corre como el usuario **1000** (no root), así que `data/` y `uploads/` tienen que ser de ese usuario. En una instalación que venía de una versión anterior (donde eran de root), una sola vez:
+
+```bash
+docker run --rm -v /opt/bookshelf:/b alpine chown -R 1000:1000 /b/data /b/uploads
+```
+
+## Colecciones = carpetas
+
+Cada colección es una carpeta dentro de `uploads/<id de usuario>/`, y puede tener subcarpetas (colecciones dentro de colecciones), como una bóveda de Obsidian. Los archivos sueltos en la raíz son "Sin coleccion".
+
+```
+uploads/2/
+  suelto.pdf                 → Sin coleccion
+  Ciberseguridad/
+    intro.pdf
+    Redes/
+      tcp.pdf
+  Temporal/                  → lo que entra acá pasa a la papelera a los 30 días
+  .papelera/                 → lo eliminado; se borra solo a los 30 días
+```
+
+- Al abrir una colección se ven sus libros **y los de todas sus subcarpetas**; al entrar a una subcarpeta se filtra a lo suyo.
+- Se pueden **dejar archivos a mano** (por SSH) en cualquier carpeta y después tocar **Ajustes → Releer biblioteca** (también se relee sola al arrancar). Un archivo movido o renombrado a mano **conserva su progreso, bookmarks y copia offline**: se reconoce por su contenido. Si el releer haría desaparecer más de la mitad de la biblioteca (la carpeta no está montada, por ejemplo), no toca nada.
+- Se ignoran los archivos ocultos, los temporales (`~$`, `.part`, `.crdownload`) y los symlinks.
+- La base de datos es un índice: guarda los ids, el progreso y los metadatos. Al pasar de v1.13 a v1.14, el primer arranque mueve cada archivo a la carpeta de su colección (y deja una copia de la base en `data/bookshelf.db.pre-v1.14`).
 
 ### Migrar una instalación que usaba volúmenes con nombre
 
@@ -118,7 +144,8 @@ Lo guardado vive en el *Cache Storage* del navegador, aislado por origen, y se i
 - 👤 Multiusuario, con bibliotecas completamente aisladas
 - 🔔 Enviar un libro a otro usuario, con notificación para aceptar
 - 📴 Lectura sin conexión: guardás los libros que quieras y se leen sin internet
-- 📁 Colecciones (crear, mover libros entre ellas)
+- 📁 Colecciones como carpetas, con subcolecciones, archivos dejados a mano y *Releer biblioteca*
+- ⏳ Colección *Temporal* (30 días) y *Papelera* (30 días, con restaurar)
 - ⬆️ Subida por drag & drop desde el browser (varios archivos a la vez)
 - 📖 Lector integrado para PDF, EPUB, TXT y Markdown
 - 🔖 Bookmarks con nombre

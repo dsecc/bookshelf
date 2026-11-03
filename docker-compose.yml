@@ -1,9 +1,15 @@
 services:
   bookshelf:
     build: .
-    image: bookshelf:1.13
+    image: bookshelf:1.14
     container_name: bookshelf
     restart: unless-stopped
+    # Corre como el usuario del servidor (santino, 1000), no como root: asi las
+    # carpetas y archivos que crea la app son suyos, y se pueden dejar libros
+    # a mano por SSH en uploads/<usuario>/. data/ y uploads/ tienen que ser de
+    # ese usuario (chown una vez). HOME: gunicorn crea su socket de control
+    # ahi, y /root no es escribible para un usuario comun.
+    user: "1000:1000"
     ports:
       - "8090:5000"
     volumes:
@@ -11,3 +17,4 @@ services:
       - ./uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
+      - HOME=/tmp

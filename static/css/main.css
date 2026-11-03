@@ -50,7 +50,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .nav-section-header .chevron { transition: transform .2s; }
 .nav-section-header.open .chevron { transform: rotate(180deg); }
 .col-list { list-style: none; overflow: hidden; max-height: 0; transition: max-height .25s ease; }
-.col-list.open { max-height: 400px; }
+/* Alto de sobra: con subcarpetas desplegadas la lista crece (400px cortaba
+   colecciones sin avisar). Solo esta para animar la apertura. */
+.col-list.open { max-height: 5000px; }
 .col-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: .35rem 1rem .35rem 1.75rem; font-size: .83rem; color: var(--text-dim);
@@ -58,7 +60,83 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 }
 .col-item:hover { background: var(--surface2); color: var(--text); }
 .col-item.active { color: var(--accent); }
-.col-count { font-size: .7rem; color: var(--text-muted); }
+.col-count { font-size: .7rem; color: var(--text-muted); margin-left: .4rem; }
+.col-item .col-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-count { margin-left: auto; font-size: .7rem; color: var(--text-muted); }
+
+/* ── Arbol de colecciones (sidebar, y el panel de colecciones en el celu) ──
+   Cada hija se une a la de arriba con un codo curvo, como Obsidian. El codo
+   va en la fila; el tramo vertical que sigue hasta la proxima hermana va en
+   el nodo, asi atraviesa tambien las nietas desplegadas en el medio. */
+:root { --tree-line: #4d4d4d; }
+.tree-children { list-style: none; }
+.tree-children > .tree-node { position: relative; }
+.tree-children > .tree-node:not(:last-child)::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  border-left: 1.5px solid var(--tree-line); pointer-events: none;
+}
+.tree-children > .tree-node > .tree-row { position: relative; }
+.tree-children > .tree-node > .tree-row::before {
+  content: ""; position: absolute; left: 0; top: 0; height: 50%; width: .6rem;
+  border-left: 1.5px solid var(--tree-line); border-bottom: 1.5px solid var(--tree-line);
+  border-bottom-left-radius: 7px; pointer-events: none;
+}
+.col-list .tree-children { margin-left: 2.05rem; }
+.col-list .tree-children .tree-children { margin-left: 1.3rem; }
+.col-list .tree-children > .tree-node > .col-item { padding-left: 1rem; }
+/* Flechita de "tiene subcarpetas": apunta abajo cuando estan a la vista. */
+.col-item.has-kids .col-name::after {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 0 2px .45rem;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); opacity: .55; transition: transform .15s;
+}
+.col-item.has-kids.expanded .col-name::after { transform: rotate(45deg); margin-bottom: 4px; }
+
+/* ── Encabezado de la vista (coleccion en el celu, papelera) ── */
+.view-head { margin-bottom: 1.1rem; }
+.view-head-title { font-size: 1.2rem; font-weight: 650; color: var(--text); line-height: 1.25; }
+.view-head-note { font-size: .8rem; color: var(--text-muted); margin-top: .3rem; line-height: 1.45; }
+/* En desktop la ruta y las subcarpetas estan en la topbar y el sidebar. */
+.col-head { display: none; }
+.trash-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.trash-head .view-head-title { display: none; }
+.trash-head .view-head-note { flex: 1; margin: 0; min-width: 12rem; }
+.col-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .35rem; font-size: .8rem; color: var(--text-muted); }
+.col-crumbs button { background: none; border: none; color: var(--accent); font: inherit; padding: .45rem 0; cursor: pointer; }
+.subcol-pills {
+  display: flex; gap: .5rem; overflow-x: auto; scrollbar-width: none;
+  margin: .8rem -.75rem 0; padding: 0 .75rem .1rem;
+}
+.subcol-pills::-webkit-scrollbar { display: none; }
+.subcol-pill {
+  display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0;
+  height: 2.6rem; padding: 0 1rem; border-radius: 999px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-size: .86rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.subcol-pill:active { background: var(--surface3); }
+.subcol-pill svg { color: var(--text-dim); flex-shrink: 0; }
+.subcol-pill .pill-count { font-size: .74rem; color: var(--text-muted); }
+
+/* Dias que le quedan (Temporal / papelera). Arriba a la izquierda: la
+   derecha es de la insignia de "sin conexion". */
+.expire-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  display: flex; align-items: center; gap: 3px;
+  height: 20px; padding: 0 7px; border-radius: 999px;
+  font-size: .66rem; font-weight: 600; color: var(--text);
+  background: rgba(13,13,13,.75); backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,.12);
+}
+.expire-badge.soon { color: #fbbf24; }
+
+.btn-danger {
+  background: transparent; color: var(--danger); border: 1px solid var(--danger);
+  border-radius: 6px; padding: .45rem .9rem; font-size: .84rem; font-weight: 500; cursor: pointer;
+}
+.btn-danger:hover { background: var(--danger); color: #fff; }
+.btn-danger.full { width: 100%; }
 .btn-new-col {
   display: flex; align-items: center; gap: .4rem;
   padding: .35rem 1rem .35rem 1.75rem; font-size: .8rem; color: var(--text-muted);
@@ -556,6 +634,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .books-row { gap: .6rem; padding-bottom: .5rem; }
   .books-row .book-card { width: 110px; }
   .books-grid { gap: .9rem .6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .col-head { display: block; }
+  .trash-head .view-head-title { display: block; width: 100%; }
+  .trash-head .btn-danger { min-height: 44px; }
   .book-cover { border-radius: 5px; }
   .section-title { font-size: .68rem; margin-top: 1.1rem; }
   .section-title:first-child { margin-top: 0; }

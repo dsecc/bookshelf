@@ -385,9 +385,7 @@ async function init() {
     document.getElementById("readerTitle").textContent = currentBook.title;
     document.title = currentBook.title;
     document.getElementById("infoTitleInput").value = currentBook.title;
-    document.getElementById("infoCollection").innerHTML = collections.map(c =>
-      "<option value='" + c.id + "'" + (c.id === currentBook.collection_id ? " selected" : "") + ">" + c.name + "</option>"
-    ).join("");
+    document.getElementById("infoCollection").innerHTML = colOptionsHTML(collections, currentBook.collection_id);
 
     updateViewModeButtons();
 

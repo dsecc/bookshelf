@@ -21,6 +21,10 @@ let notifications = [], activeShareId = null;
 // Vista "Sin conexion": el cache del service worker es la fuente de verdad de
 // que libros estan guardados (no se duplica el estado en ningun lado).
 let offlineView = false, offlineIds = new Set();
+// Vista "Papelera": books son los libros eliminados (GET /api/trash).
+let trashView = false;
+// Colecciones abiertas que el usuario plego tocandolas de nuevo.
+let collapsedCols = new Set();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -58,7 +62,8 @@ async function refresh() {
   // tirar abajo todo el render.
   const [cols, bks, recent] = await Promise.all([
     fetchJSON("/api/collections", collections),
-    fetchJSON("/api/books" + (activeColId != null ? "?collection_id=" + activeColId : ""), books),
+    trashView ? fetchJSON("/api/trash", books)
+              : fetchJSON("/api/books" + (activeColId != null ? "?collection_id=" + activeColId : ""), books),
     fetchJSON("/api/books/recent?limit=10", recentBooks)
   ]);
   collections = cols;
@@ -70,49 +75,98 @@ async function refresh() {
   updateBookCount();
 }
 
+// ── Colecciones (carpetas) ───────────────────────────────────────────────────
+// Son un arbol: parent_id apunta a la carpeta de arriba. Al abrir una se ven
+// sus libros y los de todas sus subcarpetas (el servidor ya los manda asi).
+const colById = id => collections.find(c => c.id === id);
+const childrenOf = id => colTree(collections).filter(x => x.c.parent_id === id).map(x => x.c);
+const topLevel = () => colTree(collections).filter(x => x.depth === 0).map(x => x.c);
+
+// Ids desde el primer nivel hasta id, incluido.
+function ancestorsOf(id) {
+  const out = [];
+  for (let c = colById(id); c; c = c.parent_id != null ? colById(c.parent_id) : null) out.unshift(c.id);
+  return out;
+}
+const colTrail = id => ancestorsOf(id).map(i => colById(i).name).join(" › ");
+
+// Sale de Sin conexion / Papelera y muestra una coleccion.
+async function openCollection(id) {
+  offlineView = false; trashView = false;
+  activeColId = id;
+  collapsedCols.delete(id);
+  document.getElementById("topbarTitle").textContent = colTrail(id);
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  setView("biblioteca");
+  renderSidebar();
+  books = await fetchJSON("/api/books?collection_id=" + id, []);
+  renderBooks();
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
+// Solo el primer nivel; al abrir una coleccion aparecen sus hijas, unidas por
+// un trazo curvo (como Obsidian), y las nietas recien al abrir la hija. O sea:
+// queda desplegado el camino hasta la coleccion abierta.
 function renderSidebar() {
   const list = document.getElementById("colList");
   list.innerHTML = "";
-  collections.forEach(c => {
+  const open = new Set(activeColId != null ? ancestorsOf(activeColId) : []);
+  const EDIT_ICO = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+  const build = (ul, cols) => cols.forEach(c => {
+    const kids = childrenOf(c.id);
+    const expanded = kids.length && open.has(c.id) && !collapsedCols.has(c.id);
     const li = document.createElement("li");
-    li.className = "col-item" + (activeColId === c.id ? " active" : "");
+    li.className = "col-node tree-node";
+    const row = document.createElement("div");
+    row.className = "col-item tree-row" + (activeColId === c.id ? " active" : "") +
+      (kids.length ? " has-kids" : "") + (expanded ? " expanded" : "");
 
     const span = document.createElement("span");
+    span.className = "col-name";
     span.textContent = c.name;
-    span.style.flex = "1";
+    if (c.is_temp) span.title = "Lo que entra aca se va a la papelera a los 30 dias";
+    row.appendChild(span);
 
     const badge = document.createElement("span");
     badge.className = "col-count";
     badge.textContent = c.book_count || 0;
+    row.appendChild(badge);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "col-edit";
-    editBtn.title = "Renombrar coleccion";
-    editBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-    editBtn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      openRenameCol(c.id, c.name);
+    // La raiz y Temporal no se renombran: son las carpetas fijas.
+    if (!c.is_root && !c.is_temp) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "col-edit";
+      editBtn.title = "Renombrar coleccion";
+      editBtn.innerHTML = EDIT_ICO;
+      editBtn.addEventListener("click", e => { e.stopPropagation(); openRenameCol(c.id, c.name); });
+      row.appendChild(editBtn);
+    }
+
+    row.addEventListener("click", () => {
+      // Tocar la que ya esta abierta pliega (o despliega) sus subcarpetas.
+      if (activeColId === c.id && !offlineView && !trashView && kids.length) {
+        if (collapsedCols.has(c.id)) collapsedCols.delete(c.id); else collapsedCols.add(c.id);
+        renderSidebar();
+        return;
+      }
+      openCollection(c.id);
     });
+    li.appendChild(row);
 
-    li.appendChild(span);
-    li.appendChild(badge);
-    li.appendChild(editBtn);
-
-    li.addEventListener("click", async () => {
-      offlineView = false;
-      activeColId = c.id;
-      document.getElementById("topbarTitle").textContent = c.name;
-      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-      document.querySelectorAll(".col-item").forEach(n => n.classList.remove("active"));
-      li.classList.add("active");
-      setView("biblioteca");
-      const res = await fetch("/api/books?collection_id=" + c.id);
-      books = await res.json();
-      renderBooks();
-    });
-    list.appendChild(li);
+    if (expanded) {
+      const sub = document.createElement("ul");
+      sub.className = "col-children tree-children";
+      build(sub, kids);
+      li.appendChild(sub);
+    }
+    ul.appendChild(li);
   });
+  build(list, topLevel());
+
+  const tc = document.getElementById("navTrashCount");
+  const n = collections.length ? collections[0].trash_count || 0 : 0;
+  if (tc) tc.textContent = n ? n : "";
 }
 
 function initColToggle() {
@@ -143,8 +197,9 @@ async function loadOfflineIds() {
 }
 
 async function showOfflineView() {
-  offlineView = true;
+  offlineView = true; trashView = false;
   activeColId = null;
+  renderSidebar();
   setNavActive("navOffline");
   setView("biblioteca");
   document.getElementById("topbarTitle").textContent = "Sin conexion";
@@ -152,6 +207,140 @@ async function showOfflineView() {
   // Si no hay red, books puede venir del cache del service worker.
   books = await fetchJSON("/api/books", books);
   renderBooks();
+}
+
+// ── Papelera ──────────────────────────────────────────────────────────────────
+// Lo eliminado (desde el lector, o lo que vencio en Temporal) queda 30 dias.
+// Las tarjetas no abren el lector: abren Restaurar / Eliminar definitivamente.
+async function showTrashView() {
+  offlineView = false; trashView = true;
+  activeColId = null;
+  setNavActive("navTrash");
+  setView("biblioteca");
+  renderSidebar();
+  document.getElementById("topbarTitle").textContent = "Papelera";
+  books = await fetchJSON("/api/trash", []);
+  renderBooks();
+}
+
+// Dias que faltan hasta una fecha UTC de SQLite ("2026-12-03 04:50:59").
+function daysLeft(sqlDate) {
+  const ms = Date.parse(sqlDate.replace(" ", "T") + "Z") - Date.now();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+const daysText = n => n === 0 ? "hoy" : n === 1 ? "1 dia" : n + " dias";
+
+let trashItem = null;
+function openTrashItem(book) {
+  trashItem = book;
+  const meta = "Estaba en " + book.original_collection + ". Se borra en " + daysText(daysLeft(book.trash_expires_at)) + ".";
+  if (window.innerWidth <= 640) {
+    const ICO_BACK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+    const ICO_DEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    openNavSheet(body => {
+      const head = document.createElement("div");
+      head.className = "nav-sheet-title";
+      head.appendChild(Object.assign(document.createElement("span"), { textContent: book.title }));
+      body.appendChild(head);
+      body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-note", textContent: meta }));
+      body.appendChild(navSheetRow({ label: "Restaurar", icon: ICO_BACK, onClick: () => { closeNavSheet(); restoreTrashItem(); } }));
+      body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+      const del = navSheetRow({ label: "Eliminar definitivamente", icon: ICO_DEL, onClick: () => { closeNavSheet(); purgeTrashItem(); } });
+      del.classList.add("danger");
+      body.appendChild(del);
+    });
+  } else {
+    document.getElementById("trashItemTitle").textContent = book.title;
+    document.getElementById("trashItemMeta").textContent = meta;
+    openModal("modalTrashItem");
+  }
+}
+
+async function restoreTrashItem() {
+  if (!trashItem) return;
+  const res = await fetch("/api/trash/" + trashItem.id + "/restore", { method: "POST" });
+  closeModal("modalTrashItem");
+  if (!res.ok) { toast("No se pudo restaurar"); return; }
+  const data = await res.json();
+  toast("Restaurado en " + data.collection);
+  await refresh();
+}
+
+async function purgeTrashItem() {
+  if (!trashItem) return;
+  if (!confirm("¿Eliminar \"" + trashItem.title + "\" para siempre? No se puede deshacer.")) return;
+  const res = await fetch("/api/trash/" + trashItem.id, { method: "DELETE" });
+  closeModal("modalTrashItem");
+  toast(res.ok ? "Eliminado definitivamente" : "No se pudo eliminar");
+  await refresh();
+}
+
+async function emptyTrash() {
+  const n = books.length;
+  if (!n || !confirm("¿Eliminar para siempre " + (n === 1 ? "el libro" : "los " + n + " libros") + " de la papelera? No se puede deshacer.")) return;
+  const res = await fetch("/api/trash", { method: "DELETE" });
+  toast(res.ok ? "Papelera vaciada" : "No se pudo vaciar la papelera");
+  await refresh();
+}
+
+// ── Encabezado de la vista ────────────────────────────────────────────────────
+// En el celu no hay topbar ni sidebar: el nombre de la coleccion, la ruta para
+// volver hacia arriba y las subcarpetas (pastillas) van arriba de la grilla.
+// En desktop no se ve (lo hacen la topbar y el sidebar), salvo el de la
+// papelera, que tiene el boton de vaciar.
+function makeViewHead() {
+  const head = document.createElement("div");
+  if (trashView) {
+    head.className = "view-head trash-head";
+    head.innerHTML = "<div class='view-head-title'>Papelera</div>" +
+      "<p class='view-head-note'>Lo eliminado se borra solo a los 30 dias. Hasta entonces se puede restaurar.</p>";
+    if (books.length) {
+      const btn = document.createElement("button");
+      btn.className = "btn-danger";
+      btn.textContent = "Vaciar papelera";
+      btn.onclick = emptyTrash;
+      head.appendChild(btn);
+    }
+    return head;
+  }
+  if (activeColId == null || offlineView) return null;
+  const c = colById(activeColId);
+  if (!c) return null;
+  head.className = "view-head col-head";
+
+  const trail = ancestorsOf(c.id).slice(0, -1);
+  if (trail.length) {
+    const crumbs = document.createElement("div");
+    crumbs.className = "col-crumbs";
+    trail.forEach(id => {
+      const b = document.createElement("button");
+      b.textContent = colById(id).name;
+      b.onclick = () => openCollection(id);
+      crumbs.appendChild(b);
+      crumbs.appendChild(Object.assign(document.createElement("span"), { textContent: "›" }));
+    });
+    head.appendChild(crumbs);
+  }
+  head.appendChild(Object.assign(document.createElement("div"), { className: "view-head-title", textContent: c.name }));
+  if (c.is_temp) head.appendChild(Object.assign(document.createElement("p"), {
+    className: "view-head-note", textContent: "Lo que dejes aca se va a la papelera a los 30 dias." }));
+
+  const kids = childrenOf(c.id);
+  if (kids.length) {
+    const pills = document.createElement("div");
+    pills.className = "subcol-pills";
+    kids.forEach(k => {
+      const b = document.createElement("button");
+      b.className = "subcol-pill";
+      b.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+      b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
+      b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
+      b.onclick = () => openCollection(k.id);
+      pills.appendChild(b);
+    });
+    head.appendChild(pills);
+  }
+  return head;
 }
 
 // ── Books ─────────────────────────────────────────────────────────────────────
@@ -166,13 +355,22 @@ function renderBooks(filter) {
   const filtered = source.filter(b => b.title.toLowerCase().includes(filter));
 
   if (!filtered.length) {
-    animateOut(container, () => { container.innerHTML = ""; });
+    // El encabezado se muestra igual: una subcarpeta vacia tiene que dejar
+    // volver hacia arriba, y la papelera vacia dice que esta vacia.
+    animateOut(container, () => {
+      container.innerHTML = "";
+      const head = makeViewHead();
+      if (head) container.appendChild(head);
+      animateIn(container);
+    });
     const txt = document.getElementById("emptyStateText");
     const btn = document.getElementById("btnUploadEmpty");
-    if (txt) txt.textContent = offlineView
-      ? "No guardaste ningun libro para leer sin conexion"
+    if (txt) txt.textContent = offlineView ? "No guardaste ningun libro para leer sin conexion"
+      : trashView ? "La papelera esta vacia"
+      : filter ? "Ningun libro coincide con la busqueda"
+      : activeColId != null ? "Esta coleccion esta vacia"
       : "No hay libros todavia";
-    if (btn) btn.style.display = offlineView ? "none" : "";
+    if (btn) btn.style.display = (offlineView || trashView) ? "none" : "";
     empty.style.display = "flex";
     return;
   }
@@ -182,7 +380,7 @@ function renderBooks(filter) {
   function doPopulate() {
     container.innerHTML = "";
 
-  if (activeColId == null && !offlineView) {
+  if (activeColId == null && !offlineView && !trashView) {
     // Seccion Ultimos leidos
     if (recentBooks.length > 0 && !filter) {
       const rh = document.createElement("p");
@@ -192,11 +390,11 @@ function renderBooks(filter) {
       recentBooks.forEach(b => rrow.appendChild(makeCard(b)));
       container.appendChild(rrow);
     }
-    // Agrupar por coleccion, cada una en fila horizontal
+    // Agrupar por coleccion de primer nivel, cada una en fila horizontal
     const byCol = {};
     const order = [];
     filtered.forEach(b => {
-      const k = b.collection_name || "Sin coleccion";
+      const k = b.group_name || b.collection_name || "Sin coleccion";
       if (!byCol[k]) { byCol[k] = []; order.push(k); }
       byCol[k].push(b);
     });
@@ -211,8 +409,11 @@ function renderBooks(filter) {
       container.appendChild(row);
     });
   } else {
-    // Dentro de una coleccion (o Sin conexion) no hay filas por coleccion que
-    // separar: se muestra todo en una grilla que ocupa el ancho disponible.
+    // Dentro de una coleccion (o Sin conexion, o Papelera) no hay filas por
+    // coleccion que separar: se muestra todo en una grilla que ocupa el ancho
+    // disponible. En una coleccion entran tambien sus subcarpetas, mezcladas.
+    const head = makeViewHead();
+    if (head) container.appendChild(head);
     const grid = document.createElement("div");
     grid.className = "books-grid";
     filtered.forEach(b => grid.appendChild(makeCard(b)));
@@ -279,9 +480,25 @@ function makeCard(book) {
     coverDiv.appendChild(badge);
   }
 
+  // Cuanto le queda: en la papelera hasta borrarse, en Temporal hasta irse
+  // a la papelera.
+  const vence = book.trash_expires_at || book.temp_expires_at;
+  if (vence) {
+    const n = daysLeft(vence);
+    const badge = document.createElement("div");
+    badge.className = "expire-badge" + (n <= 3 ? " soon" : "");
+    badge.title = book.trash_expires_at ? "Se borra en " + daysText(n) : "Pasa a la papelera en " + daysText(n);
+    badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+    badge.appendChild(document.createTextNode(n === 0 ? "hoy" : n + " d"));
+    coverDiv.appendChild(badge);
+  }
+
   coverDiv.appendChild(makeOverlay(book));
   card.appendChild(coverDiv);
-  card.addEventListener("click", () => { window.location.href = "/read/" + book.id; });
+  card.addEventListener("click", () => {
+    if (book.trash_expires_at) openTrashItem(book);
+    else window.location.href = "/read/" + book.id;
+  });
   return card;
 }
 
@@ -419,8 +636,8 @@ async function confirmRenameCol() {
 function updateBookCount() {
   var el = document.getElementById('totalBooksCount');
   if (!el) return;
-  // Total real desde todas las colecciones
-  var total = collections.reduce(function(acc, c) { return acc + (c.book_count || 0); }, 0);
+  // book_count es recursivo: se suman solo las de primer nivel.
+  var total = collections.reduce(function(acc, c) { return acc + (c.parent_id == null ? c.book_count || 0 : 0); }, 0);
   el.textContent = total;
 }
 
@@ -460,15 +677,19 @@ async function loadAbout() {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 function bindEvents() {
-  document.getElementById("sidebarLogo").addEventListener("click", async () => { setNavActive("navBiblioteca"); setView("biblioteca"); document.getElementById("topbarTitle").textContent = "Biblioteca"; activeColId = null; await refresh(); });
+  document.getElementById("sidebarLogo").addEventListener("click", async () => { setNavActive("navBiblioteca"); setView("biblioteca"); document.getElementById("topbarTitle").textContent = "Biblioteca"; activeColId = null; trashView = false; await refresh(); });
   document.getElementById("navBiblioteca").addEventListener("click", async () => {
     setNavActive("navBiblioteca");
     setView("biblioteca");
     document.getElementById("topbarTitle").textContent = "Biblioteca";
-    activeColId = null;
+    activeColId = null; trashView = false;
     await refresh();
   });
   document.getElementById("navOffline").addEventListener("click", showOfflineView);
+  document.getElementById("navTrash").addEventListener("click", showTrashView);
+  document.getElementById("btnTrashRestore").addEventListener("click", restoreTrashItem);
+  document.getElementById("btnTrashPurge").addEventListener("click", purgeTrashItem);
+  document.getElementById("btnRescan").addEventListener("click", rescanLibrary);
   document.getElementById("navAbout").addEventListener("click", () => {
     setNavActive("navAbout");
     setView("about");
@@ -523,7 +744,7 @@ function bindEvents() {
   // Upload
   document.getElementById("btnUpload").addEventListener("click",      () => openModal("modalUpload"));
   document.getElementById("btnUploadEmpty").addEventListener("click",  () => openModal("modalUpload"));
-  document.getElementById("btnNewCol").addEventListener("click",       () => openModal("modalNewCol"));
+  document.getElementById("btnNewCol").addEventListener("click",       openNewColModal);
 
   const dz = document.getElementById("dropZone");
   const fi = document.getElementById("fileInput");
@@ -603,11 +824,24 @@ async function doUpload() {
   toast(cnt + " libro(s) subido(s)");
 }
 
+// "Dentro de" arranca en la coleccion abierta: crear una subcarpeta es lo que
+// uno quiere si ya esta adentro de una.
+function openNewColModal() {
+  const sel = document.getElementById("newColParent");
+  const parents = collections.filter(c => !c.is_root);
+  sel.innerHTML = "<option value=''>Ninguna (primer nivel)</option>" + colOptionsHTML(parents, null);
+  const actual = colById(activeColId);
+  sel.value = actual && !actual.is_root && !offlineView && !trashView ? String(actual.id) : "";
+  openModal("modalNewCol");
+}
+
 async function createCollection() {
   const name = document.getElementById("newColName").value.trim();
   if (!name) return;
+  const parent = document.getElementById("newColParent").value;
   const res = await fetch("/api/collections", {
-    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({name})
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ name, parent_id: parent ? parseInt(parent, 10) : null })
   });
   if (res.ok) {
     document.getElementById("newColName").value = "";
@@ -617,13 +851,30 @@ async function createCollection() {
   }
 }
 
+async function rescanLibrary() {
+  const btn = document.getElementById("btnRescan");
+  btn.disabled = true; btn.textContent = "Releyendo...";
+  try {
+    const res = await fetch("/api/library/rescan", { method: "POST" });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(d.error || "No se pudo releer la biblioteca"); return; }
+    const partes = [["nuevos", "nuevo", "nuevos"], ["movidos", "movido", "movidos"],
+                    ["actualizados", "actualizado", "actualizados"], ["quitados", "quitado", "quitados"]]
+      .filter(([k]) => d[k]).map(([k, uno, varios]) => d[k] + " " + (d[k] === 1 ? uno : varios));
+    toast(partes.length ? "Biblioteca: " + partes.join(", ") : "Biblioteca al dia, sin cambios");
+    await refresh();
+  } catch {
+    toast("Sin conexion: no se pudo releer");
+  } finally {
+    btn.disabled = false; btn.textContent = "Releer biblioteca";
+  }
+}
+
 function populateCollectionSelects() {
   ["uploadCollection","infoCollection"].forEach(id => {
     const sel = document.getElementById(id); if (!sel) return;
     const placeholder = "<option value='' disabled selected>Elegi una coleccion...</option>";
-    sel.innerHTML = placeholder + collections.map(c =>
-      "<option value='" + c.id + "'>" + c.name + "</option>"
-    ).join("");
+    sel.innerHTML = placeholder + colOptionsHTML(collections, null);
   });
 }
 
@@ -687,9 +938,7 @@ function openShareDetail(n) {
 
   const sel = document.getElementById("shareCollectionSelect");
   const placeholder = "<option value='' disabled selected>Elegi una coleccion...</option>";
-  sel.innerHTML = placeholder + collections.map(c =>
-    "<option value='" + c.id + "'>" + c.name + "</option>"
-  ).join("") + "<option value='__new__'>+ Nueva coleccion</option>";
+  sel.innerHTML = placeholder + colOptionsHTML(collections, null) + "<option value='__new__'>+ Nueva coleccion</option>";
   document.getElementById("shareNewColInput").style.display = "none";
   document.getElementById("shareNewColInput").value = "";
 
@@ -822,7 +1071,7 @@ function initBottomNav() {
     setNavActive("navBiblioteca");
     setView("biblioteca");
     document.getElementById("topbarTitle").textContent = "Biblioteca";
-    activeColId = null;
+    activeColId = null; trashView = false;
     await refresh();
   });
 
@@ -1041,11 +1290,21 @@ function openUploadSheet() {
   });
 }
 
-// Colecciones: panel que crece desde la pildora (ver openNavSheet).
+// Colecciones: panel que crece desde la pildora (ver openNavSheet). Las
+// colecciones van en arbol con el mismo trazo curvo que el sidebar: tocar el
+// nombre abre la coleccion (y cierra el panel); la flechita de al lado
+// despliega sus subcarpetas sin cerrarlo.
 function openMobileColSheet() {
   const ICO_ALL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>';
   const ICO_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
-  const ICO_COL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+  const ICO_TRASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  const ICO_COL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+  const ICO_TEMP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const ICO_CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>';
+
+  // Arranca desplegado el camino hasta la coleccion abierta.
+  const abiertas = new Set(activeColId != null && !offlineView && !trashView ? ancestorsOf(activeColId) : []);
+  const salirDeEspeciales = () => document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
 
   const s = openNavSheet(body => {
     const head = document.createElement("div");
@@ -1054,59 +1313,78 @@ function openMobileColSheet() {
     const nueva = document.createElement("button");
     nueva.textContent = "+ Nueva";
     nueva.style.cssText = "background:var(--accent);color:#fff;border:none;border-radius:999px;padding:.35rem .8rem;font-size:.78rem;cursor:pointer";
-    nueva.onclick = () => { closeNavSheet(); setTimeout(() => openModal("modalNewCol"), NAV_SHEET_CLOSE_MS); };
+    nueva.onclick = () => { closeNavSheet(); setTimeout(openNewColModal, NAV_SHEET_CLOSE_MS); };
     head.appendChild(nueva);
     body.appendChild(head);
 
     body.appendChild(navSheetRow({
       label: "Todos los libros", icon: ICO_ALL,
-      active: !offlineView && activeColId === null,
+      active: !offlineView && !trashView && activeColId === null,
       onClick: async () => {
         s.close();
-        offlineView = false; activeColId = null;
+        offlineView = false; trashView = false; activeColId = null;
         document.getElementById("topbarTitle").textContent = "Biblioteca";
         setNavActive("navBiblioteca");
         setView("biblioteca");
         const bib = document.getElementById("bnBiblioteca");
         if (bib) bib.click();
-        const res = await fetch("/api/books");
-        books = await res.json();
-        renderBooks();
       },
     }));
 
     // "Sin conexion" no entra en los 5 slots de la barra, asi que vive aca.
     body.appendChild(navSheetRow({
       label: "Sin conexion", icon: ICO_OFF, active: offlineView,
-      onClick: async () => {
-        s.close();
-        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-        await showOfflineView();
-      },
+      onClick: async () => { s.close(); salirDeEspeciales(); await showOfflineView(); },
+    }));
+    const n = collections.length ? collections[0].trash_count || 0 : 0;
+    body.appendChild(navSheetRow({
+      label: "Papelera", icon: ICO_TRASH, active: trashView, detail: n ? String(n) : undefined,
+      onClick: async () => { s.close(); salirDeEspeciales(); await showTrashView(); },
     }));
 
     if (collections.length) body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
 
-    collections.forEach(c => {
-      body.appendChild(navSheetRow({
-        label: c.name, icon: ICO_COL, detail: String(c.book_count || 0),
-        active: !offlineView && activeColId === c.id,
-        onClick: async () => {
-          s.close();
-          offlineView = false; activeColId = c.id;
-          document.getElementById("topbarTitle").textContent = c.name;
-          setView("biblioteca");
-          document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
-          const res = await fetch("/api/books?collection_id=" + c.id);
-          books = await res.json();
-          renderSidebar();
-          renderBooks();
-        },
-      }));
+    const tree = document.createElement("div");
+    tree.className = "nav-tree";
+    body.appendChild(tree);
+
+    const build = (parent, cols) => cols.forEach(c => {
+      const kids = childrenOf(c.id);
+      const node = document.createElement("div");
+      node.className = "tree-node";
+      const rowWrap = document.createElement("div");
+      rowWrap.className = "tree-row";
+      const row = navSheetRow({
+        label: c.name, icon: c.is_temp ? ICO_TEMP : ICO_COL, detail: String(c.book_count || 0),
+        active: !offlineView && !trashView && activeColId === c.id,
+        onClick: () => { s.close(); salirDeEspeciales(); openCollection(c.id); },
+      });
+      rowWrap.appendChild(row);
+      if (kids.length) {
+        const chev = document.createElement("button");
+        chev.className = "tree-chev" + (abiertas.has(c.id) ? " open" : "");
+        chev.setAttribute("aria-label", (abiertas.has(c.id) ? "Plegar " : "Desplegar ") + c.name);
+        chev.innerHTML = ICO_CHEV;
+        chev.onclick = () => {
+          if (abiertas.has(c.id)) abiertas.delete(c.id); else abiertas.add(c.id);
+          pintar();
+        };
+        rowWrap.appendChild(chev);
+      }
+      node.appendChild(rowWrap);
+      if (kids.length && abiertas.has(c.id)) {
+        const sub = document.createElement("div");
+        sub.className = "tree-children";
+        build(sub, kids);
+        node.appendChild(sub);
+      }
+      parent.appendChild(node);
     });
+    // Repinta solo el arbol: rehacer todo el panel lo volveria a animar.
+    const pintar = () => { tree.innerHTML = ""; build(tree, topLevel()); };
+    pintar();
   });
 }
-
 
 // Auto-init bottom nav
 function _originalInit() {}

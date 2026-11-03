@@ -36,6 +36,12 @@
         Sin conexion
       </div>
 
+      <div class="nav-item" id="navTrash" data-view="trash">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Papelera
+        <span class="nav-count" id="navTrashCount"></span>
+      </div>
+
       <div class="nav-section">
         <div class="nav-section-header" id="colToggle">
           <span>Colecciones</span>
@@ -131,6 +137,11 @@
         <div class="info-page">
           <h2>Ajustes</h2>
           <div class="ajuste-bloque">
+            <h3>Releer biblioteca</h3>
+            <p class="ajuste-nota">Cada coleccion es una carpeta en el servidor (<code>uploads/{{ session.get("user_id") }}/</code>). Si agregaste, moviste o borraste archivos ahi a mano, esto los incorpora. Lo que se movio conserva su progreso.</p>
+            <button class="btn-primary full" id="btnRescan">Releer biblioteca</button>
+          </div>
+          <div class="ajuste-bloque">
             <h3>Cambiar contrasena</h3>
             <p class="ajuste-nota">Se pide la actual: sin eso, cualquiera con tu sesion abierta podria dejarte afuera de tu propia cuenta.</p>
             <form id="formPassword" autocomplete="off">
@@ -188,7 +199,26 @@
       <label>Nombre</label>
       <input type="text" id="newColName" placeholder="Ej: Ciencia Ficcion">
     </div>
+    <div class="form-group">
+      <label>Dentro de</label>
+      <select id="newColParent"></select>
+    </div>
     <button class="btn-primary full" id="btnCreateCol">Crear</button>
+  </div>
+</div>
+
+<!-- Modal libro en la papelera (desktop; en mobile, panel de la pildora) -->
+<div class="modal-overlay" id="modalTrashItem" style="display:none">
+  <div class="modal-sm">
+    <div class="modal-header">
+      <h2 id="trashItemTitle">Libro</h2>
+      <button class="btn-icon modal-close" data-modal="modalTrashItem">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="ajuste-nota" id="trashItemMeta"></p>
+    <button class="btn-primary full" id="btnTrashRestore">Restaurar</button>
+    <button class="btn-danger full" id="btnTrashPurge" style="margin-top:.5rem">Eliminar definitivamente</button>
   </div>
 </div>
 

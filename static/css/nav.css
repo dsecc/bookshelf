@@ -226,6 +226,24 @@
   }
   .nav-sheet-del:active { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
   .nav-sheet-empty { padding: .4rem .9rem .8rem; font-size: .82rem; color: var(--text-muted); }
+  .nav-sheet-note { padding: 0 .75rem .7rem; font-size: .8rem; color: var(--text-muted); line-height: 1.45; }
+
+  /* Arbol de colecciones: el trazo curvo sale de main.css (.tree-*); aca solo
+     la sangria y la flechita que despliega sin cerrar el panel. */
+  .nav-tree .tree-row { display: flex; align-items: center; }
+  .nav-tree .tree-row .nav-sheet-row { flex: 1; min-width: 0; }
+  .nav-tree .row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-tree .tree-children { margin-left: 1.55rem; }
+  .nav-tree .tree-children > .tree-node > .tree-row { padding-left: .7rem; }
+  .tree-chev {
+    flex-shrink: 0; width: 44px; height: 44px; border-radius: 999px;
+    border: none; background: none; color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tree-chev svg { transition: transform .18s; }
+  .tree-chev.open svg { transform: rotate(90deg); }
+  .tree-chev:active { background: var(--nav-active-bg); }
 
   /* Sub-opciones desplegadas dentro de una fila (p. ej. las colecciones). */
   .nav-sheet-suboption {

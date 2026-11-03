@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.14 — Colecciones como carpetas, Temporal y Papelera
+
+Cambio de motor: las colecciones dejan de ser filas de la base y pasan a ser **carpetas** dentro de `uploads/<usuario>/`, como una bóveda de Obsidian. La base queda como índice (ids, progreso, portadas, metadatos).
+
+### Agregado
+- **Colecciones dentro de colecciones.** Al abrir una se ven sus libros y los de todas sus subcarpetas en una sola grilla; al entrar a una subcarpeta se filtra a lo suyo. *Nueva coleccion* tiene un campo *Dentro de*, que arranca en la colección abierta.
+- **Sidebar en árbol (PC).** Solo el primer nivel; al abrir una colección aparecen sus hijas unidas con un trazo curvo, como Obsidian, y las nietas recién al abrir la hija. Tocar la colección abierta pliega o despliega sus subcarpetas. La topbar muestra la ruta (`Ciberseguridad › Redes`).
+- **Celu:** la hoja de colecciones es el mismo árbol, con una flechita al costado que despliega sin cerrar la hoja. Arriba de la grilla aparecen el nombre de la colección (antes no se veía en ningún lado: no hay topbar), la ruta para volver hacia arriba y las subcarpetas como pastillas.
+- **Releer biblioteca** (Ajustes, y solo al arrancar): incorpora lo que se deje a mano por SSH. Un archivo movido o renombrado a mano **conserva su id**, y con él progreso, bookmarks y copia offline, porque se reconoce por el hash del contenido. Si haría desaparecer más de la mitad de la biblioteca, aborta sin tocar nada. Ignora lo oculto, los temporales (`~$`, `.part`, `.crdownload`) y los symlinks (uno a `/etc` no puede terminar servido). Los nombres se normalizan a NFC también en disco (un Mac escribe NFD). Portada y páginas de lo dejado a mano se generan la primera vez que se piden.
+- **Temporal**: lo que entra se va a la papelera a los 30 días, contados desde que entró. Moverlo dentro de Temporal no reinicia el reloj; sacarlo, lo apaga. Las tarjetas muestran los días que quedan. La colección "Temporales" de antes pasa a ser esta.
+- **Papelera**: eliminar un libro (desde el lector, como siempre) lo manda ahí; se borra solo a los 30 días. Se puede restaurar a su colección original (si ya no existe, se recrea) o eliminar definitivamente, de a uno o *Vaciar papelera*. Tiene su entrada en el sidebar y en la hoja de colecciones, y se ve en grilla. Progreso y bookmarks vuelven con el libro restaurado.
+
+### Cambiado
+- Los nombres de archivo y de carpeta **conservan acentos y espacios** (antes "Programación.pdf" se guardaba como "Programacion.pdf"). Cambiar el título de un libro renombra su archivo dentro de su carpeta.
+- Mover un libro de colección mueve el archivo. Renombrar una colección renombra la carpeta y arrastra subcarpetas, libros y la ruta original de lo que está en la papelera.
+- Los contadores de colecciones son recursivos.
+- **El contenedor corre como el usuario 1000, no como root** (`user:` en el `docker-compose.yml`, con `HOME=/tmp` para el socket de control de gunicorn), así lo que crea la app es del usuario del servidor y se pueden dejar archivos a mano. `data/` y `uploads/` tienen que ser de ese usuario (ver README).
+- Todo lo que mueve archivos o reescribe el índice pasa por un lock de archivo: con los 2 workers de gunicorn, un releer y una subida simultáneos podían indexar el mismo archivo dos veces.
+
+### Migración
+- El primer arranque crea una carpeta por colección (también las vacías) y mueve cada archivo a la suya; lo de "Sin coleccion" queda en la raíz. Conserva los ids de libros y colecciones. Va libro por libro con commit: si se corta, el próximo arranque sigue desde donde quedó. Antes copia la base a `data/bookshelf.db.pre-v1.14`. Busca cada archivo por nombre dentro de la carpeta del usuario, sin confiar en la ruta absoluta guardada, y nunca toca nada fuera de esa carpeta.
+
+### Notas
+- `VERSION` del service worker: `v26` → `v27`.
+- Verificado con datos creados por v1.13 con las mismas colecciones que producción, incluidas "Temporales", una vacía y "Facultad - Arquitectura":
+  - Migración: archivos en sus carpetas, ids conservados, progreso y bookmarks intactos, carpeta vacía creada, "Temporales" → `Temporal/` con su reloj. Cortada a la mitad (archivo movido sin commit, y archivo sin mover): retoma sin duplicar.
+  - 57 pruebas de API (subcolecciones, vista recursiva, renombrar, papelera, restaurar a una colección borrada, vencimientos de Temporal y papelera, archivos dejados a mano movidos/nuevos/NFD/symlink/temporales, freno de seguridad, compartir a otro usuario, títulos con acentos), **también contra la imagen Docker real** corriendo como usuario 1000 con gunicorn y 2 workers.
+  - Concurrencia en la imagen real: 8 subidas, 8 releer y 8 listados a la vez, sin errores ni rutas duplicadas; el releer posterior no encuentra nada que corregir.
+  - Interfaz en Chromium, escritorio (1440x900) y mobile (390x844): árbol, ruta, pastillas, papelera con restaurar, crear dentro de la abierta, releer, mover desde el lector.
+
 ## v1.13 — Colecciones en grilla, doble pagina nitida y lector de texto
 
 ### Cambiado

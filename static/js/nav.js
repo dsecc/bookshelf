@@ -86,3 +86,28 @@ function navSheetRow({ label, icon, detail, active, onClick }) {
   return row;
 }
 
+
+// ── Arbol de colecciones ─────────────────────────────────────────────────────
+// Las colecciones son carpetas y pueden anidarse (parent_id). Lo usan la
+// biblioteca y el lector para los selectores: devuelve [{c, depth}] en orden
+// de arbol, alfabetico en cada nivel.
+function colTree(collections) {
+  const byName = (a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+  const out = [];
+  const walk = (parentId, depth) => collections
+    .filter(c => (c.parent_id == null ? null : c.parent_id) === parentId)
+    .sort(byName)
+    .forEach(c => { out.push({ c, depth }); walk(c.id, depth + 1); });
+  walk(null, 0);
+  return out;
+}
+
+// Opciones de un <select> con sangria. Un select nativo no admite otra
+// cosa que texto, asi que la jerarquia se dibuja con espacios y "└".
+function colOptionsHTML(collections, selectedId) {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return colTree(collections).map(({ c, depth }) =>
+    "<option value='" + c.id + "'" + (c.id === selectedId ? " selected" : "") + ">" +
+    "   ".repeat(depth) + (depth ? "└ " : "") + esc(c.name) + "</option>"
+  ).join("");
+}
