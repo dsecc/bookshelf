@@ -165,6 +165,11 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 | Topbar de la biblioteca (ancho) | .5s |
 
 ### 4.8 Etiqueta de las hileras (`#rowTag`, biblioteca, v1.16)
+Orden de las hileras: "Ultimos leidos" primero y despues las colecciones de
+primer nivel en el orden de 4.6 (Temporal ultima). En el celu, "Ultimos
+leidos" no es una hilera sino una grilla que llena la primera pantalla
+(`recortarRecientes`); la etiqueta la nombra igual (`[data-name]`).
+
 En el inicio las hileras van seguidas y **sin titulos**. Una sola etiqueta de
 vidrio, vertical, fija a la izquierda (32px de ancho), flota sobre los
 primeros libros con la palabra de costado (mayusculas espaciadas, se lee de

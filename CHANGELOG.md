@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.16.5 — Ultimos leidos llena la primera pantalla (celu)
+
+### Cambiado
+- **Celu: "Ultimos leidos" ocupa la primera pantalla**: en lugar de una hilera, una grilla con tantas filas como entren (en un 12 mini, tres filas de dos), y las hileras de las colecciones empiezan debajo. La cuenta usa el alto real de la pantalla; una fila cortada abajo cuenta si se ve mas de la mitad. En la PC sigue siendo una hilera. Se piden hasta 24 recientes al servidor (antes 10; la PC muestra 10).
+- **Las hileras del inicio siguen el orden de las colecciones**: alfabetico y **Temporal siempre ultima** (antes el servidor las ordenaba por nombre y Temporal caia en el medio).
+- `VERSION` del service worker: `v40` → `v41`.
+
 ## v1.16.4 — La rueda, por mitades
 
 ### Cambiado

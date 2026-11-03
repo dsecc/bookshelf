@@ -84,7 +84,7 @@ async function refresh() {
     fetchJSON("/api/collections", collections),
     trashView ? fetchJSON("/api/trash", books)
               : fetchJSON("/api/books" + (activeColId != null ? "?collection_id=" + activeColId : ""), books),
-    fetchJSON("/api/books/recent?limit=10", recentBooks)
+    fetchJSON("/api/books/recent?limit=24", recentBooks)
   ]);
   collections = cols;
   books = bks;
@@ -474,8 +474,20 @@ function renderBooks(filter) {
       lista.forEach(b => row.appendChild(makeCard(b)));
       rows.appendChild(row);
     };
-    if (recentBooks.length > 0 && !filter) hilera("Ultimos leidos", recentBooks);
-    // Una hilera por coleccion de primer nivel.
+    // Ultimos leidos: en la PC, una hilera; en el celu, una grilla que llena
+    // la primera pantalla (recortarRecientes) y las hileras empiezan debajo.
+    let recientes = null;
+    if (recentBooks.length > 0 && !filter) {
+      if (window.innerWidth <= 640) {
+        recientes = document.createElement("div");
+        recientes.className = "books-grid recientes";
+        recientes.dataset.name = "Ultimos leidos";
+        recentBooks.forEach(b => recientes.appendChild(makeCard(b)));
+        rows.appendChild(recientes);
+      } else hilera("Ultimos leidos", recentBooks.slice(0, 10));
+    }
+    // Una hilera por coleccion de primer nivel, en el orden de las
+    // colecciones (alfabetico, Temporal siempre ultima).
     const byCol = {};
     const order = [];
     filtered.forEach(b => {
@@ -483,8 +495,12 @@ function renderBooks(filter) {
       if (!byCol[k]) { byCol[k] = []; order.push(k); }
       byCol[k].push(b);
     });
-    order.forEach(col => hilera(col, byCol[col]));
+    const orden = topLevel().map(c => c.name);
+    const temp = topLevel().findIndex(c => c.is_temp);
+    const pos = k => { const i = orden.indexOf(k); return i >= 0 ? i : temp >= 0 ? temp - .5 : orden.length; };
+    order.sort((a, b) => pos(a) - pos(b)).forEach(col => hilera(col, byCol[col]));
     container.appendChild(rows);
+    if (recientes) recortarRecientes(recientes);
   } else {
     // Dentro de una coleccion (o Sin conexion, o Papelera) no hay filas por
     // coleccion que separar: se muestra todo en una grilla que ocupa el ancho
@@ -527,6 +543,21 @@ function medirTarjetas() {
   box.style.setProperty("--card-w", Math.floor((box.clientWidth - gap * (cols - 1)) / cols) + "px");
 }
 window.addEventListener("resize", () => medirTarjetas());
+
+// Celu: los ultimos leidos ocupan las filas de la grilla que entran en la
+// primera pantalla (en un 12 mini, tres; en uno mas alto, las que entren) y
+// sobran los que no. Una fila cortada abajo cuenta si se ve mas de la mitad.
+function recortarRecientes(grid) {
+  const cards = [...grid.children];
+  if (!cards.length) return;
+  const css = getComputedStyle(grid);
+  const cols = css.gridTemplateColumns.split(" ").length;
+  const gap = parseFloat(css.rowGap) || 0;
+  const alto = Math.max(...cards.slice(0, cols).map(c => c.offsetHeight)) + gap;
+  const arriba = grid.getBoundingClientRect().top + window.scrollY;
+  const filas = Math.max(1, Math.round((window.innerHeight - arriba) / alto));
+  cards.slice(filas * cols).forEach(c => c.remove());
+}
 
 function animateOut(el, cb) {
   el.style.transition = "opacity .18s ease, transform .18s ease";
@@ -1392,7 +1423,7 @@ const rowTag = (() => {
   const elegir = () => {
     const y = punta();
     let mejor = null, dist = Infinity;
-    document.querySelectorAll("#booksContainer .rows-home .books-row").forEach(row => {
+    document.querySelectorAll("#booksContainer .rows-home > [data-name]").forEach(row => {
       const r = row.getBoundingClientRect();
       const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
       if (d < dist) { dist = d; mejor = row; }
