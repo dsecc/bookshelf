@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.15.2 — Arriba, solo donde estas
+
+### Cambiado
+- **La topbar de carpetas (celu) muestra solo donde estas**, no adonde podes ir: la ruta `Ciberseguridad / Malware`, con la actual resaltada; tocar un tramo anterior sube hasta ahi. Las subcarpetas ya no aparecen ahi (para entrar a una esta la hoja de colecciones). Aparece solo dentro de una subcarpeta: en el primer nivel la ruta seria una sola palabra, igual al titulo de abajo.
+- `VERSION` del service worker: `v31` → `v32`.
+
 ## v1.15.1 — El libro a pantalla completa
 
 ### Cambiado

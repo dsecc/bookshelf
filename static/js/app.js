@@ -332,25 +332,24 @@ function makeViewHead() {
 }
 
 // ── Topbar flotante de la coleccion (celu) ───────────────────────────────────
-// La ruta escrita como en el disco: "Ciberseguridad / Redes /", cada tramo
-// toca para ir ahi (eso es subir), la carpeta actual resaltada, y despues de
-// la ultima barra las subcarpetas para entrar. Desliza de costado. Siempre
-// visible mientras se esta en la coleccion; solo aparece si hay a donde ir.
+// Solo DONDE ESTAS, no adonde podes ir: la ruta escrita como en el disco,
+// "Ciberseguridad / Malware", con la actual resaltada; tocar un tramo anterior
+// lleva ahi (eso es subir). Para entrar a una subcarpeta esta la hoja de
+// colecciones. Aparece solo dentro de una subcarpeta: en el primer nivel la
+// ruta seria una sola palabra, igual al titulo que ya esta debajo.
 function renderLibTopNav() {
   const bar = document.getElementById("libTopNav");
   const box = document.getElementById("libTopNavScroll");
   if (!bar) return;
   const c = activeColId != null && !offlineView && !trashView ? colById(activeColId) : null;
-  const kids = c ? childrenOf(c.id) : [];
-  const mostrar = !!c && (c.parent_id != null || kids.length > 0);
+  const mostrar = !!c && c.parent_id != null;
   bar.hidden = !mostrar;
   document.body.classList.toggle("con-topnav", mostrar);
   if (!mostrar) return;
   box.innerHTML = "";
-  const barra = () => box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
   let actual = null;
   ancestorsOf(c.id).forEach((id, i) => {
-    if (i) barra();
+    if (i) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
     const b = document.createElement("button");
     b.className = "ltn-crumb" + (id === c.id ? " current" : "");
     b.textContent = colById(id).name;
@@ -358,21 +357,10 @@ function renderLibTopNav() {
     else b.onclick = () => openCollection(id);
     box.appendChild(b);
   });
-  if (kids.length) {
-    barra();
-    kids.forEach(k => {
-      const b = document.createElement("button");
-      b.className = "ltn-item";
-      b.appendChild(Object.assign(document.createElement("span"), { textContent: k.name }));
-      b.appendChild(Object.assign(document.createElement("span"), { className: "pill-count", textContent: k.book_count || 0 }));
-      b.onclick = () => openCollection(k.id);
-      box.appendChild(b);
-    });
-  }
-  // Arranca desde el principio de la ruta; solo si la carpeta actual quedaria
-  // fuera de la vista (ruta larga) se desliza lo justo para mostrarla.
+  // Arranca desde el principio; si la ruta no entra, se desliza lo justo para
+  // que se vea la carpeta actual.
   requestAnimationFrame(() => {
-    const fin = actual ? actual.offsetLeft + actual.offsetWidth + 28 : 0;
+    const fin = actual ? actual.offsetLeft + actual.offsetWidth + 16 : 0;
     box.scrollLeft = Math.max(0, fin - box.clientWidth);
   });
 }

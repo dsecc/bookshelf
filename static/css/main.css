@@ -85,8 +85,8 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .trash-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
 .trash-head .view-head-title { display: none; }
 .trash-head .view-head-note { flex: 1; margin: 0; min-width: 12rem; }
-/* Topbar flotante de la coleccion (celu): la ruta "Ciberseguridad / Redes /"
-   y las subcarpetas, deslizables. El vidrio y la posicion son los de .top-nav
+/* Topbar flotante de la coleccion (celu): solo la ruta "Ciberseguridad /
+   Malware", deslizable si no entra. El vidrio y la posicion son los de .top-nav
    (nav.css). */
 .lib-top-nav .ltn-scroll {
   display: flex; align-items: center; gap: 2px; width: 100%; height: 100%;
@@ -104,15 +104,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .ltn-crumb.current { color: var(--text); font-weight: 650; cursor: default; }
 /* Las barras con aire alrededor: se lee como una ruta, pero moderna. */
 .ltn-slash { flex-shrink: 0; padding: 0 .4rem; color: color-mix(in srgb, var(--text) 28%, transparent); font-size: .95rem; font-weight: 300; }
-.ltn-item {
-  flex-shrink: 0; height: 36px; padding: 0 .85rem; margin-right: 4px; border-radius: 999px;
-  display: inline-flex; align-items: center; gap: .4rem;
-  border: none; background: color-mix(in srgb, var(--text) 7%, transparent);
-  color: var(--text); font: inherit; font-size: .85rem; white-space: nowrap; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.ltn-item:active { background: var(--nav-active-bg); }
-.ltn-item .pill-count { font-size: .72rem; color: var(--text-muted); }
 
 /* Dias que le quedan (Temporal / papelera). Arriba a la izquierda: la
    derecha es de la insignia de "sin conexion". */
