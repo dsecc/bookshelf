@@ -26,6 +26,8 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 
 import time as _time
 STATIC_VER = str(int(_time.time()))
+# La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
+APP_VERSION = "1.16"
 
 @app.context_processor
 def inject_ver():
@@ -1660,6 +1662,7 @@ def about():
     except:
         werkzeug_ver = "N/A"
     return jsonify({
+        "version": APP_VERSION,
         "python": sys.version.split()[0],
         "platform": platform.system() + " " + platform.release(),
         "flask": flask_ver,

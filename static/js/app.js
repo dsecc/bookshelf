@@ -237,6 +237,7 @@ async function showOfflineView() {
   activeColId = null;
   renderSidebar();
   setNavActive("navOffline");
+  document.querySelectorAll(".bn-item").forEach(b => b.classList.toggle("active", b.id === "bnOffline"));
   setView("biblioteca");
   document.getElementById("topbarTitle").textContent = "Sin conexion";
   await loadOfflineIds();
@@ -270,7 +271,7 @@ let trashItem = null;
 function openTrashItem(book) {
   trashItem = book;
   const meta = "Estaba en " + book.original_collection + ". Se borra en " + daysText(daysLeft(book.trash_expires_at)) + ".";
-  if (window.innerWidth <= 640) {
+  {
     const ICO_BACK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
     const ICO_DEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
     openNavSheet(body => {
@@ -285,17 +286,12 @@ function openTrashItem(book) {
       del.classList.add("danger");
       body.appendChild(del);
     });
-  } else {
-    document.getElementById("trashItemTitle").textContent = book.title;
-    document.getElementById("trashItemMeta").textContent = meta;
-    openModal("modalTrashItem");
   }
 }
 
 async function restoreTrashItem() {
   if (!trashItem) return;
   const res = await fetch("/api/trash/" + trashItem.id + "/restore", { method: "POST" });
-  closeModal("modalTrashItem");
   if (!res.ok) { toast("No se pudo restaurar"); return; }
   const data = await res.json();
   toast("Restaurado en " + data.collection);
@@ -306,7 +302,6 @@ async function purgeTrashItem() {
   if (!trashItem) return;
   if (!confirm("¿Eliminar \"" + trashItem.title + "\" para siempre? No se puede deshacer.")) return;
   const res = await fetch("/api/trash/" + trashItem.id, { method: "DELETE" });
-  closeModal("modalTrashItem");
   toast(res.ok ? "Eliminado definitivamente" : "No se pudo eliminar");
   await refresh();
 }
@@ -382,17 +377,30 @@ function renderLibTopNav() {
   if (tramos.length) raiz.onclick = irARaiz;
   box.appendChild(raiz);
   let actual = tramos.length ? null : raiz;
+  const col = vista === "biblioteca" && !trashView && !offlineView ? colById(activeColId) : null;
   tramos.forEach(([txt, fn], i) => {
     if (i) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
-    const b = document.createElement("button");
+    // La actual es un span: se vuelve editable en el lugar (un boton no).
+    const b = document.createElement(fn ? "button" : "span");
     b.className = "ltn-crumb" + (fn ? "" : " current");
     b.textContent = txt;
     if (fn) b.onclick = fn; else { b.setAttribute("aria-current", "page"); actual = b; }
     box.appendChild(b);
   });
-  // La pildora mide lo que muestra (crece o se achica animada, ver main.css).
-  // Si la ruta no entra, llega al maximo y se desliza lo justo para que se vea
-  // la actual.
+  if (actual && actual !== raiz && col && !col.is_root && !col.is_temp) {
+    actual.classList.add("renombrable");
+    actual.title = "Cambiar el nombre";
+    actual.onclick = () => renombrarEnTopbar(actual, col);
+  }
+  medirLibTopNav(actual);
+}
+
+// La pildora mide lo que muestra (crece o se achica animada, ver main.css).
+// Si la ruta no entra, llega al maximo y se desliza lo justo para que se vea
+// la actual.
+function medirLibTopNav(actual) {
+  const bar = document.getElementById("libTopNav");
+  const box = document.getElementById("libTopNavScroll");
   const ultimo = box.lastElementChild;
   const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
   const necesita = Math.ceil(ultimo.offsetLeft - box.firstElementChild.offsetLeft + ultimo.offsetWidth + pad * 2 + 2);
@@ -403,6 +411,51 @@ function renderLibTopNav() {
     const fin = actual ? actual.offsetLeft - box.firstElementChild.offsetLeft + actual.offsetWidth + pad + 16 : 0;
     box.scrollLeft = Math.max(0, fin - box.clientWidth);
   });
+}
+
+// Renombrar: tocar la carpeta actual la vuelve campo en el lugar, con la misma
+// transicion que el titulo del libro en el lector. Enter o salir guarda;
+// Escape vuelve atras. La topbar se estira mientras se escribe.
+function renombrarEnTopbar(el, col) {
+  if (el.classList.contains("editando")) return;
+  el.classList.add("editando");
+  el.contentEditable = "plaintext-only";
+  if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
+  el.spellcheck = false;
+  el.focus();
+  const r = document.createRange(); r.selectNodeContents(el);
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  const medir = () => medirLibTopNav(el);
+  setTimeout(medir, 300); // despues de que crece el padding
+  let listo = false;
+  const terminar = async guardar => {
+    if (listo) return;
+    listo = true;
+    el.contentEditable = "false";
+    el.classList.remove("editando");
+    getSelection().removeAllRanges();
+    const nuevo = el.textContent.replace(/\s+/g, " ").trim();
+    if (guardar && nuevo && nuevo !== col.name && await renameCollection(col.id, nuevo)) return;
+    el.textContent = col.name;
+    setTimeout(medir, 300);
+  };
+  el.oninput = medir;
+  el.onkeydown = e => {
+    if (e.key === "Enter") { e.preventDefault(); terminar(true); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); terminar(false); }
+  };
+  el.onblur = () => terminar(true);
+}
+
+async function renameCollection(id, name) {
+  const res = await fetch("/api/collections/" + id, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name })
+  }).catch(() => null);
+  if (!res) { toast("Sin conexion: no se pudo renombrar"); return false; }
+  if (!res.ok) { const err = await res.json().catch(() => ({})); toast(err.error || "No se pudo renombrar"); return false; }
+  await refresh();
+  toast("Coleccion renombrada");
+  return true;
 }
 
 // ── Books ─────────────────────────────────────────────────────────────────────
@@ -425,6 +478,7 @@ function renderBooks(filter) {
       const head = makeViewHead();
       if (head) container.appendChild(head);
       animateIn(container);
+      rowTag.refresh();
     });
     const txt = document.getElementById("emptyStateText");
     const btn = document.getElementById("btnUploadEmpty");
@@ -444,16 +498,19 @@ function renderBooks(filter) {
     container.innerHTML = "";
 
   if (activeColId == null && !offlineView && !trashView) {
-    // Seccion Ultimos leidos
-    if (recentBooks.length > 0 && !filter) {
-      const rh = document.createElement("p");
-      rh.className = "section-title"; rh.textContent = "Ultimos leidos";
-      container.appendChild(rh);
-      const rrow = document.createElement("div"); rrow.className = "books-row";
-      recentBooks.forEach(b => rrow.appendChild(makeCard(b)));
-      container.appendChild(rrow);
-    }
-    // Agrupar por coleccion de primer nivel, cada una en fila horizontal
+    // Hileras seguidas, sin titulos: el nombre de cada una lo dice la
+    // etiqueta de la izquierda (rowTag), segun cual tenga a su altura.
+    const rows = document.createElement("div");
+    rows.className = "rows-home";
+    const hilera = (nombre, lista) => {
+      const row = document.createElement("div");
+      row.className = "books-row";
+      row.dataset.name = nombre;
+      lista.forEach(b => row.appendChild(makeCard(b)));
+      rows.appendChild(row);
+    };
+    if (recentBooks.length > 0 && !filter) hilera("Ultimos leidos", recentBooks);
+    // Una hilera por coleccion de primer nivel.
     const byCol = {};
     const order = [];
     filtered.forEach(b => {
@@ -461,16 +518,8 @@ function renderBooks(filter) {
       if (!byCol[k]) { byCol[k] = []; order.push(k); }
       byCol[k].push(b);
     });
-    order.forEach(col => {
-      const h = document.createElement("p");
-      h.className = "section-title";
-      h.textContent = col;
-      container.appendChild(h);
-      const row = document.createElement("div");
-      row.className = "books-row";
-      byCol[col].forEach(b => row.appendChild(makeCard(b)));
-      container.appendChild(row);
-    });
+    order.forEach(col => hilera(col, byCol[col]));
+    container.appendChild(rows);
   } else {
     // Dentro de una coleccion (o Sin conexion, o Papelera) no hay filas por
     // coleccion que separar: se muestra todo en una grilla que ocupa el ancho
@@ -487,6 +536,7 @@ function renderBooks(filter) {
   animateOut(container, function() {
     doPopulate();
     animateIn(container);
+    rowTag.refresh();
   });
 }
 
@@ -718,6 +768,7 @@ function setView(view) {
   document.getElementById("viewSettings").style.display  = view === "settings"    ? "" : "none";
   // La topbar dice donde estas: tambien en Ajustes e Informacion.
   if (view !== "biblioteca") renderLibTopNav();
+  rowTag.refresh();
 }
 
 function setNavActive(id) {
@@ -726,18 +777,22 @@ function setNavActive(id) {
   document.querySelectorAll(".col-item").forEach(n => n.classList.remove("active"));
 }
 
+// Tarjeta de creditos: solo lo necesario (que version es y sobre que corre).
+// La usan el panel de Ajustes (PC) e Informacion (celu).
+async function creditsCard() {
+  const card = document.createElement("div");
+  card.className = "credits-card";
+  const d = await fetchJSON("/api/about", null);
+  const esc = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  card.innerHTML = "<div class='credits-name'>Bookshelf" + (d && d.version ? " <span>v" + esc(d.version) + "</span>" : "") + "</div>" +
+    (d ? "<div class='credits-stack'>" + [["Python", d.python], ["Flask", d.flask], ["PyMuPDF", d.pymupdf]]
+      .filter(([, v]) => v && v !== "N/A").map(([k, v]) => k + " " + esc(v)).join(" · ") + "</div>" : "");
+  return card;
+}
+
 async function loadAbout() {
-  const data = await (await fetch("/api/about")).json();
-  const labels = {
-    python:"Python", flask:"Flask", werkzeug:"Werkzeug",
-    pymupdf:"PyMuPDF", pillow:"Pillow", sqlite:"SQLite",
-    platform:"Sistema", uploads_dir:"Carpeta uploads",
-    data_dir:"Carpeta data", db_path:"Base de datos", covers_dir:"Portadas"
-  };
-  document.getElementById("aboutContent").innerHTML = Object.entries(data).map(([k,v]) =>
-    "<div class='about-card'><div class='about-card-label'>" + (labels[k]||k) +
-    "</div><div class='about-card-value'>" + String(v).replace(/</g,"&lt;") + "</div></div>"
-  ).join("");
+  const box = document.getElementById("aboutContent");
+  box.replaceChildren(await creditsCard());
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -752,9 +807,7 @@ function bindEvents() {
   });
   document.getElementById("navOffline").addEventListener("click", showOfflineView);
   document.getElementById("navTrash").addEventListener("click", showTrashView);
-  document.getElementById("btnTrashRestore").addEventListener("click", restoreTrashItem);
-  document.getElementById("btnTrashPurge").addEventListener("click", purgeTrashItem);
-  document.getElementById("btnRescan").addEventListener("click", rescanLibrary);
+  document.getElementById("btnRescan").addEventListener("click", () => rescanLibrary());
   document.getElementById("navAbout").addEventListener("click", () => {
     setNavActive("navAbout");
     setView("about");
@@ -807,9 +860,9 @@ function bindEvents() {
   
 
   // Upload
-  document.getElementById("btnUpload").addEventListener("click",      () => openModal("modalUpload"));
-  document.getElementById("btnUploadEmpty").addEventListener("click",  () => openModal("modalUpload"));
-  document.getElementById("btnNewCol").addEventListener("click",       openNewColModal);
+  document.getElementById("btnUpload").addEventListener("click",      () => openUploadSheet());
+  document.getElementById("btnUploadEmpty").addEventListener("click",  () => openUploadSheet());
+  document.getElementById("btnNewCol").addEventListener("click",       () => openNewColSheet());
 
   const dz = document.getElementById("dropZone");
   const fi = document.getElementById("fileInput");
@@ -823,34 +876,26 @@ function bindEvents() {
   });
 
   document.getElementById("btnDoUpload").addEventListener("click",  doUpload);
-  document.getElementById("btnCreateCol").addEventListener("click", createCollection);
-  document.getElementById("newColName").addEventListener("keydown", e => { if (e.key === "Enter") createCollection(); });
 
   // Notificaciones
   document.getElementById("btnNotif").addEventListener("click", () => {
     loadNotifications();
-    if (window.innerWidth <= 640) openNotifSheet();
-    else openModal("modalNotif");
+    openNotifSheet();
   });
-  document.getElementById("shareCollectionSelect").addEventListener("change", e => {
-    document.getElementById("shareNewColInput").style.display = (e.target.value === "__new__") ? "" : "none";
-  });
-  document.getElementById("btnAcceptShare").addEventListener("click", acceptShare);
 
   document.querySelectorAll(".modal-close").forEach(btn =>
-    btn.addEventListener("click", () => {
-      if (btn.dataset.modal === "modalShareDetail") markShareSeen();
-      closeModal(btn.dataset.modal);
-    })
+    btn.addEventListener("click", () => closeModal(btn.dataset.modal))
   );
   document.querySelectorAll(".modal-overlay").forEach(o =>
-    o.addEventListener("click", e => {
-      if (e.target === o) {
-        if (o.id === "modalShareDetail") markShareSeen();
-        closeModal(o.id);
-      }
-    })
+    o.addEventListener("click", e => { if (e.target === o) closeModal(o.id); })
   );
+
+  // Escape cierra lo que este abierto: el panel, o si no el buscador.
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (document.getElementById("navSheet")) closeNavSheet();
+    else if (document.getElementById("libSearchBar").classList.contains("open")) toggleLibSearch(false);
+  });
 }
 
 function updateDropZoneLabel() {
@@ -889,36 +934,57 @@ async function doUpload() {
   toast(cnt + " libro(s) subido(s)");
 }
 
-// "Dentro de" arranca en la coleccion abierta: crear una subcarpeta es lo que
-// uno quiere si ya esta adentro de una.
-function openNewColModal() {
-  const sel = document.getElementById("newColParent");
-  const parents = collections.filter(c => !c.is_root);
-  sel.innerHTML = "<option value=''>Ninguna (primer nivel)</option>" + colOptionsHTML(parents, null);
+// Nueva coleccion: panel con el nombre y "Dentro de" en arbol. Arranca en la
+// coleccion abierta (crear una subcarpeta es lo que uno quiere si ya esta
+// adentro de una); "Primer nivel" va arriba de todo.
+function openNewColSheet() {
+  const PRIMER = { id: 0, name: "Primer nivel", parent_id: null, _primero: 1 };
   const actual = colById(activeColId);
-  sel.value = actual && !actual.is_root && !offlineView && !trashView ? String(actual.id) : "";
-  openModal("modalNewCol");
-}
+  let dentro = actual && !actual.is_root && !offlineView && !trashView ? actual.id : 0;
+  const picker = colPicker({ collections: [PRIMER, ...collections.filter(c => !c.is_root)], selected: dentro, onChange: id => { dentro = id; } });
 
-async function createCollection() {
-  const name = document.getElementById("newColName").value.trim();
-  if (!name) return;
-  const parent = document.getElementById("newColParent").value;
-  const res = await fetch("/api/collections", {
-    method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ name, parent_id: parent ? parseInt(parent, 10) : null })
+  openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Nueva coleccion</span>";
+    body.appendChild(head);
+    const campo = document.createElement("div");
+    campo.className = "nav-sheet-field";
+    const inp = Object.assign(document.createElement("input"), { type: "text", placeholder: "Nombre", autocomplete: "off" });
+    campo.appendChild(inp);
+    body.appendChild(campo);
+    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-section", textContent: "Dentro de" }));
+    body.appendChild(picker.el);
+    const crear = Object.assign(document.createElement("button"), { className: "btn-primary full", textContent: "Crear" });
+    body.appendChild(crear);
+
+    const ir = async () => {
+      const name = inp.value.trim();
+      if (!name) { inp.focus(); return; }
+      if (crear.disabled) return;
+      crear.disabled = true;
+      const res = await fetch("/api/collections", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, parent_id: dentro || null })
+      }).catch(() => null);
+      crear.disabled = false;
+      if (res && res.ok) { closeNavSheet(); await refresh(); toast("Coleccion creada"); }
+      else { const err = res ? await res.json().catch(() => ({})) : {}; toast(err.error || "No se pudo crear la coleccion"); }
+    };
+    crear.onclick = ir;
+    inp.onkeydown = e => { if (e.key === "Enter") ir(); };
+    setTimeout(() => inp.focus(), 200);
   });
-  if (res.ok) {
-    document.getElementById("newColName").value = "";
-    await refresh(); closeModal("modalNewCol"); toast("Coleccion creada");
-  } else {
-    const err = await res.json(); toast(err.error || "Error");
-  }
 }
 
-async function rescanLibrary() {
-  const btn = document.getElementById("btnRescan");
-  btn.disabled = true; btn.textContent = "Releyendo...";
+// marcar(true/false) muestra que esta trabajando; por defecto, el boton de
+// la vista Ajustes (celu). El panel de Ajustes de la PC pasa el suyo.
+async function rescanLibrary(marcar) {
+  marcar = marcar || (on => {
+    const btn = document.getElementById("btnRescan");
+    btn.disabled = on; btn.textContent = on ? "Releyendo..." : "Releer biblioteca";
+  });
+  marcar(true);
   try {
     const res = await fetch("/api/library/rescan", { method: "POST" });
     const d = await res.json().catch(() => ({}));
@@ -931,7 +997,7 @@ async function rescanLibrary() {
   } catch {
     toast("Sin conexion: no se pudo releer");
   } finally {
-    btn.disabled = false; btn.textContent = "Releer biblioteca";
+    marcar(false);
   }
 }
 
@@ -956,6 +1022,8 @@ async function loadNotifications() {
   const badge = document.getElementById("notifBadge");
   if (unseenCount > 0) { badge.textContent = unseenCount; badge.style.display = ""; }
   else { badge.style.display = "none"; }
+  const pill = document.getElementById("bnNotifBadge");
+  if (pill) { pill.textContent = unseenCount; pill.hidden = !unseenCount; }
   renderNotifList();
 }
 
@@ -984,65 +1052,79 @@ function renderNotifList() {
       "</div>" + statusHtml;
     if (clickable) {
       row.style.cursor = "pointer";
-      row.addEventListener("click", () => openShareDetail(n));
+      row.addEventListener("click", () => { closeNavSheet(); setTimeout(() => openShareSheet(n), NAV_SHEET_CLOSE_MS); });
     }
     list.appendChild(row);
   });
 }
 
-function openShareDetail(n) {
+// Libro recibido: sale del panel de notificaciones (que se cierra y vuelve a
+// crecer con esto). La coleccion se elige en el arbol, o se escribe una nueva.
+function openShareSheet(n) {
+  const ICO_PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>';
+  const raiz = collections.find(c => c.is_root);
+  let destino = raiz ? raiz.id : null;
+  const picker = colPicker({ collections, selected: destino, onChange: id => { destino = id; if (nueva) nueva.value = ""; } });
+  let nueva = null;
   activeShareId = n.id;
-  const available = !!n.book_title;
-  document.getElementById("shareBookTitle").textContent = n.book_title || "Libro eliminado";
-  document.getElementById("shareFromUser").textContent = "Enviado por " + n.from_username;
-  document.getElementById("shareCoverWrap").innerHTML = (available && n.book_has_cover)
-    ? "<img src='/api/notifications/" + n.id + "/cover'>" : "";
-  document.getElementById("shareUnavailableMsg").style.display = available ? "none" : "";
-  document.getElementById("shareColGroup").style.display = available ? "" : "none";
-  document.getElementById("btnAcceptShare").style.display = available ? "" : "none";
 
-  const sel = document.getElementById("shareCollectionSelect");
-  const placeholder = "<option value='' disabled selected>Elegi una coleccion...</option>";
-  sel.innerHTML = placeholder + colOptionsHTML(collections, null) + "<option value='__new__'>+ Nueva coleccion</option>";
-  document.getElementById("shareNewColInput").style.display = "none";
-  document.getElementById("shareNewColInput").value = "";
+  openNavSheet(body => {
+    const det = document.createElement("div");
+    det.className = "share-detail";
+    det.innerHTML = "<div class='share-cover'></div><div class='share-info'><div class='share-title'></div><div class='share-from'></div></div>";
+    if (n.book_has_cover) det.querySelector(".share-cover").innerHTML = "<img src='/api/notifications/" + n.id + "/cover' alt=''>";
+    det.querySelector(".share-title").textContent = n.book_title;
+    det.querySelector(".share-from").textContent = "Te lo mando " + n.from_username;
+    body.appendChild(det);
 
-  closeModal("modalNotif");
-  openModal("modalShareDetail");
+    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-section", textContent: "Coleccion" }));
+    body.appendChild(picker.el);
+    // "Nueva coleccion" se transforma en el campo para escribirla.
+    const fila = navSheetRow({ label: "Nueva coleccion", icon: ICO_PLUS, onClick: () => {
+      const campo = document.createElement("div");
+      campo.className = "nav-sheet-field";
+      nueva = Object.assign(document.createElement("input"), { type: "text", placeholder: "Nombre de la coleccion", autocomplete: "off" });
+      nueva.oninput = () => picker.el.classList.toggle("apagado", !!nueva.value.trim());
+      nueva.onkeydown = e => { if (e.key === "Enter") aceptar.click(); };
+      campo.appendChild(nueva);
+      fila.replaceWith(campo);
+      treeOpen(campo);
+      nueva.focus();
+    } });
+    body.appendChild(fila);
+
+    const aceptar = Object.assign(document.createElement("button"), { className: "btn-primary full", textContent: "Aceptar" });
+    aceptar.onclick = async () => {
+      const nombre = nueva ? nueva.value.trim() : "";
+      if (!nombre && destino == null) { toast("Elegi una coleccion antes de aceptar"); return; }
+      aceptar.disabled = true;
+      await acceptShare(nombre ? { new_collection_name: nombre } : { collection_id: destino });
+      aceptar.disabled = false;
+    };
+    body.appendChild(aceptar);
+  }, () => markShareSeen());
 }
 
-async function acceptShare() {
-  const sel = document.getElementById("shareCollectionSelect");
-  const newColInput = document.getElementById("shareNewColInput");
-  const body = {};
-  if (sel.value === "__new__") {
-    const name = newColInput.value.trim();
-    if (!name) { toast("Poné un nombre para la coleccion"); return; }
-    body.new_collection_name = name;
-  } else if (sel.value) {
-    body.collection_id = sel.value;
-  } else {
-    toast("Elegi una coleccion antes de aceptar");
-    return;
-  }
+async function acceptShare(body) {
   const res = await fetch("/api/notifications/" + activeShareId + "/accept", {
     method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
-  });
-  const data = await res.json();
+  }).catch(() => null);
+  if (!res) { toast("Sin conexion: no se pudo aceptar"); return; }
+  const data = await res.json().catch(() => ({}));
   if (res.ok) {
     toast("Libro agregado a tu biblioteca");
     activeShareId = null;
-    closeModal("modalShareDetail");
+    closeNavSheet();
     await refresh();
   } else {
     toast(data.error || "Error");
-    if (res.status === 410) { activeShareId = null; closeModal("modalShareDetail"); }
+    if (res.status === 410) { activeShareId = null; closeNavSheet(); }
   }
   await loadNotifications();
 }
 
-// Se llama al cerrar el modal de "libro recibido" sin aceptar (X o click afuera):
-// solo marca que ya se vio (para el contador), sigue pudiendose aceptar despues.
+// Se llama al cerrar el panel de "libro recibido" sin aceptar: solo marca que
+// ya se vio (para el contador), sigue pudiendose aceptar despues.
 async function markShareSeen() {
   if (!activeShareId) return;
   const id = activeShareId;
@@ -1096,14 +1178,15 @@ function initBottomNav() {
   function syncNavIndicator() {
     const ind = document.getElementById("bnIndicator");
     if (!ind) return;
-    const items = [...document.querySelectorAll(".bn-item")];
-    const i = items.findIndex(b => b.classList.contains("active"));
+    // Por la posicion real del boton: en la PC hay botones que en el celu no
+    // estan y el orden visual lo da CSS, asi que el indice del DOM no sirve.
+    const act = [...document.querySelectorAll("#bottomNav .bn-item")].find(b => b.classList.contains("active") && b.offsetWidth);
     // Sin seccion activa (p. ej. al abrir una coleccion suelta) el resaltado se
     // esconde en vez de quedar apuntando a cualquier lado.
-    ind.style.opacity = i < 0 ? "0" : "1";
-    if (i < 0 || !items.length) return;
-    ind.style.left = "calc(" + (i / items.length) * 100 + "% + 6px)";
-    ind.style.width = "calc(" + 100 / items.length + "% - 12px)";
+    ind.style.opacity = act ? "1" : "0";
+    if (!act) return;
+    ind.style.left = (act.offsetLeft + 6) + "px";
+    ind.style.width = (act.offsetWidth - 12) + "px";
   }
 
   initPasswordForm();
@@ -1150,7 +1233,14 @@ function initBottomNav() {
   });
 
   bnBus.addEventListener("click", () => toggleLibSearch());
-  bnMas.addEventListener("click", () => openMoreSheet());
+  // En la PC "Mas" es Ajustes (ruedita); en el celu, el panel de siempre.
+  bnMas.addEventListener("click", () => { if (isMobile()) openMoreSheet(); else openAjustesSheet(); });
+
+  // Solo PC (en el celu viven en las hojas).
+  const bnOff = document.getElementById("bnOffline");
+  if (bnOff) bnOff.addEventListener("click", async () => { setActive("bnOffline"); await showOfflineView(); });
+  const bnNot = document.getElementById("bnNotif");
+  if (bnNot) bnNot.addEventListener("click", () => { loadNotifications(); openNotifSheet(); });
 }
 
 // ── Buscador de la biblioteca ────────────────────────────────────────────────
@@ -1232,6 +1322,212 @@ function openMoreSheet() {
     }));
   });
 }
+
+// ── Ajustes (PC) ─────────────────────────────────────────────────────────────
+// La ruedita de la pildora. Junta lo chico: la papelera, releer la biblioteca,
+// la contrasena (se despliega en el lugar), cerrar sesion y los creditos.
+function openAjustesSheet() {
+  const ico = d => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' + d + '</svg>';
+  const ICO = {
+    trash: ico('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
+    rescan: ico('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>'),
+    key: ico('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+    out: ico('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'),
+  };
+  const ICO_CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 6 15 12 9 18"/></svg>';
+  const form = document.getElementById("formPassword");
+  const casa = form.parentNode;
+
+  const s = openNavSheet(body => {
+    const head = document.createElement("div");
+    head.className = "nav-sheet-title";
+    head.innerHTML = "<span>Ajustes</span>";
+    body.appendChild(head);
+
+    const n = collections.length ? collections[0].trash_count || 0 : 0;
+    body.appendChild(navSheetRow({
+      label: "Papelera", icon: ICO.trash, detail: n ? String(n) : undefined, active: trashView,
+      onClick: async () => {
+        s.close();
+        document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+        await showTrashView();
+      },
+    }));
+
+    // Releer: se queda en el panel y la fila muestra que esta trabajando.
+    const releer = navSheetRow({ label: "Releer biblioteca", icon: ICO.rescan });
+    releer.classList.add("rescan-row");
+    releer.onclick = () => {
+      if (releer.disabled) return;
+      rescanLibrary(on => {
+        releer.disabled = on;
+        releer.classList.toggle("girando", on);
+        releer.querySelector(".row-label").textContent = on ? "Releyendo..." : "Releer biblioteca";
+      });
+    };
+    body.appendChild(releer);
+
+    // Contrasena: la fila despliega el formulario (el mismo de la vista
+    // Ajustes del celu, que se muda aca y vuelve al cerrar).
+    const pw = document.createElement("div");
+    pw.className = "tree-node";
+    const pwFila = navSheetRow({ label: "Cambiar contrasena", icon: ICO.key });
+    const chev = Object.assign(document.createElement("span"), { className: "pw-chev", innerHTML: ICO_CHEV });
+    pwFila.appendChild(chev);
+    let abierto = null;
+    pwFila.onclick = () => {
+      if (abierto) {
+        const caja = abierto; abierto = null;
+        caja.classList.add("closing");
+        treeClose(caja);
+      } else {
+        abierto = document.createElement("div");
+        abierto.className = "pw-box";
+        abierto.appendChild(form);
+        pw.appendChild(abierto);
+        treeOpen(abierto);
+        setTimeout(() => document.getElementById("pwActual").focus(), 200);
+      }
+      chev.classList.toggle("open", !!abierto);
+    };
+    pw.appendChild(pwFila);
+    body.appendChild(pw);
+
+    body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
+    body.appendChild(navSheetRow({
+      label: "Cerrar sesion", icon: ICO.out,
+      onClick: () => { document.body.classList.add("logging-out"); setTimeout(() => { window.location.href = "/logout"; }, 220); },
+    }));
+
+    const cred = document.createElement("div");
+    body.appendChild(cred);
+    creditsCard().then(c => cred.replaceWith(c));
+  }, () => {
+    // El panel ya salio del DOM: el aviso se busca adentro del formulario.
+    form.reset(); form.querySelector("#pwError").style.display = "none";
+    casa.appendChild(form);
+  });
+}
+
+// ── Etiqueta de las hileras ──────────────────────────────────────────────────
+// Una sola, vertical, a la izquierda: nombra la hilera que tiene a la altura
+// de su piquito. Al scrollear cambia la palabra (fundido) y el alto acompana
+// el largo. Se arrastra arriba y abajo, solo entre la topbar y la pildora; el
+// lugar se guarda como proporcion de ese espacio (sirve aunque cambie el alto
+// de la ventana). El piquito marca la altura elegida y no se mueve cuando la
+// etiqueta cambia de largo: asi la palabra no puede ir y venir entre dos
+// hileras por su propio cambio de tamano.
+const rowTag = (() => {
+  const KEY = "bs_row_tag", MARGEN = 12, MIN_ALTO = 64, AIRE = 36, PUNTA = 18;
+  const el = document.getElementById("rowTag");
+  const txt = document.getElementById("rowTagTxt");
+  const tail = el && el.querySelector(".row-tag-tail");
+  let ratio = .5, palabra = null, alto = MIN_ALTO, cambio = 0, raf = 0, primera = true;
+  try { const r = parseFloat(localStorage.getItem(KEY)); if (r >= 0 && r <= 1) ratio = r; } catch (e) {}
+
+  // El largo de la palabra, medido con la misma letra pero acostada.
+  const medidor = document.createElement("span");
+  medidor.className = "row-tag-medir";
+  const medir = t => { medidor.textContent = t; return Math.max(MIN_ALTO, Math.ceil(medidor.offsetWidth) + AIRE); };
+
+  const bordes = () => {
+    const top = document.getElementById("libTopNav");
+    const nav = document.getElementById("bottomNav");
+    const arriba = top && !top.hidden && top.offsetHeight ? top.getBoundingClientRect().bottom : 0;
+    const abajo = nav && nav.offsetHeight ? nav.getBoundingClientRect().top : window.innerHeight;
+    return [arriba + MARGEN, abajo - MARGEN];
+  };
+  // Donde puede estar el piquito (lo que se guarda como proporcion).
+  const rango = () => { const [a, b] = bordes(); return [a + MIN_ALTO / 2, b - MIN_ALTO / 2]; };
+  const punta = () => { const [lo, hi] = rango(); return lo + ratio * Math.max(0, hi - lo); };
+
+  const colocar = () => {
+    const [a, b] = bordes();
+    const y = punta();
+    const top = Math.min(Math.max(y - alto / 2, a), Math.max(a, b - alto));
+    el.style.top = top + "px";
+    el.style.height = alto + "px";
+    tail.style.top = Math.min(Math.max(y - top, PUNTA), alto - PUNTA) + "px";
+  };
+
+  const poner = nombre => {
+    if (nombre === palabra) return;
+    palabra = nombre;
+    alto = medir(nombre);
+    const n = ++cambio;
+    if (primera) { primera = false; txt.textContent = nombre; return; }
+    txt.classList.add("sale");
+    setTimeout(() => {
+      if (n !== cambio) return;
+      txt.textContent = nombre;
+      txt.classList.remove("sale");
+      txt.classList.add("entra");
+      txt.offsetHeight; // entra desde el otro lado, sin transicion
+      txt.classList.remove("entra");
+    }, 170);
+  };
+
+  // La hilera a la altura del piquito (o la mas cercana si cae en un hueco).
+  const elegir = () => {
+    const y = punta();
+    let mejor = null, dist = Infinity;
+    document.querySelectorAll("#booksContainer .rows-home .books-row").forEach(row => {
+      const r = row.getBoundingClientRect();
+      const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      if (d < dist) { dist = d; mejor = row; }
+    });
+    return mejor;
+  };
+
+  const actualizar = () => {
+    raf = 0;
+    const vista = document.getElementById("viewBiblioteca");
+    const row = vista && vista.style.display !== "none" ? elegir() : null;
+    el.hidden = !row;
+    if (!row) { primera = true; palabra = null; return; }
+    poner(row.dataset.name);
+    colocar();
+  };
+  const programar = () => { if (!raf) raf = requestAnimationFrame(actualizar); };
+
+  if (el) {
+    document.body.appendChild(medidor);
+    document.addEventListener("scroll", programar, { capture: true, passive: true });
+    window.addEventListener("resize", programar);
+
+    el.addEventListener("pointerdown", e => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      el.classList.add("arrastrando");
+      const y0 = e.clientY, p0 = punta();
+      const mover = ev => {
+        const [lo, hi] = rango();
+        const y = Math.min(hi, Math.max(lo, p0 + ev.clientY - y0));
+        ratio = hi > lo ? (y - lo) / (hi - lo) : .5;
+        actualizar();
+      };
+      const soltar = () => {
+        el.classList.remove("arrastrando");
+        el.removeEventListener("pointermove", mover);
+        el.removeEventListener("pointerup", soltar);
+        el.removeEventListener("pointercancel", soltar);
+        try { localStorage.setItem(KEY, ratio.toFixed(4)); } catch (e) {}
+      };
+      el.addEventListener("pointermove", mover);
+      el.addEventListener("pointerup", soltar);
+      el.addEventListener("pointercancel", soltar);
+    });
+    // Es fija: la rueda encima de ella tiene que seguir moviendo la lista.
+    el.addEventListener("wheel", e => {
+      const c = document.getElementById("content");
+      if (c && c.scrollHeight > c.clientHeight) c.scrollTop += e.deltaY;
+      else window.scrollBy(0, e.deltaY);
+    }, { passive: true });
+  }
+
+  return { refresh: () => { if (el) programar(); } };
+})();
 
 // ── Notificaciones en panel ──────────────────────────────────────────────────
 // Mismo criterio que el resto en mobile: crece desde la pildora en vez de
@@ -1357,7 +1653,7 @@ function openMobileColSheet() {
     const nueva = document.createElement("button");
     nueva.textContent = "+ Nueva";
     nueva.style.cssText = "background:var(--accent);color:#fff;border:none;border-radius:999px;padding:.35rem .8rem;font-size:.78rem;cursor:pointer";
-    nueva.onclick = () => { closeNavSheet(); setTimeout(openNewColModal, NAV_SHEET_CLOSE_MS); };
+    nueva.onclick = () => { closeNavSheet(); setTimeout(openNewColSheet, NAV_SHEET_CLOSE_MS); };
     head.appendChild(nueva);
     body.appendChild(head);
 
@@ -1375,7 +1671,9 @@ function openMobileColSheet() {
       },
     }));
 
-    // "Sin conexion" no entra en los 5 slots de la barra, asi que vive aca.
+    // "Sin conexion" no entra en los 5 slots de la barra, asi que vive aca
+    // (en la PC tiene su boton, y la Papelera esta en Ajustes).
+    if (window.innerWidth <= 640) {
     body.appendChild(navSheetRow({
       label: "Sin conexion", icon: ICO_OFF, active: offlineView,
       onClick: async () => { s.close(); salirDeEspeciales(); await showOfflineView(); },
@@ -1385,6 +1683,7 @@ function openMobileColSheet() {
       label: "Papelera", icon: ICO_TRASH, active: trashView, detail: n ? String(n) : undefined,
       onClick: async () => { s.close(); salirDeEspeciales(); await showTrashView(); },
     }));
+    }
 
     if (collections.length) body.appendChild(Object.assign(document.createElement("div"), { className: "nav-sheet-sep" }));
 
@@ -1446,14 +1745,9 @@ function openMobileColSheet() {
 function _originalInit() {}
 init();
 
-// Scroll horizontal con mouse wheel sobre las filas
-document.addEventListener('wheel', function(e) {
-  const row = e.target.closest('.books-row');
-  if (!row) return;
-  if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return; // ya es scroll horizontal
-  e.preventDefault();
-  row.scrollBy({ left: e.deltaY * 2.5, behavior: 'smooth' });
-}, { passive: false });
+// La rueda sobre una hilera ya no la corre de costado: sin sidebar y con las
+// hileras seguidas, casi toda la pantalla es hilera y no habia forma de bajar.
+// De costado: Shift + rueda o el touchpad (lo hace el navegador solo).
 
 // Scroll sidebar -> content con inercia suave
 (function() {

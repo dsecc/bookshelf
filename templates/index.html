@@ -130,7 +130,7 @@
       <!-- Vista: About -->
       <div id="viewAbout" style="display:none">
         <div class="info-page">
-          <h2>About</h2>
+          <h2>Informacion</h2>
           <div id="aboutContent" class="about-grid"></div>
         </div>
       </div>
@@ -189,42 +189,6 @@
   </div>
 </div>
 
-<!-- Modal Nueva coleccion -->
-<div class="modal-overlay" id="modalNewCol" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Nueva coleccion</h2>
-      <button class="btn-icon modal-close" data-modal="modalNewCol">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="newColName" placeholder="Ej: Ciencia Ficcion">
-    </div>
-    <div class="form-group">
-      <label>Dentro de</label>
-      <select id="newColParent"></select>
-    </div>
-    <button class="btn-primary full" id="btnCreateCol">Crear</button>
-  </div>
-</div>
-
-<!-- Modal libro en la papelera (desktop; en mobile, panel de la pildora) -->
-<div class="modal-overlay" id="modalTrashItem" style="display:none">
-  <div class="modal-sm">
-    <div class="modal-header">
-      <h2 id="trashItemTitle">Libro</h2>
-      <button class="btn-icon modal-close" data-modal="modalTrashItem">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <p class="ajuste-nota" id="trashItemMeta"></p>
-    <button class="btn-primary full" id="btnTrashRestore">Restaurar</button>
-    <button class="btn-danger full" id="btnTrashPurge" style="margin-top:.5rem">Eliminar definitivamente</button>
-  </div>
-</div>
-
 <!-- Modal renombrar coleccion -->
 <div class="modal-overlay" id="modalRenameCol" style="display:none">
   <div class="modal-sm">
@@ -258,32 +222,6 @@
   </div>
 </div>
 
-<!-- Modal libro recibido: aceptar / rechazar -->
-<div class="modal-overlay" id="modalShareDetail" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Libro recibido</h2>
-      <button class="btn-icon modal-close" data-modal="modalShareDetail">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="share-detail">
-      <div class="share-cover" id="shareCoverWrap"></div>
-      <div class="share-info">
-        <div class="share-title" id="shareBookTitle"></div>
-        <div class="share-from" id="shareFromUser"></div>
-      </div>
-    </div>
-    <div id="shareUnavailableMsg" class="auth-error" style="display:none">Este libro ya no está disponible.</div>
-    <div class="form-group" id="shareColGroup">
-      <label>Coleccion</label>
-      <select id="shareCollectionSelect"></select>
-      <input type="text" id="shareNewColInput" placeholder="Nombre de la nueva coleccion" style="display:none;margin-top:.4rem">
-    </div>
-    <button class="btn-primary full" id="btnAcceptShare" style="margin-top:.5rem">Aceptar</button>
-  </div>
-</div>
-
 <!-- Bottom nav mobile: pildora flotante. Solo iconos, sin etiquetas — el
      resaltado deslizante (.bn-indicator) marca cual esta activo. Las medidas
      viven en nav.css como --nav-bar-*.
@@ -304,20 +242,26 @@
   <button class="bn-item" id="bnUploadMobile" aria-label="Subir" title="Subir">
     <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
   </button>
-  <button class="bn-item" id="bnMore" aria-label="Mas" title="Mas">
-    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
+  <!-- En la PC: Sin conexion y Notificaciones tambien van en la pildora, y
+       "Mas" es Ajustes (ruedita). En el celu queda como estaba. El orden de
+       la PC lo da CSS (order), asi el HTML sirve para las dos. -->
+  <button class="bn-item bn-desk" id="bnOffline" aria-label="Sin conexion" title="Sin conexion"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14.9A5 5 0 0 1 7 6a6 6 0 0 1 11.6 2A4.5 4.5 0 0 1 20 15"/><polyline points="9 15 11 17 15 12"/></svg></button>
+  <button class="bn-item bn-desk" id="bnNotif" aria-label="Notificaciones" title="Notificaciones"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="bn-badge" id="bnNotifBadge" hidden></span></button>
+  <button class="bn-item" id="bnMore" aria-label="Mas" title="Mas"><span class="ico-cel"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span><span class="ico-pc"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></button>
 </nav>
 
-<!-- Buscador mobile: sale de atras de la pildora (ver .nav-search en nav.css).
+<!-- Etiqueta de las hileras: una sola, vertical, a la izquierda. Nombra la
+     hilera que tiene a su altura; se arrastra entre las dos barras. -->
+<div class="row-tag" id="rowTag" hidden><span class="row-tag-tail"></span><span class="row-tag-txt" id="rowTagTxt"></span></div>
+
+<!-- Topbar flotante: gemela de la pildora, anclada arriba. Dice donde estas
+     ("/" es la raiz); tocar la carpeta actual la renombra. -->
+<div class="top-nav lib-top-nav" id="libTopNav" hidden><div class="ltn-scroll" id="libTopNavScroll"></div></div>
+
+<!-- Buscador: sale de atras de la pildora (ver .nav-search en nav.css).
      El input real se mueve aca desde la topbar al abrirlo, para no duplicar
      handlers, y vuelve a su lugar al cerrar. Sin boton de cerrar: se cierra
      tocando la misma lupa que lo abrio. -->
-<!-- Topbar flotante (celu): gemela de la pildora, anclada arriba. Dentro de
-     una coleccion lleva "‹ subir" y las subcarpetas, deslizables. Solo aparece
-     cuando hace falta (hay subcarpetas o una carpeta de arriba). -->
-<div class="top-nav lib-top-nav" id="libTopNav" hidden><div class="ltn-scroll" id="libTopNavScroll"></div></div>
-
 <div class="nav-search" id="libSearchBar">
   <span id="libSearchSlot"></span>
 </div>

@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.16 — La PC, como el celu
+
+### Cambiado
+- **La biblioteca en la PC usa el sistema de pildoras**: sin sidebar, sin la topbar vieja y sin logo. Arriba, la misma topbar del celu que dice donde estas (`/`, `/ Ciberseguridad / Malware`); abajo, una pildora con Biblioteca, Sin conexion, Colecciones, Buscar, Subir, Notificaciones (con contador) y **Ajustes**. Todo lo que eran ventanas ahora crece desde la pildora.
+- **Ajustes (PC)**: Papelera, Releer biblioteca (se queda en el panel y el icono gira), Cambiar contrasena (se despliega en el lugar), Cerrar sesion y una tarjeta de creditos con solo lo necesario (version, Python, Flask, PyMuPDF). La tarjeta reemplaza tambien a la lista de rutas y versiones de Informacion en el celu.
+- **Hileras sin titulos** (celu y PC): van seguidas y el nombre lo dice **una etiqueta vertical de vidrio** a la izquierda, con un piquito que apunta a la hilera a su altura. Al bajar cambia la palabra y su alto se anima segun el largo. **Se arrastra** arriba y abajo (mouse o dedo), sin pasar nunca la topbar ni la pildora, y se acuerda donde la dejaste.
+- **Libros un 20% mas grandes** (PC 164 → 197px, celu 110 → 132px).
+- **Renombrar una coleccion**: tocando la carpeta actual en la topbar, que se vuelve editable en el lugar (misma animacion que el titulo del libro). Celu y PC.
+- **Nueva coleccion**, **libro recibido** y **libro en la papelera** son paneles en las dos plataformas; la coleccion se elige con el arbol (en "Nueva coleccion", "Primer nivel" va arriba de todo; en "libro recibido", "Nueva coleccion" se transforma en el campo).
+- En la PC la hoja de Colecciones ya no repite Sin conexion ni Papelera (tienen su lugar en la pildora y en Ajustes).
+- La rueda del mouse sobre una hilera ya no la corre de costado: con todo hecho hileras no habia forma de bajar. De costado: Shift + rueda o el touchpad.
+- Escape cierra el panel abierto o el buscador.
+- `/api/about` devuelve la `version`. `VERSION` del service worker: `v35` → `v36`. Spec: `docs/pildoras.md` (4.1, 4.2, 4.8, 6, 7).
+
 ## v1.15.7 — Subir, con la estetica de las pildoras
 
 ### Cambiado

@@ -70,20 +70,22 @@ Vidrio, `border-radius: 999px`, `z-index: 150`, anclada abajo.
 | Donde | Contenido |
 |---|---|
 | Biblioteca, celu (`#bottomNav`) | 5 items de igual ancho: Colecciones, Buscar, Biblioteca, Subir (en acento), Mas. Resaltado deslizante (`.bn-indicator`) detras del item activo. |
+| Biblioteca, PC (`#bottomNav`, v1.16) | 7 items, 600px de ancho: Biblioteca, Sin conexion, Colecciones, Buscar, Subir, Notificaciones (con contador), Ajustes (ruedita). Mismo HTML que el celu: los dos de mas son `.bn-desk` y el orden lo da CSS (`order`); "Mas" muestra la ruedita (`.ico-pc`). El resaltado se ubica por la posicion real del boton (`offsetLeft`), no por el indice. |
 | Lector, celu (`#readerNav`) | 4 items: Volver, Buscar, Bookmarks, Info (ruedita). Los grupos son `display: contents` y lo `.rn-desk` no se ve. |
 | Lector, PC (`#readerNav`) | Grilla de 3 columnas: izquierda Volver + titulo; centro el paginador (o los ajustes de letra en TXT/MD/EPUB); derecha Buscar, Bookmarks, Lupa, Pantalla completa, Info. Items de 42px con hover. |
 
 Items: icono de linea, trazo 1.8, 23px (celu) / 21px (PC). Sin texto.
 
 ### 4.2 Topbar flotante (`.top-nav`)
-Gemela de la pildora, anclada arriba (`--top-nav-top`, 52px de alto). **Solo
-en el celu y solo cuando hace falta** (atributo `hidden` si no). Con
+Gemela de la pildora, anclada arriba (`--top-nav-top`, 52px de alto). En el
+lector, **solo en el celu y solo cuando hace falta** (atributo `hidden` si no);
+la de la biblioteca esta siempre, en celu y PC (v1.16). Con
 `body.con-topnav` el contenido arranca debajo.
 
 | Donde | Contenido |
 |---|---|
 | Lector (`#readerTopNav`) | Ajustes de letra de TXT/MD/EPUB: fuente, A− tamaño A+, tres temas. El mismo nodo (`#textCtl`) que en la PC va en la pildora; se muda segun el ancho (`placeTextCtl`). |
-| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
+| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. **Tocar la carpeta actual la renombra en el lugar** (v1.16): el tramo es un `span` que se vuelve editable con la misma transicion que el titulo del libro (pildora con borde de acento); Enter o salir guarda, Escape vuelve atras, y la topbar se estira mientras se escribe. No en la raiz, Sin coleccion ni Temporal. **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
 
 ### 4.3 Panel (`.nav-sheet`, `openNavSheet(build, onClose)` en nav.js)
 La pildora estirandose hacia arriba. Mismo `left/right/bottom` que la pildora,
@@ -162,6 +164,25 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 | Resaltado deslizante de la barra | .38s |
 | Topbar de la biblioteca (ancho) | .5s |
 
+### 4.8 Etiqueta de las hileras (`#rowTag`, biblioteca, v1.16)
+En el inicio las hileras van seguidas y **sin titulos**. Una sola etiqueta de
+vidrio, vertical, fija a la izquierda (32px de ancho), flota sobre los
+primeros libros con la palabra de costado (mayusculas espaciadas, se lee de
+abajo hacia arriba) y un **piquito** a la derecha, pegado al costado (no
+encima: una sola capa), que apunta a la hilera que tiene a su altura.
+
+- Al scrollear cambia la palabra (sale hacia abajo, entra desde arriba, .2s) y
+  el alto se anima (.45s) segun el largo (medido con la misma letra acostada).
+- **Se arrastra** arriba y abajo (mouse o dedo, pointer events). Nunca pisa
+  las barras: queda a 12px de la topbar y de la pildora. Lo que se guarda
+  (`localStorage`, `bs_row_tag`) es la altura del piquito como proporcion de
+  ese espacio, asi sirve aunque cambie el alto de la ventana.
+- El piquito marca la altura elegida y **no se mueve cuando cambia el largo**
+  (la caja se acomoda alrededor, sin pasar las barras): si no, la palabra
+  podria ir y venir entre dos hileras por su propio cambio de tamano.
+- Solo en el inicio (hileras); en una coleccion, Sin conexion, Papelera o las
+  vistas de Ajustes se esconde con un fundido.
+
 ## 5. Esconder la navegacion
 
 | Donde | Gesto | Efecto |
@@ -171,17 +192,22 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 
 `setReaderNavHidden(bool)` en reader.js. Al esconder se cierran panel y barras.
 
-## 6. Inventario (v1.15.5)
+## 6. Inventario (v1.16)
 
 | Pantalla | Plataforma | Disparador | Pieza | Contenido |
 |---|---|---|---|---|
-| Biblioteca | celu | Colecciones | panel | Todos, Sin conexion, Papelera, arbol de colecciones (flechita despliega sin cerrar), + Nueva |
-| Biblioteca | celu | Subir | panel | zona de arrastrar (vidrio), arbol de coleccion (`colPicker`), boton pildora |
+| Biblioteca | celu + PC | Colecciones | panel | Todos, Sin conexion y Papelera (solo celu: en la PC tienen su lugar), arbol de colecciones (flechita despliega sin cerrar), + Nueva |
+| Biblioteca | celu + PC | Subir | panel | zona de arrastrar (vidrio), arbol de coleccion (`colPicker`), boton pildora |
 | Biblioteca | celu | Mas (tres rayitas) | panel, sin titulo | Notificaciones, Informacion, Ajustes, Cerrar sesion |
 | Biblioteca | celu | Mas → Notificaciones | panel | lista del modal mudada al panel |
-| Biblioteca | celu | tocar un libro en la Papelera | panel | Restaurar / Eliminar definitivamente |
-| Biblioteca | celu | Buscar | barra (`#libSearchBar`) | el input real se muda desde la topbar |
-| Biblioteca | celu | siempre | topbar | donde estas (`/`, la ruta o la vista especial) |
+| Biblioteca | celu + PC | tocar un libro en la Papelera | panel | Restaurar / Eliminar definitivamente |
+| Biblioteca | celu + PC | Buscar | barra (`#libSearchBar`) | el input real se muda desde la topbar |
+| Biblioteca | celu + PC | siempre | topbar | donde estas (`/`, la ruta o la vista especial); tocar la actual la renombra |
+| Biblioteca | celu + PC | Colecciones → + Nueva | panel | nombre + "Dentro de" en arbol (`colPicker`, con "Primer nivel" arriba) |
+| Biblioteca | celu + PC | Notificaciones → un libro recibido | panel | tapa, titulo, quien lo mando, arbol de coleccion o "Nueva coleccion" (se vuelve campo), Aceptar |
+| Biblioteca | PC | Ajustes (ruedita) | panel | Papelera, Releer biblioteca (la fila gira), Cambiar contrasena (se despliega en el lugar), Cerrar sesion, tarjeta de creditos |
+| Biblioteca | PC | Sin conexion / Notificaciones | item de la pildora / panel | lo que en el celu esta en las hojas |
+| Biblioteca | celu + PC | inicio | etiqueta (`#rowTag`) | nombre de la hilera a su altura |
 | Lector | celu + PC | ruedita | panel | titulo editable, Lectura (PC, PDF), acciones, arbol de coleccion + Mover |
 | Lector | celu | Bookmark | panel | Nuevo / Ver |
 | Lector | PC | Bookmark | panel | la lista, con Nuevo abajo |
@@ -192,18 +218,14 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 | Lector | celu + PC | Nuevo bookmark | barra (`#bmBarReader`) | input + tilde |
 | Lector (TXT/MD/EPUB) | celu | siempre | topbar | ajustes de letra |
 
-## 7. Pendiente para v1.16 (PC = celu)
+## 7. PC = celu (v1.16)
 
-La biblioteca en PC todavia usa sidebar, topbar y **modales**. Para llevarla a
-la pildora:
+La biblioteca en la PC ya no tiene sidebar, topbar vieja ni modales: arriba la
+topbar de la ruta y abajo la pildora (4.1), con las medidas de PC del lector
+(600px, 58px de alto). Los modales que quedan en el HTML (Subir, Notificaciones)
+son solo deposito: su contenido se muda al panel. Libros un 20% mas grandes
+(197px en PC, 132px en el celu). La rueda del mouse sobre una hilera ya no la
+corre de costado (casi toda la pantalla es hilera): de costado, Shift + rueda o
+el touchpad.
 
-- Modales de la biblioteca que en PC siguen siendo ventanas: Nueva coleccion,
-  Renombrar coleccion, Subir, Notificaciones, Libro recibido, Libro en la
-  papelera. En el celu varios ya se mudan a paneles (Subir, Notificaciones,
-  Papelera); el resto hay que construirlo como panel.
-- El sidebar (arbol de colecciones, Biblioteca, Sin conexion, Papelera,
-  About, Ajustes) pasa a la pildora + paneles, como en el celu.
-- Medidas de PC ya resueltas en el lector (`reader.css`, bloque
-  `min-width: 641px`): reusar las mismas variables para la biblioteca.
-- Mantener las reglas de la seccion 1: un solo material, sin oscurecer, una
-  sola capa.
+Escape cierra el panel abierto, o si no el buscador.
