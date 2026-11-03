@@ -553,6 +553,9 @@ async function initPDF() {
   // siempre al borde superior de la pagina, o sea un poco mas arriba de donde
   // uno habia dejado la lectura.
   _pdfOffset = Number(prog.offset) || 0;
+  // La misma posicion como fraccion de la pagina: los pixeles dependen del
+  // ancho de la pantalla, y el progreso ahora cruza entre celu y PC.
+  _pdfFrac = prog.frac != null ? Number(prog.frac) : null;
   // Solo el modo scroll re-escala al cambiar el ancho; si se cambia a otro
   // modo hay que soltar el handler viejo para no redibujar un viewer oculto.
   _scrollRerender = null;
@@ -564,7 +567,7 @@ async function initPDF() {
   else if (viewMode === "spread") await initPDFSpread();
 }
 
-let _pdfOffset = 0;
+let _pdfOffset = 0, _pdfFrac = null;
 
 // Mide y guarda la posicion exacta en el modo scroll. Los guardados van con
 // debounce; al salir del lector (volver, cambiar de app, bloquear) se llama
@@ -692,7 +695,8 @@ async function initPDFScroll() {
   // solo este contenedor), tapando la topbar arriba del viewport — se
   // setea el scroll directo sobre "wrap" para que quede contenido ahi.
   // Se suma el offset guardado: volver al punto exacto, no al borde de la hoja.
-  S.top = S.offsetOf(wrappers[startIdx]) + _pdfOffset;
+  const w0 = wrappers[startIdx];
+  S.top = S.offsetOf(w0) + (_pdfFrac != null && w0 ? Math.round(_pdfFrac * w0.offsetHeight) : _pdfOffset);
 
   // Renderizar de a poco: solo las paginas que se acercan al viewport, no
   // el documento entero de una — con libros largos, renderizar todo al
@@ -741,7 +745,10 @@ async function initPDFScroll() {
   function guardarPosicion() {
     const w = wrappers[pdfPage - 1];
     const off = w ? Math.round(S.top - S.offsetOf(w)) : 0;
-    saveProgress({ page: pdfPage, total: pdfTotal, offset: off });
+    // Puede ser negativa: la pagina "actual" es la que mas se ve, y el borde
+    // de arriba de la pantalla puede estar todavia en la anterior.
+    const frac = w && w.offsetHeight ? Math.min(0.9999, Math.max(-0.9999, off / w.offsetHeight)) : 0;
+    saveProgress({ page: pdfPage, total: pdfTotal, offset: off, frac: Math.round(frac * 10000) / 10000 });
   }
   // El observer solo avisa al CAMBIAR de pagina; sin esto, moverse dentro de
   // una pagina larga no quedaba guardado. Guardar es solo escribir en

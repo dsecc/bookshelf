@@ -1049,24 +1049,23 @@ def rename_collection(col_id):
 
 # ── Progreso entre dispositivos ───────────────────────────────────────────────
 # Cada dispositivo guarda su propia fila (el progreso es local primero, ver
-# progress.js), pero lo que se muestra es el mejor de todos: el ultimo lugar
-# donde se leyo, en cualquier dispositivo. Abrir un libro guarda la posicion
-# en la que arranca (pagina 1, 0%): eso no cuenta como lectura, asi un
-# dispositivo nuevo no tapa lo leido en otro.
-def progress_is_start(d):
+# progress.js), pero lo que se muestra es el mejor de todos: la posicion MAS
+# AVANZADA a la que se llego en cualquier dispositivo (pedido del usuario: un
+# vistazo corto en otro dispositivo no tiene que tirar para atras lo leido).
+def progress_position(d):
+    """Que tan adentro del libro: pagina (+ fraccion dentro de ella) en PDF,
+    porcentaje en EPUB/TXT/MD."""
     try:
         if d.get("page") is not None:
-            return int(d.get("page") or 0) <= 1
-        if d.get("percentage") is not None:
-            return float(d.get("percentage") or 0) <= 0
+            return float(d.get("page") or 0) + min(max(float(d.get("frac") or 0), -0.9999), 0.9999)
+        return float(d.get("percentage") or 0)
     except (TypeError, ValueError):
-        pass
-    return not d.get("cfi")
+        return 0.0
 
 def best_progress(rows):
     """De las filas (progress_data, updated_at) de un libro, la que se
-    muestra: lectura real antes que "abierto sin avanzar", y despues la mas
-    reciente. Devuelve el dict con ts y updated_at, o None."""
+    muestra: la mas avanzada; a igual posicion, la mas reciente. Devuelve el
+    dict con ts y updated_at, o None."""
     best = None
     for r in rows:
         try:
@@ -1078,7 +1077,7 @@ def best_progress(rows):
         ts = int(d.get("ts") or 0)
         if not ts and r["updated_at"]:
             ts = int(datetime.strptime(r["updated_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() * 1000)
-        key = (0 if progress_is_start(d) else 1, ts)
+        key = (progress_position(d), ts)
         if best is None or key > best[0]:
             best = (key, dict(d, ts=ts, updated_at=r["updated_at"]))
     return best[1] if best else None

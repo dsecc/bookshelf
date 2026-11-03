@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.14.2 — Gana lo más avanzado
+
+### Cambiado
+- **Entre dispositivos gana la posición más avanzada**, no la más reciente (pedido del usuario). Con "la más reciente", un vistazo corto en otro dispositivo tiraba para atrás lo leído: en producción, un libro leído hasta la página 18 en agosto abría en la 2 porque en septiembre se había abierto un momento en otros tres dispositivos. A igual posición gana la más reciente. Misma regla en el servidor (`best_progress`) y en el cliente (`progress.js`), así que también vale para la copia local y para las tarjetas.
+
+### Corregido
+- **La posición dentro de la página no cruzaba bien entre pantallas.** El modo scroll del PDF guardaba el desplazamiento dentro de la página en píxeles, que dependen del ancho: una página mide ~550 px en el celu y ~1200 en la PC. Ahora guarda también la fracción de la página (`frac`, puede ser negativa: la página "actual" es la que más se ve, y el borde de la pantalla puede estar todavía en la anterior) y la usa al reabrir. Los guardados viejos, sin `frac`, siguen usando los píxeles.
+
+### Notas
+- `VERSION` del service worker: `v28` → `v29`.
+- Verificado: página 18 vieja contra aperturas en la 2 y la 3 más nuevas y una "página 1" de hoy → abre en la 18 (y la tarjeta dice 18). Leído hasta la mitad de la página 25 en el celu (390 px) → la PC (1440 px) abre en la página 25 al 51 % de la hoja.
+
 ## v1.14.1 — El progreso te sigue entre dispositivos
 
 ### Corregido

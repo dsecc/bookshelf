@@ -63,24 +63,22 @@ const Progress = (() => {
   }
 
   // ── Leer ─────────────────────────────────────────────────────────────────
-  // El progreso sigue al libro entre dispositivos: gana el ultimo lugar donde
-  // se leyo, en cualquiera. El servidor manda el mejor de todos (?latest=1) y
-  // se compara con la copia local, que sigue siendo la fuente de verdad sin
-  // conexion. Abrir un libro guarda donde arranca (pagina 1, 0%): eso no
-  // cuenta como lectura, asi no tapa lo leido en otro lado. Misma regla que
-  // best_progress en app.py.
-  function isStart(d) {
+  // El progreso sigue al libro entre dispositivos: gana la posicion MAS
+  // AVANZADA a la que se llego en cualquiera (un vistazo corto en otro
+  // dispositivo no tira para atras lo leido). El servidor manda la mejor de
+  // todas (?latest=1) y se compara con la copia local, que sigue siendo la
+  // fuente de verdad sin conexion. Misma regla que best_progress en app.py.
+  function position(d) {
     d = d || {};
-    if (d.page != null) return Number(d.page) <= 1;
-    if (d.percentage != null) return Number(d.percentage) <= 0;
-    return !d.cfi;
+    if (d.page != null) return Number(d.page) + Math.min(Math.max(Number(d.frac) || 0, -0.9999), 0.9999);
+    return Number(d.percentage) || 0;
   }
-  // a y b son { data, ts } o null.
+  // a y b son { data, ts } o null. A igual posicion, la mas reciente.
   function pick(a, b) {
     if (!a) return b;
     if (!b) return a;
-    const sa = isStart(a.data), sb = isStart(b.data);
-    if (sa !== sb) return sa ? b : a;
+    const pa = position(a.data), pb = position(b.data);
+    if (pa !== pb) return pb > pa ? b : a;
     return (b.ts || 0) > (a.ts || 0) ? b : a;
   }
   function fromServer(remote) {
