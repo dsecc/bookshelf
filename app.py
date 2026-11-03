@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.16.6"
+APP_VERSION = "1.16.7"
 
 @app.context_processor
 def inject_ver():
@@ -47,6 +47,9 @@ def load_or_create_secret_key():
 
 app.secret_key = load_or_create_secret_key()
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+# La cookie de sesion no viaja en pedidos que arma otro sitio (un form o un
+# fetch desde otra pagina no puede actuar con tu sesion). HttpOnly ya viene.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 
@@ -1640,40 +1643,23 @@ def mark_notification_seen(share_id):
 @app.route("/api/about")
 @login_required
 def about():
-    import sys, platform
+    import sys
     try:
         import fitz
         mupdf_ver = fitz.version[0]
     except:
         mupdf_ver = "N/A"
     try:
-        import PIL
-        pillow_ver = PIL.__version__
-    except:
-        pillow_ver = "N/A"
-    try:
         import flask
         flask_ver = flask.__version__
     except:
         flask_ver = "N/A"
-    try:
-        import werkzeug
-        werkzeug_ver = werkzeug.__version__
-    except:
-        werkzeug_ver = "N/A"
     return jsonify({
+        # Solo lo que muestra la tarjeta de creditos: nada de rutas del servidor.
         "version": APP_VERSION,
         "python": sys.version.split()[0],
-        "platform": platform.system() + " " + platform.release(),
         "flask": flask_ver,
-        "werkzeug": werkzeug_ver,
         "pymupdf": mupdf_ver,
-        "pillow": pillow_ver,
-        "sqlite": __import__("sqlite3").sqlite_version,
-        "uploads_dir": UPLOAD_FOLDER,
-        "data_dir": os.path.dirname(DB_PATH),
-        "db_path": DB_PATH,
-        "covers_dir": COVERS_FOLDER,
     })
 
 

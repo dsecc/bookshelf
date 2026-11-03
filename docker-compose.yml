@@ -2,16 +2,20 @@ services:
   bookshelf:
     build: .
     image: bookshelf:1.15
-    container_name: bookshelf
+    container_name: ${BOOKSHELF_CONTAINER:-bookshelf}
     restart: unless-stopped
-    # Corre como el usuario del servidor (santino, 1000), no como root: asi las
-    # carpetas y archivos que crea la app son suyos, y se pueden dejar libros
-    # a mano por SSH en uploads/<usuario>/. data/ y uploads/ tienen que ser de
-    # ese usuario (chown una vez). HOME: gunicorn crea su socket de control
-    # ahi, y /root no es escribible para un usuario comun.
-    user: "1000:1000"
+    # Corre como un usuario comun, no como root: asi las carpetas y archivos
+    # que crea la app son suyos, y se pueden dejar libros a mano por SSH en
+    # uploads/<usuario>/. data/ y uploads/ tienen que ser de ese usuario.
+    # setup.sh pone el tuyo en .env; sin .env, 1000 (y el puerto, 8090).
+    # HOME: gunicorn crea su socket de control ahi, y /root no es escribible
+    # para un usuario comun.
+    user: "${BOOKSHELF_UID:-1000}:${BOOKSHELF_GID:-1000}"
     ports:
-      - "8090:5000"
+      # BOOKSHELF_BIND=127.0.0.1 en .env: solo se entra desde la misma maquina
+      # (por ejemplo, a traves de tailscale serve con HTTPS). Sin eso, desde
+      # toda la red local por HTTP.
+      - "${BOOKSHELF_BIND:-0.0.0.0}:${BOOKSHELF_PORT:-8090}:5000"
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads

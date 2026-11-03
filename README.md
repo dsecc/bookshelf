@@ -1,6 +1,6 @@
 # 📚 Bookshelf
 
-**v1.16.6** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
+**v1.16.7** — ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones.
 
 Tu biblioteca personal self-hosted. Drag & drop de libros, lector integrado, bookmarks y progreso sincronizado, con soporte multiusuario.
 
@@ -33,15 +33,35 @@ Celu y PC comparten la misma interfaz: **dos barras de vidrio flotando sobre los
 
 ## Instalación
 
+Hace falta **git** y **Docker** (con Compose). Sirve Linux, macOS o Windows (desde WSL o Git Bash, con Docker Desktop).
+
 ```bash
 git clone https://github.com/dsecc/bookshelf.git
 cd bookshelf
-docker compose up -d --build
+./setup.sh
 ```
 
-Abrí `http://localhost:8090` (o `http://IP-DEL-SERVIDOR:8090` si es un servidor remoto) y entrá con `admin` / `admin123`. `data/` y `uploads/` se crean solos en el primer arranque — ahí vive todo lo tuyo, y nunca se suben a git.
+Eso es todo. `setup.sh` construye la imagen, levanta el contenedor en el puerto **8090**, espera a que responda y al final te muestra:
 
-> Si el Docker del servidor es viejo (20.10 o anterior) no trae el plugin v2 y `docker compose` no existe: usá `docker-compose` con guion, el binario standalone.
+- la dirección para entrar (en esa máquina y en tu red),
+- **la contraseña del administrador**, generada al azar la primera vez (no queda `admin123`). Guardala: no se vuelve a mostrar.
+
+Después entrá a `http://localhost:8090/admin`, creá tu usuario y usá la biblioteca con él (el admin no tiene biblioteca propia). También se puede crear desde la terminal: `./manage.sh create-user tu_nombre tu_clave`.
+
+| Comando | Qué hace |
+|---|---|
+| `./setup.sh --port 9000` | Lo levanta en otro puerto (queda guardado para la próxima). |
+| `./setup.sh --update` | Baja la última versión (`git pull`) y reconstruye. Los datos no se tocan. |
+| `./setup.sh` otra vez | Reconstruye y levanta de nuevo, sin tocar los datos ni la contraseña. |
+| `./manage.sh reset-password admin` | Cambia la contraseña del admin (si te la olvidaste). |
+
+Tus datos viven en `data/` (la base, la clave de sesión y las portadas) y `uploads/` (los libros), dentro de la carpeta del repo. Están en `.gitignore`: nunca se suben a git. `setup.sh` guarda el puerto y el usuario con el que corre el contenedor en `.env` (también ignorado), así que un `docker compose up -d --build` a mano usa lo mismo.
+
+> **Solo desde la misma máquina**: con `BOOKSHELF_BIND=127.0.0.1 ./setup.sh` el puerto no se abre a la red local (útil si entrás por HTTPS con `tailscale serve`, ver más abajo). Queda guardado en `.env`.
+>
+> Si ya tenés otro contenedor que se llama `bookshelf`: `BOOKSHELF_CONTAINER=otro_nombre ./setup.sh`.
+>
+> Si el Docker es viejo (20.10 o anterior) y no trae `docker compose`, el script usa `docker-compose` (con guion) solo.
 
 ## Desplegar y actualizar
 
@@ -99,10 +119,7 @@ Antes de levantar, verificá que estén las tres cosas que importan: `data/secre
 
 Cada usuario tiene su propia biblioteca (libros, colecciones, progreso, bookmarks, highlights), completamente aislada de la de los demás. Además existe una cuenta de **administrador**, que no tiene biblioteca propia: solo sirve para crear y borrar usuarios desde `/admin`.
 
-En una instalación nueva (clonada desde cero, sin datos previos) solo se crea automáticamente:
-- `admin` / `admin123` — cuenta de administración, sin biblioteca propia.
-
-**Cambiá esta contraseña apenas levantes el proyecto**, y creá desde `/admin` las cuentas reales de cada persona.
+En una instalación nueva (clonada desde cero, sin datos previos) solo se crea automáticamente la cuenta `admin`, sin biblioteca propia. Con `./setup.sh` su contraseña se genera al azar y se muestra una vez; si levantás el contenedor a mano (`docker compose up`), arranca como `admin` / `admin123` y **hay que cambiarla apenas lo levantes** (`./manage.sh reset-password admin`). Después creá desde `/admin` las cuentas reales de cada persona.
 
 ### Cambiar la contrasena propia
 

@@ -2,6 +2,19 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.16.7 — Instalar con un comando, y menos a la vista
+
+### Agregado
+- **`setup.sh`: clonar y levantar con un solo comando.** Chequea Docker y Compose (plugin o `docker-compose`), crea `data/` y `uploads/` con tu usuario (si las crea Docker son de root y la app no puede escribir), construye, levanta, espera a que responda y muestra la dirección. La primera vez **genera la contraseña del admin al azar** en lugar de dejar `admin123`. `--port` cambia el puerto, `--update` hace `git pull` y reconstruye; correrlo de nuevo no toca los datos ni la contraseña. Guarda puerto, usuario y nombre del contenedor en `.env` (ignorado por git), que `docker compose` lee solo.
+- `docker-compose.yml` toma de `.env` el puerto (`BOOKSHELF_PORT`), el usuario (`BOOKSHELF_UID`/`GID`), el nombre del contenedor (`BOOKSHELF_CONTAINER`) y la interfaz (`BOOKSHELF_BIND=127.0.0.1` para no abrir el puerto a la red local). Sin `.env`, lo de siempre: usuario 1000, puerto 8090.
+- Tutorial de instalación en el README.
+
+### Seguridad
+- `/api/about` ya no devuelve rutas del servidor (carpeta de subidas, base de datos, portadas) ni el sistema operativo: solo lo que muestra la tarjeta de creditos.
+- La cookie de sesion va con `SameSite=Lax` (ademas de `HttpOnly`): otra pagina no puede mandar pedidos con tu sesion.
+- `.env` y `docs/` excluidos de la imagen de Docker.
+- `manage.sh` funciona tambien sin terminal (desde un script o cron) y lee el nombre del contenedor de `.env`.
+
 ## v1.16.6 — El arbol sin scroll propio
 
 ### Cambiado
