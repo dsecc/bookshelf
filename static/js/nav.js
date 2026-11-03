@@ -6,7 +6,7 @@
 // misma estirandose. Dos fases (montar / .open) porque un clip-path solo anima
 // si el elemento ya estuvo en el DOM con el valor inicial aplicado; con una
 // sola pasada el navegador colapsa ambos estados y no se ve la transicion.
-const NAV_SHEET_CLOSE_MS = 220;
+const NAV_SHEET_CLOSE_MS = 340;
 let _navSheetClosing = null;
 // El callback de limpieza vive aca y no en el que cierra, porque el panel se
 // puede cerrar por varios caminos: el fondo, una fila que navega, o codigo
@@ -101,7 +101,8 @@ function navSheetRow({ label, icon, detail, active, onClick }) {
 // biblioteca y el lector para los selectores: devuelve [{c, depth}] en orden
 // de arbol, alfabetico en cada nivel.
 function colTree(collections) {
-  const byName = (a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+  // Alfabetico, salvo Temporal: siempre ultima (fija, aunque se creen otras).
+  const byName = (a, b) => (a.is_temp - b.is_temp) || a.name.localeCompare(b.name, "es", { sensitivity: "base" });
   const out = [];
   const walk = (parentId, depth) => collections
     .filter(c => (c.parent_id == null ? null : c.parent_id) === parentId)
@@ -125,7 +126,7 @@ function colOptionsHTML(collections, selectedId) {
 // Se anima el alto del bloque de hijas (y se funde), con la misma curva que la
 // pildora. La hoja del celu toma su alto del contenido, asi que crece sola
 // junto con la lista. Sin animacion si el sistema pide reducir movimiento.
-const TREE_MS = 300;
+const TREE_MS = 380;
 const _treeQuieto = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function _treeAnimar(el, desde, hasta, alTerminar) {

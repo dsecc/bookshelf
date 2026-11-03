@@ -31,6 +31,7 @@ async function init() {
   // refresh() va aparte: sin conexion sus fetch pueden fallar, y si eso corta
   // el init la UI queda sin ningun handler enganchado (nada clickeable).
   try { await refresh(); } catch (e) { console.error("refresh error:", e); }
+  hideSplash();
   try {
     bindEvents();
     initColToggle();
@@ -40,6 +41,24 @@ async function init() {
   } catch(e) {
     console.error("init error:", e);
   }
+}
+
+// ── Pantalla de inicio ───────────────────────────────────────────────────────
+// Se va cuando la biblioteca ya esta armada: libros dibujados y las primeras
+// tapas cargadas (con tope, para no quedar esperando una tapa lenta). Se
+// muestra un minimo para que el logo no sea un parpadeo.
+const SPLASH_MIN = 700, SPLASH_MAX_TAPAS = 1600;
+async function hideSplash() {
+  const sp = document.getElementById("splash");
+  if (!sp || sp.hidden) return;
+  const tapas = [...document.querySelectorAll("#booksContainer .book-cover img")].slice(0, 9)
+    .map(img => img.complete ? null : new Promise(r => { img.addEventListener("load", r, { once: true }); img.addEventListener("error", r, { once: true }); }))
+    .filter(Boolean);
+  await Promise.race([Promise.all(tapas), new Promise(r => setTimeout(r, SPLASH_MAX_TAPAS))]);
+  const falta = SPLASH_MIN - performance.now();
+  if (falta > 0) await new Promise(r => setTimeout(r, falta));
+  sp.classList.add("fuera");
+  setTimeout(() => sp.remove(), 520);
 }
 
 // GET de JSON que no explota sin conexion: devuelve el fallback.
@@ -99,6 +118,7 @@ async function openCollection(id) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   setView("biblioteca");
   renderSidebar();
+  renderLibTopNav();
   books = await fetchJSON("/api/books?collection_id=" + id, []);
   renderBooks();
 }
@@ -308,8 +328,7 @@ function makeViewHead() {
   const head = document.createElement("div");
   if (trashView) {
     head.className = "view-head trash-head";
-    head.innerHTML = "<div class='view-head-title'>Papelera</div>" +
-      "<p class='view-head-note'>Lo eliminado se borra solo a los 30 dias. Hasta entonces se puede restaurar.</p>";
+    head.innerHTML = "<p class='view-head-note'>Lo eliminado se borra solo a los 30 dias. Hasta entonces se puede restaurar.</p>";
     if (books.length) {
       const btn = document.createElement("button");
       btn.className = "btn-danger";
@@ -322,45 +341,66 @@ function makeViewHead() {
   if (activeColId == null || offlineView) return null;
   const c = colById(activeColId);
   if (!c) return null;
+  // El nombre ya lo dice la topbar; aca solo lo que agrega algo (Temporal).
+  if (!c.is_temp) return null;
   head.className = "view-head col-head";
-
-  head.appendChild(Object.assign(document.createElement("div"), { className: "view-head-title", textContent: c.name }));
-  if (c.is_temp) head.appendChild(Object.assign(document.createElement("p"), {
+  head.appendChild(Object.assign(document.createElement("p"), {
     className: "view-head-note", textContent: "Lo que dejes aca se va a la papelera a los 30 dias." }));
 
   return head;
 }
 
-// ── Topbar flotante de la coleccion (celu) ───────────────────────────────────
-// Solo DONDE ESTAS, no adonde podes ir: la ruta escrita como en el disco,
-// "Ciberseguridad / Malware", con la actual resaltada; tocar un tramo anterior
-// lleva ahi (eso es subir). Para entrar a una subcarpeta esta la hoja de
-// colecciones. Aparece solo dentro de una subcarpeta: en el primer nivel la
-// ruta seria una sola palabra, igual al titulo que ya esta debajo.
+// ── Topbar flotante (celu): donde estas ──────────────────────────────────────
+// Reemplaza al logo de arriba. Siempre a la vista en la biblioteca, con la
+// ruta como en el disco: "/" es la raiz (la biblioteca general), y adentro
+// "/ Ciberseguridad / Malware". Las vistas especiales son un tramo mas
+// ("/ Papelera", "/ Ajustes"). Cada tramo lleva ahi; la actual, resaltada.
+// Solo donde estas, no adonde podes ir (para eso esta la hoja de colecciones).
+function irARaiz() { const b = document.getElementById("bnBiblioteca"); if (b) b.click(); }
 function renderLibTopNav() {
   const bar = document.getElementById("libTopNav");
   const box = document.getElementById("libTopNavScroll");
   if (!bar) return;
-  const c = activeColId != null && !offlineView && !trashView ? colById(activeColId) : null;
-  const mostrar = !!c && c.parent_id != null;
-  bar.hidden = !mostrar;
-  document.body.classList.toggle("con-topnav", mostrar);
-  if (!mostrar) return;
+  const vista = vistaActual();
+  const tramos = [];  // [texto, onClick | null]
+  if (vista === "settings") tramos.push(["Ajustes", null]);
+  else if (vista === "about") tramos.push(["Informacion", null]);
+  else if (trashView) tramos.push(["Papelera", null]);
+  else if (offlineView) tramos.push(["Sin conexion", null]);
+  else if (activeColId != null && colById(activeColId)) {
+    const camino = ancestorsOf(activeColId);
+    camino.forEach((id, i) => tramos.push([colById(id).name, i < camino.length - 1 ? () => openCollection(id) : null]));
+  }
+  bar.hidden = false;
+  document.body.classList.add("con-topnav");
   box.innerHTML = "";
-  let actual = null;
-  ancestorsOf(c.id).forEach((id, i) => {
+  const raiz = document.createElement("button");
+  raiz.className = "ltn-crumb ltn-root" + (tramos.length ? "" : " current");
+  raiz.textContent = "/";
+  raiz.title = "Biblioteca";
+  raiz.setAttribute("aria-label", "Biblioteca");
+  if (tramos.length) raiz.onclick = irARaiz;
+  box.appendChild(raiz);
+  let actual = tramos.length ? null : raiz;
+  tramos.forEach(([txt, fn], i) => {
     if (i) box.appendChild(Object.assign(document.createElement("span"), { className: "ltn-slash", textContent: "/" }));
     const b = document.createElement("button");
-    b.className = "ltn-crumb" + (id === c.id ? " current" : "");
-    b.textContent = colById(id).name;
-    if (id === c.id) { b.setAttribute("aria-current", "page"); actual = b; }
-    else b.onclick = () => openCollection(id);
+    b.className = "ltn-crumb" + (fn ? "" : " current");
+    b.textContent = txt;
+    if (fn) b.onclick = fn; else { b.setAttribute("aria-current", "page"); actual = b; }
     box.appendChild(b);
   });
-  // Arranca desde el principio; si la ruta no entra, se desliza lo justo para
-  // que se vea la carpeta actual.
+  // La pildora mide lo que muestra (crece o se achica animada, ver main.css).
+  // Si la ruta no entra, llega al maximo y se desliza lo justo para que se vea
+  // la actual.
+  const ultimo = box.lastElementChild;
+  const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
+  const necesita = Math.ceil(ultimo.offsetLeft - box.firstElementChild.offsetLeft + ultimo.offsetWidth + pad * 2 + 2);
+  const maximo = window.innerWidth - 2 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav-bar-side")) || 16);
+  bar.style.width = Math.max(necesita, bar.offsetHeight) + "px";
+  bar.classList.toggle("desborda", necesita > maximo);
   requestAnimationFrame(() => {
-    const fin = actual ? actual.offsetLeft + actual.offsetWidth + 16 : 0;
+    const fin = actual ? actual.offsetLeft - box.firstElementChild.offsetLeft + actual.offsetWidth + pad + 16 : 0;
     box.scrollLeft = Math.max(0, fin - box.clientWidth);
   });
 }
@@ -673,15 +713,11 @@ function vistaActual() {
 }
 
 function setView(view) {
-  // La topbar de la coleccion es de la vista de libros.
-  if (view !== "biblioteca") {
-    const t = document.getElementById("libTopNav");
-    if (t) t.hidden = true;
-    document.body.classList.remove("con-topnav");
-  }
   document.getElementById("viewBiblioteca").style.display = view === "biblioteca" ? "" : "none";
   document.getElementById("viewAbout").style.display     = view === "about"       ? "" : "none";
   document.getElementById("viewSettings").style.display  = view === "settings"    ? "" : "none";
+  // La topbar dice donde estas: tambien en Ajustes e Informacion.
+  if (view !== "biblioteca") renderLibTopNav();
 }
 
 function setNavActive(id) {
@@ -1070,7 +1106,6 @@ function initBottomNav() {
     ind.style.width = "calc(" + 100 / items.length + "% - 12px)";
   }
 
-  initHeroFade();
   initPasswordForm();
 
   const nav = document.getElementById("bottomNav");
@@ -1163,10 +1198,6 @@ function openMoreSheet() {
     out:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
   };
   const s = openNavSheet(body => {
-    const head = document.createElement("div");
-    head.className = "nav-sheet-title";
-    head.innerHTML = "<span>Mas</span>";
-    body.appendChild(head);
 
     // Notificaciones: el contador del boton original se replica como detalle.
     const badge = document.getElementById("notifBadge");
@@ -1270,31 +1301,6 @@ function initPasswordForm() {
   });
 }
 
-// ── Titulo de marca ──────────────────────────────────────────────────────────
-// Se MANTIENE los primeros HOLD px de scroll y recien despues se desvanece a lo
-// largo de FADE. Apagarlo de entrada se sentia como que se escapaba; con la
-// permanencia acompana un tramo y se va cuando el contenido ya tomo la
-// pantalla. Sube un poco mientras se apaga, para que no se quede clavado.
-const HERO_HOLD = 90;
-const HERO_FADE = 120;
-
-function initHeroFade() {
-  const hero = document.getElementById("libHero");
-  if (!hero) return;
-  let pedido = false;
-  const pintar = () => {
-    pedido = false;
-    const y = window.scrollY || document.documentElement.scrollTop || 0;
-    const t = Math.min(1, Math.max(0, (y - HERO_HOLD) / HERO_FADE));
-    hero.style.opacity = String(1 - t);
-    hero.style.transform = "translateY(" + (-10 * t).toFixed(1) + "px)";
-  };
-  // rAF: el scroll dispara muchisimo y esto solo toca una propiedad.
-  window.addEventListener("scroll", () => {
-    if (!pedido) { pedido = true; requestAnimationFrame(pintar); }
-  }, { passive: true });
-  pintar();
-}
 
 // Subir: mismo panel. En vez de duplicar el formulario, se MUEVEN los nodos
 // del modal adentro y se devuelven al cerrar — asi los handlers enganchados por

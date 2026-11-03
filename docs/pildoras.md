@@ -1,6 +1,6 @@
 # Spec: el sistema de pildoras
 
-Estado a v1.15.5. Es la base para v1.16, donde la interfaz de PC pasa a ser la
+Estado a v1.15.6. Es la base para v1.16, donde la interfaz de PC pasa a ser la
 del celu.
 
 ## 1. Idea
@@ -33,7 +33,7 @@ Tres consecuencias que valen para todo lo nuevo:
 | `--glass-fill` | `--text` al 7% | campos, segmentados, botones secundarios adentro |
 | `--glass-fill-strong` | `--text` al 11% | estado presionado / campo en edicion |
 | `--nav-active-bg` | blanco al 7% | fila o item activo / hover |
-| `--nav-ease` | `cubic-bezier(.4,0,.2,1)` | toda transicion de la navegacion |
+| `--nav-ease` | `cubic-bezier(.32,.72,0,1)` (resorte: arranca agil, se asienta despacio) | toda transicion de la navegacion |
 
 No usar `--surface2`/`--surface3` (opacos) adentro de una pieza de vidrio.
 
@@ -83,7 +83,7 @@ en el celu y solo cuando hace falta** (atributo `hidden` si no). Con
 | Donde | Contenido |
 |---|---|
 | Lector (`#readerTopNav`) | Ajustes de letra de TXT/MD/EPUB: fuente, A− tamaño A+, tres temas. El mismo nodo (`#textCtl`) que en la PC va en la pildora; se muda segun el ancho (`placeTextCtl`). |
-| Biblioteca (`#libTopNav`) | Solo **donde estas**: la ruta `Ciberseguridad / Malware`, la actual resaltada, cada tramo anterior lleva ahi. Aparece solo dentro de una subcarpeta. Desliza de costado si no entra. |
+| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
 
 ### 4.3 Panel (`.nav-sheet`, `openNavSheet(build, onClose)` en nav.js)
 La pildora estirandose hacia arriba. Mismo `left/right/bottom` que la pildora,
@@ -95,15 +95,18 @@ notch; en PC `min(80vh, 760px)`).
    iconos (opacidad 0 en .12s) y deja de dibujar fondo, borde, sombra y blur,
    y no recibe toques.
 2. El panel arranca recortado (`clip-path: inset(calc(100% - alto-de-barra) 0 0 0 round 999px)`)
-   con la forma exacta de la pildora, en el mismo lugar, y se abre en .32s a
+   con la forma exacta de la pildora, en el mismo lugar, y se abre en .52s a
    `inset(-80px round 108px)` (los -80px dejan ver la sombra; la forma la da
-   el `border-radius`). Termina con un rebote chico (`navLiquid`: `scaleY`
-   .985 → 1, .5s, `cubic-bezier(.25,1.35,.45,1)`, desde abajo).
-3. El contenido aparece con un fundido corto, .08s despues.
+   el `border-radius`). Termina con un rebote leve (`navLiquid`: `scaleY`
+   .99 → 1, .7s, `cubic-bezier(.3,1.18,.4,1)`, desde abajo).
+3. El contenido aparece con un fundido de .32s, .16s despues.
 4. Al cerrar (fondo, Escape, una accion), el panel vuelve a la forma de la
-   pildora (220ms) y **recien al terminar** se saca la clase: la pildora
-   recupera fondo e iconos en el mismo lugar, sin salto.
-5. `prefers-reduced-motion`: sin animacion.
+   pildora (.34s, `NAV_SHEET_CLOSE_MS`) y **recien al terminar** se saca la
+   clase: la pildora recupera fondo e iconos (.3s) en el mismo lugar.
+5. **Sin lugar reservado abajo**: como la barra se transforma (sus iconos se
+   van), el panel termina con su padding normal, sin la franja del alto de la
+   barra.
+6. `prefers-reduced-motion`: sin animacion.
 
 **Fondo:** `.nav-sheet-backdrop` transparente; solo atrapa el toque afuera para
 cerrar. No oscurece.
@@ -134,6 +137,30 @@ poligonal) y queda solo en los extremos, donde tapa el hueco de las esquinas
 redondas de la barra: asi no hay doble capa a traves de la pildora. Suben con el
 teclado (`--kb-offset`). Input de 16px.
 
+### 4.5 Pantalla de inicio (`#splash`, biblioteca)
+Al abrir la app **desde cero** (una vez por sesion: `sessionStorage`), el logo
+y el nombre en el centro, con una entrada suave y un respiro. Se va (fundido y
+`scale(1.04)`, .5s) cuando la biblioteca ya esta armada: libros dibujados y las
+primeras 9 tapas cargadas (tope 1,6s), con un minimo de .7s desde que abrio.
+Navegar adentro (volver del lector) no la repite.
+
+### 4.6 Orden de las colecciones
+Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
+(`colTree` en nav.js). Vale para la hoja, el sidebar y los selectores.
+
+### 4.7 Duraciones
+
+| Animacion | Duracion |
+|---|---|
+| Panel: abrir / cerrar | .52s / .34s (+ rebote .7s) |
+| Contenido del panel | .32s, .16s de demora |
+| Iconos de la barra: irse / volver | .18s / .3s |
+| Desplegar / plegar subcarpetas (`TREE_MS`) | .38s |
+| Buscador y barra de bookmark | .44s |
+| Esconder / mostrar las pildoras | .44s (opacidad .32s) |
+| Resaltado deslizante de la barra | .38s |
+| Topbar de la biblioteca (ancho) | .5s |
+
 ## 5. Esconder la navegacion
 
 | Donde | Gesto | Efecto |
@@ -149,11 +176,11 @@ teclado (`--kb-offset`). Input de 16px.
 |---|---|---|---|---|
 | Biblioteca | celu | Colecciones | panel | Todos, Sin conexion, Papelera, arbol de colecciones (flechita despliega sin cerrar), + Nueva |
 | Biblioteca | celu | Subir | panel | contenido del modal de subida mudado al panel |
-| Biblioteca | celu | Mas | panel | Notificaciones, Informacion, Ajustes, Cerrar sesion |
+| Biblioteca | celu | Mas (tres rayitas) | panel, sin titulo | Notificaciones, Informacion, Ajustes, Cerrar sesion |
 | Biblioteca | celu | Mas → Notificaciones | panel | lista del modal mudada al panel |
 | Biblioteca | celu | tocar un libro en la Papelera | panel | Restaurar / Eliminar definitivamente |
 | Biblioteca | celu | Buscar | barra (`#libSearchBar`) | el input real se muda desde la topbar |
-| Biblioteca | celu | dentro de una subcarpeta | topbar | la ruta |
+| Biblioteca | celu | siempre | topbar | donde estas (`/`, la ruta o la vista especial) |
 | Lector | celu + PC | ruedita | panel | titulo editable, Lectura (PC, PDF), acciones, arbol de coleccion + Mover |
 | Lector | celu | Bookmark | panel | Nuevo / Ver |
 | Lector | PC | Bookmark | panel | la lista, con Nuevo abajo |

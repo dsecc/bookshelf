@@ -422,7 +422,7 @@ function setReaderNavHidden(ocultar) {
   if (ocultar === _rnHidden) return;
   _rnHidden = ocultar;
   if (ocultar) { closeNavSheet(); toggleSearchBar(false); toggleBookmarkBar(false); }
-  const t = "transform .32s var(--nav-ease), opacity .24s var(--nav-ease)";
+  const t = "transform .44s var(--nav-ease), opacity .32s var(--nav-ease)";
   const nav = document.getElementById("readerNav");
   if (nav) {
     nav.style.transition = t;

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.15.6 — Pantalla de inicio y la topbar que dice donde estas
+
+### Agregado
+- **Pantalla de inicio**: al abrir la app desde cero (celu o PC), el logo y el nombre en el centro mientras carga; se va cuando la biblioteca ya esta armada (libros dibujados y las primeras tapas, con tope) y aparecen los libros listos. Una vez por sesion: volver del lector no la repite.
+
+### Cambiado
+- **Sin logo ni nombre arriba en el celu: la topbar flotante esta siempre y dice donde estas.** `/` es la raiz (la biblioteca general); en una coleccion, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi. El titulo grande que se repetia arriba de la grilla se fue (queda la nota de Temporal y la de la Papelera).
+- **La topbar mide lo que muestra**: centrada, en la raiz es una pildorita con la `/` y al entrar a una carpeta se estira animada hasta abarcar la ruta (y se achica al volver). Si no entra, llega al ancho maximo y desliza.
+- **Animaciones mas fluidas y suaves**: curva tipo resorte en toda la navegacion (`cubic-bezier(.32,.72,0,1)`); la barra transformandose en el panel tarda .52s (antes .32s) con un rebote mas leve, el contenido aparece mas despacio, el cierre se alarga a .34s; desplegar carpetas, los buscadores y esconder las pildoras tambien suben de duracion.
+- **Los paneles ya no dejan un espacio vacio abajo** (era el lugar de los iconos de la barra, que ahora se transforma en el panel).
+- **Temporal siempre ultima**, fija, en todas las listas de colecciones (hoja del celu, sidebar de la PC, selectores).
+- El panel de las tres rayitas ya no lleva el titulo "Mas".
+
+### Notas
+- `VERSION` del service worker: `v33` → `v34`. Spec actualizado (`docs/pildoras.md`: 4.2, 4.3, 4.5-4.7).
+
 ## v1.15.5 — Un solo vidrio, que se estira
 
 Relevamiento de todos los lugares que usan la pildora (celu y PC): 10 paneles, 3 barras que salen de atras, 2 pildoras y 2 topbars flotantes. El sistema quedo documentado en `docs/pildoras.md`, base para v1.16.

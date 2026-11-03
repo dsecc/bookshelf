@@ -336,7 +336,7 @@ html[data-text-theme] body { background: var(--tx-bg); }
 
   /* Paneles y buscador con medidas de PC: filas mas bajas y hover. */
   .nav-sheet { max-height: min(80vh, 760px); }
-  .nav-sheet-body { padding: 1.1rem .9rem var(--nav-bar-height); }
+  .nav-sheet-body { padding: 1.1rem .9rem .9rem; }
   .nav-sheet-row { min-height: 40px; padding: .45rem .8rem; font-size: .86rem; }
   .nav-sheet-row:hover { background: var(--nav-active-bg); color: var(--text); }
   .nav-sheet-row:hover svg { color: var(--text); }

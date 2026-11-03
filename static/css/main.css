@@ -88,9 +88,20 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 /* Topbar flotante de la coleccion (celu): solo la ruta "Ciberseguridad /
    Malware", deslizable si no entra. El vidrio y la posicion son los de .top-nav
    (nav.css). */
+/* Mide lo que muestra: en la raiz es una pildorita con la "/", y al entrar a
+   una carpeta se estira (animado) hasta abarcar la ruta. Centrada, crece hacia
+   los dos costados. El ancho lo pone renderLibTopNav; si la ruta no entra,
+   llega al maximo y recien ahi desliza (con los bordes esfumados). */
+.lib-top-nav {
+  left: 50%; right: auto; transform: translateX(-50%);
+  width: var(--top-nav-h); max-width: calc(100vw - 2 * var(--nav-bar-side));
+  padding: 0; transition: width .5s var(--nav-ease);
+}
 .lib-top-nav .ltn-scroll {
   display: flex; align-items: center; gap: 2px; width: 100%; height: 100%;
-  overflow-x: auto; scrollbar-width: none; padding: 0 10px;
+  overflow-x: auto; scrollbar-width: none; padding: 0 6px;
+}
+.lib-top-nav.desborda .ltn-scroll {
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
 }
@@ -241,7 +252,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .ajuste-ok    { font-size: .8rem; color: var(--accent); margin: .1rem 0 .6rem; }
 
 /* El titulo de marca es solo de mobile: en desktop estan la topbar y el sidebar. */
-.lib-hero { display: none; }
 
 @media (max-width: 640px) {
   .sidebar { display: none; }
@@ -576,31 +586,6 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
      unica navegacion. */
   .topbar { display: none; }
 
-  /* Titulo de marca: aparece al entrar y se va al scrollear. Puro adorno —
-     app.js le baja la opacidad con el scroll. El padding-top deja pasar la
-     safe area para que no quede debajo de la hora. */
-  .lib-hero {
-    /* sticky: se queda por delante mientras el contenido pasa por detras, en
-       vez de irse con el scroll. app.js lo mantiene un tramo y despues lo
-       desvanece. */
-    position: sticky; top: 0; z-index: 90;
-    display: flex; align-items: center; justify-content: center; gap: .5rem;
-    font-size: 1.35rem;
-    font-weight: 600;
-    letter-spacing: -.01em;
-    color: var(--text);
-    padding: calc(env(safe-area-inset-top, 0px) + 1.1rem) 1rem .9rem;
-    /* El degradado lo separa de las portadas que pasan por detras: sin el, el
-       texto quedaria ilegible encima de una tapa clara. Se va junto con el
-       titulo, porque es el fondo del mismo elemento. */
-    background: linear-gradient(to bottom,
-      var(--bg) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 60%, transparent) 80%, transparent 100%);
-    /* Nunca roba toques: el dedo siempre llega al libro que hay detras. */
-    pointer-events: none;
-    will-change: opacity, transform;
-  }
-  .lib-hero-logo:empty { display: none; }
-
   /* ── Topbar ── */
   /* Con viewport-fit=cover el contenido llega al borde fisico: la topbar
      tiene que bajar para no quedar debajo del notch / barra de estado. */
@@ -621,9 +606,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   .books-row .book-card { width: 110px; }
   .books-grid { gap: .9rem .6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .col-head { display: block; }
-  /* Con la topbar flotante el titulo de marca se va (ocuparia el mismo lugar)
-     y el contenido arranca debajo de ella. */
-  body.con-topnav .lib-hero { display: none; }
+  /* El contenido arranca debajo de la topbar flotante. */
   body.con-topnav .content { padding-top: calc(var(--top-nav-top) + var(--top-nav-h) + 14px); }
   .trash-head .view-head-title { display: block; width: 100%; }
   .trash-head .btn-danger { min-height: 44px; }
@@ -804,3 +787,22 @@ body.logging-out {
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255,255,255,.12);
 }
+
+/* ── Pantalla de inicio ── */
+.splash {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+  background: var(--bg); color: var(--text);
+  transition: opacity .5s cubic-bezier(.32,.72,0,1), transform .5s cubic-bezier(.32,.72,0,1);
+}
+.splash[hidden] { display: none; }
+.splash-logo { animation: splashIn .7s cubic-bezier(.32,.72,0,1) both, splashBreath 2.4s ease-in-out .7s infinite; }
+.splash-name { font-size: 1.35rem; font-weight: 600; letter-spacing: -.01em; animation: splashIn .7s cubic-bezier(.32,.72,0,1) .08s both; }
+.splash.fuera { opacity: 0; transform: scale(1.04); pointer-events: none; }
+@keyframes splashIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes splashBreath { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+@media (prefers-reduced-motion: reduce) { .splash-logo, .splash-name { animation: none; } }
+
+/* La raiz de la ruta: una "/" sola, un poco mas grande. */
+.ltn-root { font-size: 1.05rem; font-weight: 500; padding: 0 .65rem; }
+
