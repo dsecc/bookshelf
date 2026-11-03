@@ -348,7 +348,6 @@ html[data-text-theme] body { background: var(--tx-bg); }
   .nav-sheet-seg .vm-btn:hover:not(.active) { color: var(--text); }
   .nav-sheet-field input { font-size: .95rem; }
   .info-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.75rem; padding: 0 .4rem; }
-  .col-tree { max-height: 52vh; }
   .nav-search { --search-tuck: 26px; height: calc(48px + var(--search-tuck)); padding-left: 1.25rem; }
   .nav-search input { font-size: .95rem; }
   .nav-search .r-btn { width: 34px; height: 34px; }

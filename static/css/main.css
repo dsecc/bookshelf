@@ -935,7 +935,8 @@ body.logging-out {
   #bnUploadMobile { order: 4; } #bnNotif { order: 5; } #bnMore { order: 6; }
 
   /* Paneles y buscador con medidas de PC (como en el lector). */
-  .nav-sheet { max-height: min(78vh, 720px); }
+  /* Crece hasta debajo de la topbar; si no entra, scrollea el panel entero. */
+  .nav-sheet { max-height: calc(100vh - var(--nav-bar-bottom) - var(--top-nav-top) - var(--top-nav-h) - 12px); }
   .nav-sheet-body { padding: 1.1rem .9rem .9rem; }
   .nav-sheet-row { min-height: 40px; padding: .45rem .8rem; font-size: .86rem; }
   .nav-sheet-row:hover { background: var(--nav-active-bg); color: var(--text); }
@@ -943,7 +944,6 @@ body.logging-out {
   .nav-sheet-row.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
   .tree-chev { width: 36px; height: 36px; }
   .tree-chev:hover { background: var(--nav-active-bg); color: var(--text); }
-  .col-tree { max-height: 46vh; }
   .nav-search { height: calc(48px + var(--search-tuck)); padding-left: 1.25rem; }
   .nav-search input { font-size: .95rem; }
   .rows-home { gap: 20px; }

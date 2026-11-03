@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.16.6 — El arbol sin scroll propio
+
+### Cambiado
+- **El arbol para elegir coleccion (Subir, Nueva coleccion, libro recibido, mover un libro desde el lector) ya no tiene su propio scroll con barrita**: se ve entero y, si no entra, scrollea el panel completo, sin barra, como el resto de los paneles.
+- **PC: los paneles de la biblioteca crecen hasta debajo de la topbar** (antes tope en 78% de la pantalla).
+- `VERSION` del service worker: `v41` → `v42`.
+
 ## v1.16.5 — Ultimos leidos llena la primera pantalla (celu)
 
 ### Cambiado
