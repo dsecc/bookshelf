@@ -201,12 +201,16 @@ function navSheetRow({ label, icon, detail, active, onClick }) {
 // ── Arbol de colecciones ─────────────────────────────────────────────────────
 // Las colecciones son carpetas y pueden anidarse (parent_id). Lo usan la
 // biblioteca y el lector para los selectores: devuelve [{c, depth}] en orden
-// de arbol, alfabetico en cada nivel.
+// de arbol: en cada nivel, el orden elegido a mano (la flechita de la hoja de
+// colecciones) y despues alfabetico.
 function colTree(collections) {
-  // Alfabetico, salvo Temporal: siempre ultima (fija, aunque se creen otras).
-  // (_primero: una fila que va arriba de todo, como "Primer nivel" al crear.)
+  // Temporal siempre ultima (fija, aunque se creen otras). Las que nunca se
+  // ordenaron (sort_order null, p. ej. una recien creada) van despues de las
+  // ordenadas, alfabeticas. (_primero: una fila que va arriba de todo, como
+  // "Primer nivel" al crear.)
+  const orden = c => c.sort_order == null ? Infinity : c.sort_order;
   const byName = (a, b) => ((b._primero | 0) - (a._primero | 0)) || (a.is_temp - b.is_temp) ||
-    a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+    (orden(a) - orden(b) || 0) || a.name.localeCompare(b.name, "es", { sensitivity: "base" });
   const out = [];
   const walk = (parentId, depth) => collections
     .filter(c => (c.parent_id == null ? null : c.parent_id) === parentId)

@@ -877,6 +877,18 @@ body.logging-out {
   -webkit-tap-highlight-color: transparent;
 }
 .tree-pen:hover { opacity: 1; background: var(--nav-active-bg); }
+/* Ordenar: la flechita sube la carpeta un lugar. En la primera de cada nivel
+   no hay a donde subir: se va, pero deja su lugar (columnas parejas). */
+.tree-up {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: none; color: var(--text-muted); opacity: .6;
+  transition: background .25s var(--nav-ease), opacity .2s, transform .2s var(--nav-ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.tree-up:hover { opacity: 1; background: var(--nav-active-bg); }
+.tree-up:active { transform: translateY(-2px); }
+.tree-up.primera { opacity: 0; pointer-events: none; }
 .tree-chev-vacio { pointer-events: none; }
 .tree-pen > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transition: opacity .2s ease, transform .28s var(--nav-ease); }
 .tree-pen .ico-ok { opacity: 0; transform: rotate(-45deg) scale(.6); }

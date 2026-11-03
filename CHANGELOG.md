@@ -2,6 +2,12 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17 — Las carpetas, en el orden que quieras
+
+### Agregado
+- **Ordenar las colecciones.** En el panel de colecciones, cada carpeta tiene una **flechita** al lado del lápiz que la sube un lugar entre sus hermanas (las dos filas se cruzan animadas). Funciona en cada nivel, también en las subcarpetas. *Temporal* queda fija al final y *Últimos leídos* siempre arriba de todo. Las hileras del inicio, el árbol para mover un libro y el de subir siguen ese orden.
+- El orden se guarda en el servidor (columna nueva `collections.sort_order`, se agrega sola al arrancar), así que es el mismo en la PC y en el celu. Las carpetas que nunca se ordenaron (una recién creada, por ejemplo) van después de las ordenadas, alfabéticas. Sin conexión no se guarda y la lista vuelve a como estaba.
+
 ## v1.16.7 — Instalar con un comando, y menos a la vista
 
 ### Agregado

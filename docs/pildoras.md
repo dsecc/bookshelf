@@ -231,7 +231,7 @@ scrollee. Los `focus()` del codigo van con `preventScroll`.
 
 | Pantalla | Plataforma | Disparador | Pieza | Contenido |
 |---|---|---|---|---|
-| Biblioteca | celu + PC | tocar la topbar | panel desde arriba (4.9) | arbol; cada carpeta (menos Sin coleccion y Temporal) con un lapiz que la renombra en el lugar | Todos, Sin conexion y Papelera (solo celu: en la PC tienen su lugar), arbol de colecciones (flechita despliega sin cerrar), + Nueva |
+| Biblioteca | celu + PC | tocar la topbar | panel desde arriba (4.9) | arbol; cada carpeta (menos Sin coleccion y Temporal) con un lapiz que la renombra en el lugar; todas menos Temporal con una flechita que la sube un lugar entre sus hermanas (v1.17, el orden va al servidor y lo siguen las hileras) | Todos, Sin conexion y Papelera (solo celu: en la PC tienen su lugar), arbol de colecciones (flechita despliega sin cerrar), + Nueva |
 | Biblioteca | celu + PC | Subir | panel | zona de arrastrar (vidrio), arbol de coleccion (`colPicker`), boton pildora |
 | Biblioteca | celu | Mas (tres rayitas) | panel, sin titulo | Notificaciones, Ajustes |
 | Biblioteca | celu | Mas → Notificaciones / Ajustes | el mismo panel, estirado (`swapNavSheet`) | la lista de notificaciones / el panel de Ajustes de la PC |

@@ -1609,6 +1609,42 @@ function openColSheet() {
 
   const ICO_PEN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const ICO_OK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>';
+  const ICO_UP = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg>';
+
+  // Ordenar: la flechita sube la carpeta un lugar entre sus hermanas (Temporal
+  // queda fija al final). Se guarda el orden de todo ese nivel y las filas se
+  // cruzan animadas; las hileras de la biblioteca se acomodan al cerrar.
+  let reordenado = false;
+  const pintarFlechas = cont => cont.querySelectorAll(":scope > .tree-node > .tree-row > .tree-up")
+    .forEach((f, i) => { f.classList.toggle("primera", i === 0); f.tabIndex = i === 0 ? -1 : 0; });
+  const subir = async (c, node) => {
+    const hermanas = (c.parent_id == null ? topLevel() : childrenOf(c.parent_id)).filter(x => !x.is_temp);
+    const i = hermanas.indexOf(c);
+    const prev = node.previousElementSibling;
+    if (i < 1 || !prev) return;
+    [hermanas[i - 1], hermanas[i]] = [hermanas[i], hermanas[i - 1]];
+    const antes = hermanas.map(x => x.sort_order);
+    hermanas.forEach((x, n) => { x.sort_order = n; });
+    // FLIP: las dos filas arrancan donde estaban y se deslizan a su lugar.
+    const pares = [node, prev].map(el => [el, el.getBoundingClientRect().top]);
+    node.parentNode.insertBefore(node, prev);
+    pintarFlechas(node.parentNode);
+    if (!_treeQuieto()) pares.forEach(([el, top]) => {
+      el.animate([{ transform: "translateY(" + (top - el.getBoundingClientRect().top) + "px)" }, { transform: "none" }],
+        { duration: TREE_MS, easing: "cubic-bezier(.32,.72,0,1)" });
+    });
+    reordenado = true;
+    const res = await fetch("/api/collections/order", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: hermanas.map(x => x.id) }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      // No se guardo: vuelve todo a como estaba.
+      hermanas.forEach((x, n) => { x.sort_order = antes[n]; });
+      if (node.parentNode) { node.parentNode.insertBefore(prev, node); pintarFlechas(node.parentNode); }
+      toast(res ? "No se pudo ordenar" : "Sin conexion: no se pudo ordenar");
+    }
+  };
 
   const s = openNavSheet(body => {
     const head = document.createElement("div");
@@ -1705,6 +1741,19 @@ function openColSheet() {
         onClick: () => ir(() => openCollection(c.id)),
       });
       rowWrap.appendChild(row);
+      // Lo que no esta (la flechita en Temporal, que no se mueve: siempre
+      // ultima; el lapiz en la raiz y en Temporal) deja su lugar, para que los
+      // numeros y los botones queden en columna.
+      const hueco = cls => rowWrap.appendChild(Object.assign(document.createElement("span"), { className: cls + " tree-chev-vacio" }));
+      if (c.is_temp) hueco("tree-up primera");
+      else {
+        const flecha = Object.assign(document.createElement("button"), { className: "tree-up", title: "Subir" });
+        flecha.setAttribute("aria-label", "Subir " + c.name);
+        flecha.innerHTML = ICO_UP;
+        flecha.onclick = () => subir(c, node);
+        rowWrap.appendChild(flecha);
+      }
+      if (c.is_root || c.is_temp) hueco("tree-pen");
       // La raiz (Sin coleccion) y Temporal no se renombran.
       if (!c.is_root && !c.is_temp) {
         const lapiz = Object.assign(document.createElement("button"), { className: "tree-pen", title: "Cambiar el nombre" });
@@ -1722,6 +1771,7 @@ function openColSheet() {
         const sub = document.createElement("div");
         sub.className = "tree-children";
         build(sub, kids);
+        pintarFlechas(sub);
         return sub;
       };
       if (kids.length) {
@@ -1756,7 +1806,12 @@ function openColSheet() {
       parent.appendChild(node);
     });
     build(tree, topLevel());
-  }, null, { desde: document.getElementById("libTopNav") });
+    pintarFlechas(tree);
+  }, () => {
+    // Si se ordeno y se sigue en la biblioteca, las hileras toman el orden
+    // nuevo (si se fue a una coleccion, esa ya se pinta sola).
+    if (reordenado && activeColId === null && !offlineView && !trashView) renderBooks();
+  }, { desde: document.getElementById("libTopNav") });
 }
 
 // Auto-init bottom nav

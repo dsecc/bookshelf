@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.16.7"
+APP_VERSION = "1.17"
 
 @app.context_processor
 def inject_ver():
@@ -664,6 +664,14 @@ def init_db():
     with library_lock():
         migrate_collections_to_folders(conn)
         migrate_books_to_folders(conn)
+    # v1.17: orden de las carpetas entre hermanas, elegido a mano (NULL = sin
+    # tocar: van despues, alfabeticas). Despues de la migracion a carpetas,
+    # que rehace la tabla.
+    try:
+        conn.execute("ALTER TABLE collections ADD COLUMN sort_order INTEGER")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     try:
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_books_relpath ON books(user_id, relpath)")
         conn.commit()
@@ -949,7 +957,7 @@ def get_collections():
         conn.commit()
     sweep_library(conn, uid)
     cols = [dict(r) for r in conn.execute(
-        "SELECT id, name, path, parent_id, created_at FROM collections WHERE user_id=?", (uid,)).fetchall()]
+        "SELECT id, name, path, parent_id, sort_order, created_at FROM collections WHERE user_id=?", (uid,)).fetchall()]
     direct = dict(conn.execute(
         "SELECT collection_id, COUNT(*) FROM books WHERE user_id=? AND deleted_at IS NULL GROUP BY collection_id",
         (uid,)).fetchall())
@@ -989,6 +997,28 @@ def create_collection():
         col = conn.execute("SELECT * FROM collections WHERE id=?", (col_id,)).fetchone()
     conn.close()
     return jsonify(dict(col)), 201
+
+@app.route("/api/collections/order", methods=["PUT"])
+@login_required
+def order_collections():
+    """Orden a mano de las carpetas de un mismo nivel: llegan los ids en el
+    orden nuevo y quedan numerados. Temporal no entra: va siempre ultima."""
+    ids = (request.json or {}).get("ids")
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids) or len(set(ids)) != len(ids):
+        return jsonify({"error": "Orden invalido"}), 400
+    uid = current_user_id()
+    conn = get_db()
+    rows = conn.execute("SELECT id, parent_id, path FROM collections WHERE user_id=? AND id IN (%s)"
+                        % ",".join("?" * len(ids)), (uid, *ids)).fetchall()
+    if len(rows) != len(ids) or len({r["parent_id"] for r in rows}) != 1 or \
+            any(r["path"] == TEMP_COLLECTION_NAME for r in rows):
+        conn.close(); return jsonify({"error": "Orden invalido"}), 400
+    with library_lock():
+        for i, col_id in enumerate(ids):
+            conn.execute("UPDATE collections SET sort_order=? WHERE id=?", (i, col_id))
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 @app.route("/api/collections/<int:col_id>", methods=["DELETE"])
 @login_required
