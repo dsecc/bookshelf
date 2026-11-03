@@ -330,7 +330,7 @@ function toggleBookmarkBar(forzar) {
       : _text ? "Bookmark en el " + _bmLabel(_bmHere()) : "Nombre del bookmark";
   }
   bar.classList.toggle("open", abrir);
-  if (abrir) input.focus(); else input.blur();
+  if (abrir) input.focus({ preventScroll: true }); else input.blur();
 }
 
 // ── Barra de busqueda ────────────────────────────────────────────────────────
@@ -342,25 +342,8 @@ function toggleSearchBar(forzar) {
   const abrir = forzar === undefined ? !bar.classList.contains("open") : forzar;
   if (abrir) { closeNavSheet(); toggleBookmarkBar(false); }
   bar.classList.toggle("open", abrir);
-  if (abrir) document.getElementById("searchTextInput").focus();
+  if (abrir) document.getElementById("searchTextInput").focus({ preventScroll: true });
   else       document.getElementById("searchTextInput").blur();
-}
-
-// ── El teclado no puede tapar la barra ───────────────────────────────────────
-// visualViewport se encoge cuando aparece el teclado; la diferencia contra
-// innerHeight es cuanto ocupa. Se publica como --kb-offset y la pildora, el
-// panel y la busqueda lo suman a su separacion del borde.
-function initKeyboardOffset() {
-  const vv = window.visualViewport;
-  if (!vv) return;
-  const sync = () => {
-    const tapado = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    // Umbral: cambios chicos son la barra de direcciones, no el teclado.
-    document.documentElement.style.setProperty("--kb-offset", (tapado > 120 ? tapado : 0) + "px");
-  };
-  vv.addEventListener("resize", sync);
-  vv.addEventListener("scroll", sync);
-  sync();
 }
 
 // Esconder las pildoras para leer sin nada encima: la de abajo se va hacia
@@ -372,7 +355,8 @@ function setReaderNavHidden(ocultar) {
   if (ocultar === _rnHidden) return;
   _rnHidden = ocultar;
   if (ocultar) { closeNavSheet(); toggleSearchBar(false); toggleBookmarkBar(false); }
-  const t = "transform .44s var(--nav-ease), opacity .32s var(--nav-ease)";
+  // bottom: lo mueve el teclado (--kb-offset); el inline no lo puede pisar.
+  const t = "transform .44s var(--nav-ease), opacity .32s var(--nav-ease), bottom .3s var(--nav-ease)";
   const nav = document.getElementById("readerNav");
   if (nav) {
     nav.style.transition = t;
@@ -538,7 +522,7 @@ async function init() {
   // ni el boton de volver funciona.
   bindAll();
   initReaderNav();
-  initKeyboardOffset();
+  initKeyboard();
   loadBookmarks();
   refreshOfflineBtn();
   placeTextCtl();

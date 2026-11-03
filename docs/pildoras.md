@@ -69,7 +69,7 @@ Vidrio, `border-radius: 999px`, `z-index: 150`, anclada abajo.
 
 | Donde | Contenido |
 |---|---|
-| Biblioteca, celu (`#bottomNav`) | 4 items de igual ancho: Buscar, Biblioteca, Subir (en acento), Mas (desde v1.16.1 las colecciones se abren desde la topbar). Resaltado deslizante (`.bn-indicator`) detras del item activo. |
+| Biblioteca, celu (`#bottomNav`) | 4 items de igual ancho: Biblioteca, Buscar, Subir (en acento), Mas (desde v1.16.1 las colecciones se abren desde la topbar). Resaltado deslizante (`.bn-indicator`) detras del item activo. |
 | Biblioteca, PC (`#bottomNav`, v1.16) | 6 items, 600px de ancho: Biblioteca, Sin conexion, Buscar, Subir, Notificaciones (con contador), Ajustes (ruedita). Mismo HTML que el celu: los dos de mas son `.bn-desk` y el orden lo da CSS (`order`); "Mas" muestra la ruedita (`.ico-pc`). El resaltado se ubica por la posicion real del boton (`offsetLeft`), no por el indice. |
 | Lector, celu (`#readerNav`) | 4 items: Volver, Buscar, Bookmarks, Info (ruedita). Los grupos son `display: contents` y lo `.rn-desk` no se ve. |
 | Lector, PC (`#readerNav`) | Grilla de 3 columnas: izquierda Volver + titulo; centro el paginador (o los ajustes de letra en TXT/MD/EPUB); derecha Buscar, Bookmarks, Lupa, Pantalla completa, Info. Items de 42px con hover. |
@@ -198,6 +198,15 @@ cerrar ya esta en su medida nueva. Por eso las filas **navegan antes de
 cerrar** el panel. La pildora de abajo no se toca. El contenido aparece a los
 .26s, cuando ya se ensancho: el titulo ("Colecciones") queda donde estaba la
 ruta.
+
+### 4.10 Teclado (`initKeyboard`, nav.js, v1.16.2)
+En iOS el teclado tapa la pagina sin achicarla. `--kb-offset` (lo que tapa,
+segun `visualViewport`; 0 en la PC y en Android) se suma al `bottom` de la
+pildora, el buscador y el panel de abajo, que suben con el teclado (.3s); el
+panel ademas achica su alto maximo. Al enfocar un campo de una barra o un
+panel flotante, la pagina se devuelve a donde estaba durante un segundo (iOS la
+scrollea para mostrar el campo y el fondo se corria), salvo que el dedo
+scrollee. Los `focus()` del codigo van con `preventScroll`.
 
 ## 5. Esconder la navegacion
 

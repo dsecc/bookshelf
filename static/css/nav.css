@@ -70,6 +70,7 @@
    display:contents el grupo no dibuja caja y su opacidad no les llegaria, asi
    que se apunta tambien a lo de adentro. */
 .bottom-nav > *, .bottom-nav .rn-group > * { transition: opacity .3s var(--nav-ease); }
+.bottom-nav { transition: bottom .3s var(--nav-ease); }
 .nav-sheet-abierta .bottom-nav {
   background-color: transparent; border-color: transparent; box-shadow: none;
   -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -79,7 +80,8 @@
 .nav-sheet-abierta .bottom-nav .rn-group > * { opacity: 0; transition-duration: .18s; }
 .bottom-nav {
   display: none;
-  bottom: var(--nav-bar-bottom);
+  /* Sube con el teclado (--kb-offset, ver initKeyboard en nav.js). */
+  bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px));
   height: var(--nav-bar-height);
   align-items: stretch;
   overflow: hidden;
@@ -147,8 +149,8 @@
   .nav-sheet {
     position: fixed; z-index: 170;
     left: var(--nav-left); right: var(--nav-right);
-    bottom: var(--nav-bar-bottom);
-    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 24px);
+    bottom: calc(var(--nav-bar-bottom) + var(--kb-offset, 0px));
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 24px - var(--kb-offset, 0px));
     display: flex; flex-direction: column; overflow: hidden;
     border-radius: 28px;
     /* El mismo vidrio que la pildora (antes era casi opaco, 96%). Sin fondo
@@ -161,7 +163,8 @@
     clip-path: inset(calc(100% - var(--nav-bar-height)) 0px 0px 0px round 999px);
     -webkit-clip-path: inset(calc(100% - var(--nav-bar-height)) 0px 0px 0px round 999px);
     /* Cerrar: .34s. Abrir (.open): mas largo, para que se vea estirarse. */
-    transition: clip-path .34s var(--nav-ease), -webkit-clip-path .34s var(--nav-ease);
+    transition: clip-path .34s var(--nav-ease), -webkit-clip-path .34s var(--nav-ease),
+      bottom .3s var(--nav-ease), max-height .3s var(--nav-ease);
     will-change: clip-path;
   }
   /* Abierto, el recorte se agranda 80px para afuera: si no, cortaria la
@@ -171,7 +174,7 @@
     clip-path: inset(-80px round 108px);
     -webkit-clip-path: inset(-80px round 108px);
     /* El estiramiento termina con un rebote chico, como algo liquido. */
-    transition-duration: .52s;
+    transition-duration: .52s, .52s, .3s, .3s;
     animation: navLiquid .7s cubic-bezier(.3, 1.18, .4, 1) both;
   }
 
@@ -356,7 +359,7 @@
     /* Cerrada: escondida detras de la pildora. */
     transform: translateY(52px);
     opacity: 0;
-    transition: transform .44s var(--nav-ease), opacity .3s var(--nav-ease);
+    transition: transform .44s var(--nav-ease), opacity .3s var(--nav-ease), bottom .3s var(--nav-ease);
   }
   .nav-search.open {
     transform: translateY(0);

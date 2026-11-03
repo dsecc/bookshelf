@@ -36,6 +36,7 @@ async function init() {
     bindEvents();
     initColToggle();
     registerSW();
+    initKeyboard();
     initBottomNav();
     loadNotifications();
   } catch(e) {
@@ -981,7 +982,7 @@ function openNewColSheet() {
     };
     crear.onclick = ir;
     inp.onkeydown = e => { if (e.key === "Enter") ir(); };
-    setTimeout(() => inp.focus(), 200);
+    setTimeout(() => inp.focus({ preventScroll: true }), 200);
   });
 }
 
@@ -1097,7 +1098,7 @@ function openShareSheet(n) {
       campo.appendChild(nueva);
       fila.replaceWith(campo);
       treeOpen(campo);
-      nueva.focus();
+      nueva.focus({ preventScroll: true });
     } });
     body.appendChild(fila);
 
@@ -1259,7 +1260,7 @@ function toggleLibSearch(forzar) {
     closeNavSheet();
     slot.appendChild(input);
     bar.classList.add("open");
-    setTimeout(() => input.focus(), 120);
+    setTimeout(() => input.focus({ preventScroll: true }), 120);
   } else {
     bar.classList.remove("open");
     // Solo re-renderizar si habia algo escrito: cerrar el buscador vacio no
@@ -1387,7 +1388,7 @@ function openAjustesSheet() {
         abierto.appendChild(form);
         pw.appendChild(abierto);
         treeOpen(abierto);
-        setTimeout(() => document.getElementById("pwActual").focus(), 200);
+        setTimeout(() => document.getElementById("pwActual").focus({ preventScroll: true }), 200);
       }
       chev.classList.toggle("open", !!abierto);
     };

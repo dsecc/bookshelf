@@ -119,6 +119,46 @@ function _topSheetAnimar(sheet, bar, abrir) {
   }
 }
 
+// ── Teclado (celu) ──────────────────────────────────────────────────────────
+// En iOS el teclado no achica la pagina: la tapa. visualViewport si se achica,
+// y la diferencia es cuanto tapa; se publica como --kb-offset y la pildora, el
+// buscador y el panel lo suman a su distancia del borde (suben con el
+// teclado, animados). En Android la pagina se achica sola y esto da 0.
+//
+// Ademas, para mostrar el campo enfocado iOS scrollea la pagina: el fondo se
+// corria junto con la barra. Si el campo es de una barra o un panel flotante,
+// que ya sube solo, se devuelve la pagina a donde estaba mientras el teclado
+// entra (hasta un segundo, o hasta que el dedo scrollee).
+function initKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv || initKeyboard._listo) return;
+  initKeyboard._listo = true;
+  const sync = () => {
+    const tapado = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    // Umbral: cambios chicos son la barra de direcciones, no el teclado.
+    document.documentElement.style.setProperty("--kb-offset", (tapado > 120 ? tapado : 0) + "px");
+  };
+  let quedarseEn = null, hasta = 0;
+  const quieto = () => {
+    if (quedarseEn == null || performance.now() > hasta) return;
+    if (Math.abs(window.scrollY - quedarseEn) > 1) window.scrollTo(window.scrollX, quedarseEn);
+  };
+  vv.addEventListener("resize", () => { sync(); quieto(); });
+  vv.addEventListener("scroll", () => { sync(); quieto(); });
+  window.addEventListener("scroll", quieto, { passive: true });
+  document.addEventListener("touchmove", () => { hasta = 0; }, { passive: true });
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!el.matches || !el.matches("input, textarea, [contenteditable]")) return;
+    if (!el.closest(".bottom-nav, .top-nav, .nav-search, .nav-sheet")) return;
+    quedarseEn = window.scrollY;
+    hasta = performance.now() + 1000;
+    const vuelta = () => { quieto(); if (performance.now() < hasta) requestAnimationFrame(vuelta); };
+    requestAnimationFrame(vuelta);
+  });
+  sync();
+}
+
 // Fila de panel: pildora con icono opcional, etiqueta y detalle a la derecha.
 function navSheetRow({ label, icon, detail, active, onClick }) {
   const row = document.createElement("button");

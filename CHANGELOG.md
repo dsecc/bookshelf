@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.16.2 — El teclado sube la barra, no la pagina
+
+### Arreglado
+- **Al escribir en una barra o un panel (buscar, bookmark, nueva coleccion, contrasena...), el fondo ya no se corre.** iOS scrolleaba la pagina para mostrar el campo; ahora la pildora, el buscador y el panel suben solos justo encima del teclado (animados) y la pagina vuelve a donde estaba mientras el teclado entra. Vale en la biblioteca y en el lector (el manejo del teclado paso a nav.js, `initKeyboard`).
+
+### Cambiado
+- Pildora de la biblioteca en el celu: **Biblioteca primero y Buscar segundo** (estaban al reves). En la PC el orden no cambia.
+- `VERSION` del service worker: `v37` → `v38`.
+
 ## v1.16.1 — Las colecciones bajan desde la topbar
 
 ### Cambiado
