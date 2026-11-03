@@ -70,16 +70,6 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       <span id="totalBooksCount">0</span> libros
     </div>
-    <div class="sidebar-footer">
-      <div class="nav-item" id="navAbout" data-view="about">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        About
-      </div>
-      <div class="nav-item" id="navSettings" data-view="settings">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
-        Ajustes
-      </div>
-    </div>
   </aside>
 
   <!-- Main -->
@@ -127,35 +117,16 @@
         </div>
       </div>
 
-      <!-- Vista: About -->
-      <div id="viewAbout" style="display:none">
-        <div class="info-page">
-          <h2>Informacion</h2>
-          <div id="aboutContent" class="about-grid"></div>
-        </div>
-      </div>
-
-      <!-- Vista: Ajustes -->
-      <div id="viewSettings" style="display:none">
-        <div class="info-page">
-          <h2>Ajustes</h2>
-          <div class="ajuste-bloque">
-            <h3>Releer biblioteca</h3>
-            <p class="ajuste-nota">Cada coleccion es una carpeta en el servidor (<code>uploads/{{ session.get("user_id") }}/</code>). Si agregaste, moviste o borraste archivos ahi a mano, esto los incorpora. Lo que se movio conserva su progreso.</p>
-            <button class="btn-primary full" id="btnRescan">Releer biblioteca</button>
-          </div>
-          <div class="ajuste-bloque">
-            <h3>Cambiar contrasena</h3>
-            <p class="ajuste-nota">Se pide la actual: sin eso, cualquiera con tu sesion abierta podria dejarte afuera de tu propia cuenta.</p>
-            <form id="formPassword" autocomplete="off">
-              <input type="password" id="pwActual" class="ajuste-input" placeholder="Contrasena actual" autocomplete="current-password" required>
-              <input type="password" id="pwNueva"  class="ajuste-input" placeholder="Contrasena nueva" autocomplete="new-password" required>
-              <input type="password" id="pwRepetir" class="ajuste-input" placeholder="Repetir la nueva" autocomplete="new-password" required>
-              <p class="ajuste-error" id="pwError" style="display:none"></p>
-              <button type="submit" class="btn-primary full" id="btnCambiarPw">Cambiar contrasena</button>
-            </form>
-          </div>
-        </div>
+      <!-- Deposito: el formulario de la contrasena vive aca escondido y se muda
+           al panel de Ajustes al desplegarlo (ver openAjustesSheet). -->
+      <div id="depositoAjustes" hidden>
+        <form id="formPassword" autocomplete="off">
+          <input type="password" id="pwActual" class="ajuste-input" placeholder="Contrasena actual" autocomplete="current-password" required>
+          <input type="password" id="pwNueva"  class="ajuste-input" placeholder="Contrasena nueva" autocomplete="new-password" required>
+          <input type="password" id="pwRepetir" class="ajuste-input" placeholder="Repetir la nueva" autocomplete="new-password" required>
+          <p class="ajuste-error" id="pwError" style="display:none"></p>
+          <button type="submit" class="btn-primary full" id="btnCambiarPw">Cambiar contrasena</button>
+        </form>
       </div>
 
     </div>

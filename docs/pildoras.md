@@ -85,7 +85,7 @@ la de la biblioteca esta siempre, en celu y PC (v1.16). Con
 | Donde | Contenido |
 |---|---|
 | Lector (`#readerTopNav`) | Ajustes de letra de TXT/MD/EPUB: fuente, A− tamaño A+, tres temas. El mismo nodo (`#textCtl`) que en la PC va en la pildora; se muda segun el ancho (`placeTextCtl`). |
-| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. La topbar es solo para ver y navegar: **tocarla en cualquier lugar que no sea un tramo de arriba (la `/` y la carpeta actual incluidas) abre las colecciones**, que bajan desde ella (4.9). Renombrar se hace con el lapiz de cada carpeta en ese panel (v1.16.3). **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
+| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`). Cada tramo lleva ahi; la actual, resaltada. La topbar es solo para ver y navegar: **tocarla en cualquier lugar que no sea un tramo de arriba (la `/` y la carpeta actual incluidas) abre las colecciones**, que bajan desde ella (4.9). Renombrar se hace con el lapiz de cada carpeta en ese panel (v1.16.3). **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
 
 ### 4.3 Panel (`.nav-sheet`, `openNavSheet(build, onClose)` en nav.js)
 La pildora estirandose hacia arriba. Mismo `left/right/bottom` que la pildora,
@@ -232,7 +232,7 @@ scrollee. Los `focus()` del codigo van con `preventScroll`.
 | Biblioteca | celu | Mas → Notificaciones / Ajustes | el mismo panel, estirado (`swapNavSheet`) | la lista de notificaciones / el panel de Ajustes de la PC |
 | Biblioteca | celu + PC | tocar un libro en la Papelera | panel | Restaurar / Eliminar definitivamente |
 | Biblioteca | celu + PC | Buscar | barra (`#libSearchBar`) | el input real se muda desde la topbar |
-| Biblioteca | celu + PC | siempre | topbar | donde estas (`/`, la ruta o la vista especial); tocar la actual la renombra |
+| Biblioteca | celu + PC | siempre | topbar | donde estas (`/`, la ruta o la vista especial) |
 | Biblioteca | celu + PC | Colecciones → + Nueva | panel | nombre + "Dentro de" en arbol (`colPicker`, con "Primer nivel" arriba) |
 | Biblioteca | celu + PC | Notificaciones → un libro recibido | panel | tapa, titulo, quien lo mando, arbol de coleccion o "Nueva coleccion" (se vuelve campo), Aceptar |
 | Biblioteca | PC | Ajustes (ruedita) | panel | Papelera, Releer biblioteca (la fila gira), Cambiar contrasena (se despliega en el lugar), Cerrar sesion, tarjeta de creditos |

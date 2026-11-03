@@ -117,7 +117,6 @@ async function openCollection(id) {
   collapsedCols.delete(id);
   document.getElementById("topbarTitle").textContent = colTrail(id);
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-  setView("biblioteca");
   renderSidebar();
   renderLibTopNav();
   books = await fetchJSON("/api/books?collection_id=" + id, []);
@@ -239,7 +238,6 @@ async function showOfflineView() {
   renderSidebar();
   setNavActive("navOffline");
   document.querySelectorAll(".bn-item").forEach(b => b.classList.toggle("active", b.id === "bnOffline"));
-  setView("biblioteca");
   document.getElementById("topbarTitle").textContent = "Sin conexion";
   await loadOfflineIds();
   // Si no hay red, books puede venir del cache del service worker.
@@ -254,7 +252,6 @@ async function showTrashView() {
   offlineView = false; trashView = true;
   activeColId = null;
   setNavActive("navTrash");
-  setView("biblioteca");
   renderSidebar();
   document.getElementById("topbarTitle").textContent = "Papelera";
   books = await fetchJSON("/api/trash", []);
@@ -356,11 +353,8 @@ function renderLibTopNav() {
   const bar = document.getElementById("libTopNav");
   const box = document.getElementById("libTopNavScroll");
   if (!bar) return;
-  const vista = vistaActual();
   const tramos = [];  // [texto, onClick | null]
-  if (vista === "settings") tramos.push(["Ajustes", null]);
-  else if (vista === "about") tramos.push(["Informacion", null]);
-  else if (trashView) tramos.push(["Papelera", null]);
+  if (trashView) tramos.push(["Papelera", null]);
   else if (offlineView) tramos.push(["Sin conexion", null]);
   else if (activeColId != null && colById(activeColId)) {
     const camino = ancestorsOf(activeColId);
@@ -516,7 +510,7 @@ function renderBooks(filter) {
 // topbar: los libros van arriba de todo y ella flota encima. Se marca recien
 // con el contenido escondido (animateOut), para que el salto no se vea.
 function marcarRaiz() {
-  const raiz = vistaActual() === "biblioteca" && activeColId == null && !offlineView && !trashView;
+  const raiz = activeColId == null && !offlineView && !trashView;
   document.body.classList.toggle("en-raiz", raiz);
 }
 
@@ -747,23 +741,6 @@ function updateBookCount() {
   el.textContent = total;
 }
 
-// Que vista se esta mostrando. No habia forma de preguntarlo: setView solo
-// cambiaba displays. El panel "Mas" lo necesita para marcar la fila activa.
-function vistaActual() {
-  if (document.getElementById("viewAbout").style.display === "none" &&
-      document.getElementById("viewSettings").style.display === "none") return "biblioteca";
-  return document.getElementById("viewAbout").style.display !== "none" ? "about" : "settings";
-}
-
-function setView(view) {
-  document.getElementById("viewBiblioteca").style.display = view === "biblioteca" ? "" : "none";
-  document.getElementById("viewAbout").style.display     = view === "about"       ? "" : "none";
-  document.getElementById("viewSettings").style.display  = view === "settings"    ? "" : "none";
-  // La topbar dice donde estas: tambien en Ajustes e Informacion.
-  if (view !== "biblioteca") { renderLibTopNav(); document.body.classList.remove("en-raiz"); }
-  rowTag.refresh();
-}
-
 function setNavActive(id) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -771,7 +748,7 @@ function setNavActive(id) {
 }
 
 // Tarjeta de creditos: solo lo necesario (que version es y sobre que corre).
-// La usan el panel de Ajustes (PC) e Informacion (celu).
+// Va al pie del panel de Ajustes.
 async function creditsCard() {
   const card = document.createElement("div");
   card.className = "credits-card";
@@ -783,35 +760,18 @@ async function creditsCard() {
   return card;
 }
 
-async function loadAbout() {
-  const box = document.getElementById("aboutContent");
-  box.replaceChildren(await creditsCard());
-}
 
 // ── Events ────────────────────────────────────────────────────────────────────
 function bindEvents() {
-  document.getElementById("sidebarLogo").addEventListener("click", async () => { setNavActive("navBiblioteca"); setView("biblioteca"); document.getElementById("topbarTitle").textContent = "Biblioteca"; activeColId = null; trashView = false; await refresh(); });
+  document.getElementById("sidebarLogo").addEventListener("click", async () => { setNavActive("navBiblioteca"); document.getElementById("topbarTitle").textContent = "Biblioteca"; activeColId = null; trashView = false; await refresh(); });
   document.getElementById("navBiblioteca").addEventListener("click", async () => {
     setNavActive("navBiblioteca");
-    setView("biblioteca");
     document.getElementById("topbarTitle").textContent = "Biblioteca";
     activeColId = null; trashView = false;
     await refresh();
   });
   document.getElementById("navOffline").addEventListener("click", showOfflineView);
   document.getElementById("navTrash").addEventListener("click", showTrashView);
-  document.getElementById("btnRescan").addEventListener("click", () => rescanLibrary());
-  document.getElementById("navAbout").addEventListener("click", () => {
-    setNavActive("navAbout");
-    setView("about");
-    document.getElementById("topbarTitle").textContent = "About";
-    loadAbout();
-  });
-  document.getElementById("navSettings").addEventListener("click", () => {
-    setNavActive("navSettings");
-    setView("settings");
-    document.getElementById("topbarTitle").textContent = "Ajustes";
-  });
 
   // Search expandible
   const btnSearch   = document.getElementById("btnSearch");
@@ -970,13 +930,8 @@ function openNewColSheet() {
   });
 }
 
-// marcar(true/false) muestra que esta trabajando; por defecto, el boton de
-// la vista Ajustes (celu). El panel de Ajustes de la PC pasa el suyo.
+// marcar(true/false) muestra que esta trabajando (la fila del panel de Ajustes).
 async function rescanLibrary(marcar) {
-  marcar = marcar || (on => {
-    const btn = document.getElementById("btnRescan");
-    btn.disabled = on; btn.textContent = on ? "Releyendo..." : "Releer biblioteca";
-  });
   marcar(true);
   try {
     const res = await fetch("/api/library/rescan", { method: "POST" });
@@ -1208,7 +1163,6 @@ function initBottomNav() {
   bnBib.addEventListener("click", async () => {
     setActive("bnBiblioteca");
     setNavActive("navBiblioteca");
-    setView("biblioteca");
     document.getElementById("topbarTitle").textContent = "Biblioteca";
     activeColId = null; trashView = false;
     await refresh();
@@ -1681,7 +1635,6 @@ function openColSheet() {
       active: !offlineView && !trashView && activeColId === null,
       onClick: () => {
         offlineView = false; trashView = false; activeColId = null;
-        setView("biblioteca");
         renderLibTopNav();
         s.close();
         const bib = document.getElementById("bnBiblioteca");

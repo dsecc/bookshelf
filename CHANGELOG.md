@@ -7,6 +7,7 @@
 - **Los libros del inicio miden lo mismo que adentro de una carpeta** (celu y PC): las tarjetas de las hileras toman el ancho de una columna de la grilla, con la misma cuenta que hace la grilla (`medirTarjetas`).
 - **Renombrar pasa a un lapiz al lado de cada carpeta** en el panel de colecciones (no en Sin coleccion ni en Temporal): la carpeta se vuelve campo en el lugar y el lapiz se transforma en el tilde. La topbar queda solo para ver donde estas y navegar (tocar la carpeta actual tambien abre las colecciones).
 - **Celu: "Mas" queda con Notificaciones y Ajustes**, y las dos se abren en el mismo panel, que se estira hasta su contenido (`swapNavSheet`), sin ir a otra pantalla. Ajustes es el mismo de la PC: Papelera, Releer biblioteca, Cambiar contrasena, Cerrar sesion y la tarjeta de creditos (lo que era Informacion).
+- **Se borraron las pantallas viejas de Ajustes e Informacion** (y sus entradas del sidebar, su CSS y `loadAbout`/`setView`/`vistaActual`): todo eso vive en el panel de Ajustes. El formulario de la contrasena queda escondido en `#depositoAjustes` y se muda al panel al desplegarlo.
 - `VERSION` del service worker: `v38` → `v39`.
 
 ## v1.16.2 — El teclado sube la barra, no la pagina
