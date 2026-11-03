@@ -97,6 +97,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   left: 50%; right: auto; transform: translateX(-50%);
   width: var(--top-nav-h); max-width: calc(100vw - 2 * var(--nav-bar-side));
   padding: 0; transition: width .5s var(--nav-ease);
+  cursor: pointer; /* tocarla abre las colecciones */
 }
 .lib-top-nav .ltn-scroll {
   display: flex; align-items: center; gap: 2px; width: 100%; height: 100%;
@@ -927,10 +928,10 @@ body.logging-out {
   .bn-item .ico-pc { display: contents; }
   .bn-indicator { position: absolute; top: 7px; bottom: 7px; border-radius: 999px; background: var(--nav-active-bg);
     pointer-events: none; transition: left .38s var(--nav-ease), width .38s var(--nav-ease); }
-  /* Orden en la PC: Biblioteca, Sin conexion, Colecciones, Buscar, Subir,
-     Notificaciones, Ajustes. */
-  #bnBiblioteca { order: 1; } #bnOffline { order: 2; } #bnColecciones { order: 3; } #bnSearchMobile { order: 4; }
-  #bnUploadMobile { order: 5; } #bnNotif { order: 6; } #bnMore { order: 7; }
+  /* Orden en la PC: Biblioteca, Sin conexion, Buscar, Subir, Notificaciones,
+     Ajustes. Las colecciones se abren desde la topbar. */
+  #bnBiblioteca { order: 1; } #bnOffline { order: 2; } #bnSearchMobile { order: 3; }
+  #bnUploadMobile { order: 4; } #bnNotif { order: 5; } #bnMore { order: 6; }
 
   /* Paneles y buscador con medidas de PC (como en el lector). */
   .nav-sheet { max-height: min(78vh, 720px); }

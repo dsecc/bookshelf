@@ -351,7 +351,6 @@ function makeViewHead() {
 // "/ Ciberseguridad / Malware". Las vistas especiales son un tramo mas
 // ("/ Papelera", "/ Ajustes"). Cada tramo lleva ahi; la actual, resaltada.
 // Solo donde estas, no adonde podes ir (para eso esta la hoja de colecciones).
-function irARaiz() { const b = document.getElementById("bnBiblioteca"); if (b) b.click(); }
 function renderLibTopNav() {
   const bar = document.getElementById("libTopNav");
   const box = document.getElementById("libTopNavScroll");
@@ -368,13 +367,19 @@ function renderLibTopNav() {
   }
   bar.hidden = false;
   document.body.classList.add("con-topnav");
+  // Tocar la barra (la "/" o cualquier lugar que no sea un tramo) abre las
+  // colecciones, que bajan desde ella. Los tramos de arriba siguen llevando
+  // ahi y la carpeta actual se renombra.
+  bar.onclick = e => {
+    if (e.target.closest("button.ltn-crumb:not(.ltn-root), .ltn-crumb.renombrable")) return;
+    openColSheet();
+  };
   box.innerHTML = "";
   const raiz = document.createElement("button");
   raiz.className = "ltn-crumb ltn-root" + (tramos.length ? "" : " current");
   raiz.textContent = "/";
-  raiz.title = "Biblioteca";
-  raiz.setAttribute("aria-label", "Biblioteca");
-  if (tramos.length) raiz.onclick = irARaiz;
+  raiz.title = "Colecciones";
+  raiz.setAttribute("aria-label", "Colecciones");
   box.appendChild(raiz);
   let actual = tramos.length ? null : raiz;
   const col = vista === "biblioteca" && !trashView && !offlineView ? colById(activeColId) : null;
@@ -506,6 +511,9 @@ function renderBooks(filter) {
       const row = document.createElement("div");
       row.className = "books-row";
       row.dataset.name = nombre;
+      // La coleccion de la hilera: tocar la etiqueta entra ahi.
+      const col = collections.find(c => c.parent_id == null && c.name === nombre);
+      if (col) row.dataset.colId = col.id;
       lista.forEach(b => row.appendChild(makeCard(b)));
       rows.appendChild(row);
     };
@@ -1206,7 +1214,6 @@ function initBottomNav() {
   }
 
   const bnBib = document.getElementById("bnBiblioteca");
-  const bnCol = document.getElementById("bnColecciones");
   const bnUp  = document.getElementById("bnUploadMobile");
   const bnBus = document.getElementById("bnSearchMobile");
   const bnMas = document.getElementById("bnMore");
@@ -1220,12 +1227,6 @@ function initBottomNav() {
     document.getElementById("topbarTitle").textContent = "Biblioteca";
     activeColId = null; trashView = false;
     await refresh();
-  });
-
-  bnCol.addEventListener("click", () => {
-    setActive("bnColecciones");
-    // En mobile abrir un sheet de colecciones
-    openMobileColSheet();
   });
 
   bnUp.addEventListener("click", () => {
@@ -1416,7 +1417,8 @@ function openAjustesSheet() {
 // lugar se guarda como proporcion de ese espacio (sirve aunque cambie el alto
 // de la ventana). El piquito marca la altura elegida y no se mueve cuando la
 // etiqueta cambia de largo: asi la palabra no puede ir y venir entre dos
-// hileras por su propio cambio de tamano.
+// hileras por su propio cambio de tamano. Tocarla sin arrastrar entra a la
+// coleccion de la hilera que marca ("Ultimos leidos" no es una carpeta).
 const rowTag = (() => {
   const KEY = "bs_row_tag", MARGEN = 12, MIN_ALTO = 64, AIRE = 36, PUNTA = 18;
   const el = document.getElementById("rowTag");
@@ -1479,10 +1481,12 @@ const rowTag = (() => {
     return mejor;
   };
 
+  let marcada = null;
   const actualizar = () => {
     raf = 0;
     const vista = document.getElementById("viewBiblioteca");
     const row = vista && vista.style.display !== "none" ? elegir() : null;
+    marcada = row;
     el.hidden = !row;
     if (!row) { primera = true; palabra = null; return; }
     poner(row.dataset.name);
@@ -1501,18 +1505,22 @@ const rowTag = (() => {
       el.setPointerCapture(e.pointerId);
       el.classList.add("arrastrando");
       const y0 = e.clientY, p0 = punta();
+      let movio = false;
       const mover = ev => {
+        if (Math.abs(ev.clientY - y0) > 4) movio = true;
+        if (!movio) return;
         const [lo, hi] = rango();
         const y = Math.min(hi, Math.max(lo, p0 + ev.clientY - y0));
         ratio = hi > lo ? (y - lo) / (hi - lo) : .5;
         actualizar();
       };
-      const soltar = () => {
+      const soltar = ev => {
         el.classList.remove("arrastrando");
         el.removeEventListener("pointermove", mover);
         el.removeEventListener("pointerup", soltar);
         el.removeEventListener("pointercancel", soltar);
-        try { localStorage.setItem(KEY, ratio.toFixed(4)); } catch (e) {}
+        if (movio) { try { localStorage.setItem(KEY, ratio.toFixed(4)); } catch (e) {} }
+        else if (ev.type === "pointerup" && marcada && marcada.dataset.colId) openCollection(Number(marcada.dataset.colId));
       };
       el.addEventListener("pointermove", mover);
       el.addEventListener("pointerup", soltar);
@@ -1630,11 +1638,11 @@ function openUploadSheet() {
   });
 }
 
-// Colecciones: panel que crece desde la pildora (ver openNavSheet). Las
+// Colecciones: panel que baja desde la topbar (ver openNavSheet, opts.desde). Las
 // colecciones van en arbol con el mismo trazo curvo que el sidebar: tocar el
 // nombre abre la coleccion (y cierra el panel); la flechita de al lado
 // despliega sus subcarpetas sin cerrarlo.
-function openMobileColSheet() {
+function openColSheet() {
   const ICO_ALL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>';
   const ICO_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
   const ICO_TRASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
@@ -1645,6 +1653,9 @@ function openMobileColSheet() {
   // Arranca desplegado el camino hasta la coleccion abierta.
   const abiertas = new Set(activeColId != null && !offlineView && !trashView ? ancestorsOf(activeColId) : []);
   const salirDeEspeciales = () => document.querySelectorAll(".bn-item").forEach(b => b.classList.remove("active"));
+  // Se navega ANTES de cerrar: la topbar toma su ancho nuevo y el panel se
+  // cierra directo a esa medida (si no, cerraria a la vieja y saltaria).
+  const ir = fn => { salirDeEspeciales(); fn(); renderLibTopNav(); s.close(); };
 
   const s = openNavSheet(body => {
     const head = document.createElement("div");
@@ -1660,12 +1671,11 @@ function openMobileColSheet() {
     body.appendChild(navSheetRow({
       label: "Todos los libros", icon: ICO_ALL,
       active: !offlineView && !trashView && activeColId === null,
-      onClick: async () => {
-        s.close();
+      onClick: () => {
         offlineView = false; trashView = false; activeColId = null;
-        document.getElementById("topbarTitle").textContent = "Biblioteca";
-        setNavActive("navBiblioteca");
         setView("biblioteca");
+        renderLibTopNav();
+        s.close();
         const bib = document.getElementById("bnBiblioteca");
         if (bib) bib.click();
       },
@@ -1676,12 +1686,12 @@ function openMobileColSheet() {
     if (window.innerWidth <= 640) {
     body.appendChild(navSheetRow({
       label: "Sin conexion", icon: ICO_OFF, active: offlineView,
-      onClick: async () => { s.close(); salirDeEspeciales(); await showOfflineView(); },
+      onClick: () => ir(() => { offlineView = true; trashView = false; activeColId = null; showOfflineView(); }),
     }));
     const n = collections.length ? collections[0].trash_count || 0 : 0;
     body.appendChild(navSheetRow({
       label: "Papelera", icon: ICO_TRASH, active: trashView, detail: n ? String(n) : undefined,
-      onClick: async () => { s.close(); salirDeEspeciales(); await showTrashView(); },
+      onClick: () => ir(() => { offlineView = false; trashView = true; activeColId = null; showTrashView(); }),
     }));
     }
 
@@ -1700,7 +1710,7 @@ function openMobileColSheet() {
       const row = navSheetRow({
         label: c.name, icon: c.is_temp ? ICO_TEMP : ICO_COL, detail: String(c.book_count || 0),
         active: !offlineView && !trashView && activeColId === c.id,
-        onClick: () => { s.close(); salirDeEspeciales(); openCollection(c.id); },
+        onClick: () => ir(() => openCollection(c.id)),
       });
       rowWrap.appendChild(row);
       const hijas = () => {
@@ -1738,7 +1748,7 @@ function openMobileColSheet() {
       parent.appendChild(node);
     });
     build(tree, topLevel());
-  });
+  }, null, { desde: document.getElementById("libTopNav") });
 }
 
 // Auto-init bottom nav

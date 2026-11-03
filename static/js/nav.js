@@ -19,7 +19,7 @@ function _navSheetCleanup() {
   _navSheetOnClose = null;
   // Recien cuando el panel termino de volver a la forma de la pildora: la
   // barra recupera su fondo en el mismo lugar, sin salto.
-  document.documentElement.classList.remove("nav-sheet-abierta");
+  document.documentElement.classList.remove("nav-sheet-abierta", "top-sheet-abierta");
   if (fn) fn();
 }
 
@@ -41,6 +41,7 @@ function closeNavSheet(inmediato) {
   }
   if (sheet) sheet.classList.remove("open");
   if (back)  back.classList.remove("open");
+  if (sheet && sheet._desde) _topSheetAnimar(sheet, sheet._desde, false);
   _navSheetClosing = setTimeout(() => {
     if (sheet) sheet.remove();
     if (back) back.remove();
@@ -49,11 +50,14 @@ function closeNavSheet(inmediato) {
 }
 
 // build(body) llena el contenido. onClose corre despues de sacarlo del DOM.
-function openNavSheet(build, onClose) {
+// opts.desde: una topbar (.top-nav) de la que el panel crece hacia abajo, en
+// vez de la pildora de abajo (ver _topSheetAnimar).
+function openNavSheet(build, onClose, opts) {
   closeNavSheet(true);
+  const desde = opts && opts.desde;
 
   _navSheetOnClose = onClose || null;
-  document.documentElement.classList.add("nav-sheet-abierta");
+  document.documentElement.classList.add(desde ? "top-sheet-abierta" : "nav-sheet-abierta");
 
   const back = document.createElement("div");
   back.id = "navSheetBackdrop";
@@ -62,7 +66,7 @@ function openNavSheet(build, onClose) {
 
   const sheet = document.createElement("div");
   sheet.id = "navSheet";
-  sheet.className = "nav-sheet";
+  sheet.className = "nav-sheet" + (desde ? " nav-sheet-top" : "");
   const body = document.createElement("div");
   body.className = "nav-sheet-body";
   sheet.appendChild(body);
@@ -70,12 +74,49 @@ function openNavSheet(build, onClose) {
   document.body.appendChild(back);
   document.body.appendChild(sheet);
   build(body);
+  if (desde) { sheet._desde = desde; _topSheetAnimar(sheet, desde, true); }
 
   requestAnimationFrame(() => requestAnimationFrame(() => {
     sheet.classList.add("open");
     back.classList.add("open");
   }));
   return { sheet, body, close: () => closeNavSheet() };
+}
+
+// ── Panel que crece desde la topbar ──────────────────────────────────────────
+// El espejo del de abajo, en dos tiempos de una sola animacion: la topbar (que
+// mide lo que muestra) primero se ensancha hasta el ancho de la pildora de
+// abajo y despues baja hasta ser el panel. Cerrar hace el camino inverso: sube
+// y se angosta hasta el ancho que tenga la topbar en ese momento (si se navego,
+// el de la ruta nueva). Es un clip-path por fotogramas (Web Animations): los
+// dos tiempos dependen de medidas que solo se saben al abrir.
+const TOP_SHEET_OPEN_MS = 680;
+const _ease = "cubic-bezier(.32,.72,0,1)";
+
+function _topSheetAnimar(sheet, bar, abrir) {
+  if (!sheet.animate || _treeQuieto()) return;
+  const s = sheet.getBoundingClientRect(), r = bar.getBoundingClientRect();
+  // La topbar puede estar animando su ancho: cuenta el de destino.
+  const w = parseFloat(bar.style.width) || r.width;
+  const cx = r.left + r.width / 2;
+  const izq = Math.max(0, cx - w / 2 - s.left), der = Math.max(0, s.right - cx - w / 2);
+  const abajo = Math.max(0, s.height - r.height);
+  const barra = "inset(0px " + der + "px " + abajo + "px " + izq + "px round 999px)";
+  const ancha = "inset(0px 0px " + abajo + "px 0px round 999px)";
+  const abierto = "inset(-80px round 108px)";
+  if (abrir) {
+    sheet.animate([
+      { clipPath: barra, offset: 0, easing: _ease },
+      { clipPath: ancha, offset: .34, easing: _ease },
+      { clipPath: abierto, offset: 1 },
+    ], { duration: TOP_SHEET_OPEN_MS });
+  } else {
+    sheet.animate([
+      { clipPath: abierto, offset: 0, easing: _ease },
+      { clipPath: ancha, offset: .6, easing: _ease },
+      { clipPath: barra, offset: 1 },
+    ], { duration: NAV_SHEET_CLOSE_MS, fill: "forwards" });
+  }
 }
 
 // Fila de panel: pildora con icono opcional, etiqueta y detalle a la derecha.

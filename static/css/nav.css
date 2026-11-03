@@ -102,7 +102,7 @@
      syncNavIndicator() en app.js segun cual item tenga .active. */
   .bn-indicator {
     position: absolute; top: 6px; bottom: 6px;
-    width: calc(100% / 5 - 12px);
+    width: calc(100% / 4 - 12px);
     left: 6px;
     border-radius: 999px;
     background: var(--nav-active-bg);
@@ -410,6 +410,29 @@
 .nav-sheet .progress-bar { background: var(--glass-fill); }
 .nav-sheet .notif-row { background: var(--glass-fill); border-color: var(--glass-border); }
 .nav-sheet .notif-row.unread:hover { background: var(--glass-fill-strong); }
+
+/* Panel que crece desde la topbar (opts.desde en openNavSheet): anclado
+   arriba, del ancho de la pildora de abajo, y sin pasar por encima de ella.
+   La forma la anima nav.js por fotogramas (_topSheetAnimar); aca queda
+   abierta, que es como termina. El contenido aparece cuando ya bajo. */
+.nav-sheet.nav-sheet-top {
+  top: var(--top-nav-top); bottom: auto;
+  max-height: calc(100dvh - var(--top-nav-top) - var(--nav-space) - 8px);
+  clip-path: inset(-80px round 108px);
+  -webkit-clip-path: inset(-80px round 108px);
+  transition: none;
+  transform-origin: 50% 0;
+}
+.nav-sheet.nav-sheet-top.open .nav-sheet-body { transition-delay: .26s; }
+/* Mientras tanto la topbar no se dibuja (el panel es ella misma) y su ancho
+   cambia sin animar: si se navego, al cerrar ya esta en su medida nueva. */
+.top-sheet-abierta .top-nav {
+  background-color: transparent; border-color: transparent; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  transition: none; pointer-events: none;
+}
+.top-nav > * { transition: opacity .3s var(--nav-ease); }
+.top-sheet-abierta .top-nav > * { opacity: 0; transition-duration: .18s; }
 
 @keyframes navLiquid {
   0%   { transform: scale(1, .99); }

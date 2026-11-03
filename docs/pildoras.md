@@ -69,8 +69,8 @@ Vidrio, `border-radius: 999px`, `z-index: 150`, anclada abajo.
 
 | Donde | Contenido |
 |---|---|
-| Biblioteca, celu (`#bottomNav`) | 5 items de igual ancho: Colecciones, Buscar, Biblioteca, Subir (en acento), Mas. Resaltado deslizante (`.bn-indicator`) detras del item activo. |
-| Biblioteca, PC (`#bottomNav`, v1.16) | 7 items, 600px de ancho: Biblioteca, Sin conexion, Colecciones, Buscar, Subir, Notificaciones (con contador), Ajustes (ruedita). Mismo HTML que el celu: los dos de mas son `.bn-desk` y el orden lo da CSS (`order`); "Mas" muestra la ruedita (`.ico-pc`). El resaltado se ubica por la posicion real del boton (`offsetLeft`), no por el indice. |
+| Biblioteca, celu (`#bottomNav`) | 4 items de igual ancho: Buscar, Biblioteca, Subir (en acento), Mas (desde v1.16.1 las colecciones se abren desde la topbar). Resaltado deslizante (`.bn-indicator`) detras del item activo. |
+| Biblioteca, PC (`#bottomNav`, v1.16) | 6 items, 600px de ancho: Biblioteca, Sin conexion, Buscar, Subir, Notificaciones (con contador), Ajustes (ruedita). Mismo HTML que el celu: los dos de mas son `.bn-desk` y el orden lo da CSS (`order`); "Mas" muestra la ruedita (`.ico-pc`). El resaltado se ubica por la posicion real del boton (`offsetLeft`), no por el indice. |
 | Lector, celu (`#readerNav`) | 4 items: Volver, Buscar, Bookmarks, Info (ruedita). Los grupos son `display: contents` y lo `.rn-desk` no se ve. |
 | Lector, PC (`#readerNav`) | Grilla de 3 columnas: izquierda Volver + titulo; centro el paginador (o los ajustes de letra en TXT/MD/EPUB); derecha Buscar, Bookmarks, Lupa, Pantalla completa, Info. Items de 42px con hover. |
 
@@ -85,7 +85,7 @@ la de la biblioteca esta siempre, en celu y PC (v1.16). Con
 | Donde | Contenido |
 |---|---|
 | Lector (`#readerTopNav`) | Ajustes de letra de TXT/MD/EPUB: fuente, A− tamaño A+, tres temas. El mismo nodo (`#textCtl`) que en la PC va en la pildora; se muda segun el ancho (`placeTextCtl`). |
-| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. **Tocar la carpeta actual la renombra en el lugar** (v1.16): el tramo es un `span` que se vuelve editable con la misma transicion que el titulo del libro (pildora con borde de acento); Enter o salir guarda, Escape vuelve atras, y la topbar se estira mientras se escribe. No en la raiz, Sin coleccion ni Temporal. **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
+| Biblioteca (`#libTopNav`) | **Reemplaza al logo**: siempre a la vista y solo dice **donde estas**. `/` es la raiz (biblioteca general); adentro, `/ Ciberseguridad / Malware`; las vistas especiales son un tramo (`/ Papelera`, `/ Sin conexion`, `/ Ajustes`, `/ Informacion`). Cada tramo lleva ahi; la actual, resaltada. **Tocar la carpeta actual la renombra en el lugar** (v1.16): el tramo es un `span` que se vuelve editable con la misma transicion que el titulo del libro (pildora con borde de acento); Enter o salir guarda, Escape vuelve atras, y la topbar se estira mientras se escribe. No en la raiz, Sin coleccion ni Temporal. **Tocar la barra en cualquier otro lugar (la `/` incluida) abre las colecciones**, que bajan desde ella (4.3, v1.16.1). **Mide lo que muestra**: centrada, en la raiz es una pildorita de la altura de la barra con la `/`, y al cambiar de lugar su ancho se anima (.5s) hasta abarcar la ruta. Si no entra, llega al maximo y desliza, con los bordes esfumados (`.desborda`). |
 
 ### 4.3 Panel (`.nav-sheet`, `openNavSheet(build, onClose)` en nav.js)
 La pildora estirandose hacia arriba. Mismo `left/right/bottom` que la pildora,
@@ -180,8 +180,24 @@ encima: una sola capa), que apunta a la hilera que tiene a su altura.
 - El piquito marca la altura elegida y **no se mueve cuando cambia el largo**
   (la caja se acomoda alrededor, sin pasar las barras): si no, la palabra
   podria ir y venir entre dos hileras por su propio cambio de tamano.
+- **Tocarla sin arrastrar** (menos de 4px) entra a la coleccion de la hilera
+  marcada (v1.16.1); en "Ultimos leidos" no hace nada.
 - Solo en el inicio (hileras); en una coleccion, Sin conexion, Papelera o las
   vistas de Ajustes se esconde con un fundido.
+
+### 4.9 Panel desde la topbar (`openNavSheet(build, onClose, { desde })`, v1.16.1)
+El espejo del 4.3: anclado arriba (`.nav-sheet-top`), del ancho de la pildora
+de abajo y sin pasarla (alto maximo: hasta `--nav-space`). Una sola animacion
+en dos tiempos (`_topSheetAnimar`, Web Animations sobre el `clip-path`): la
+topbar, que mide lo que muestra, **primero se ensancha** hasta el ancho de la
+pildora (34% de .68s) y **despues baja** hasta ser el panel. Cerrar: sube y se
+angosta (.34s) hasta el ancho de destino de la topbar. Mientras esta abierto,
+la pagina lleva `.top-sheet-abierta`: la topbar no dibuja su vidrio, esconde
+la ruta y cambia de ancho sin animar, asi que si se eligio una carpeta, al
+cerrar ya esta en su medida nueva. Por eso las filas **navegan antes de
+cerrar** el panel. La pildora de abajo no se toca. El contenido aparece a los
+.26s, cuando ya se ensancho: el titulo ("Colecciones") queda donde estaba la
+ruta.
 
 ## 5. Esconder la navegacion
 
@@ -196,7 +212,7 @@ encima: una sola capa), que apunta a la hilera que tiene a su altura.
 
 | Pantalla | Plataforma | Disparador | Pieza | Contenido |
 |---|---|---|---|---|
-| Biblioteca | celu + PC | Colecciones | panel | Todos, Sin conexion y Papelera (solo celu: en la PC tienen su lugar), arbol de colecciones (flechita despliega sin cerrar), + Nueva |
+| Biblioteca | celu + PC | tocar la topbar | panel desde arriba (4.9) | Todos, Sin conexion y Papelera (solo celu: en la PC tienen su lugar), arbol de colecciones (flechita despliega sin cerrar), + Nueva |
 | Biblioteca | celu + PC | Subir | panel | zona de arrastrar (vidrio), arbol de coleccion (`colPicker`), boton pildora |
 | Biblioteca | celu | Mas (tres rayitas) | panel, sin titulo | Notificaciones, Informacion, Ajustes, Cerrar sesion |
 | Biblioteca | celu | Mas → Notificaciones | panel | lista del modal mudada al panel |

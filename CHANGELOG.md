@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.16.1 — Las colecciones bajan desde la topbar
+
+### Cambiado
+- **Colecciones sale de la pildora** (celu y PC): la de abajo queda con 4 botones en el celu (Buscar, Biblioteca, Subir, Mas) y 6 en la PC, del mismo tamano.
+- **Tocar la topbar abre las colecciones**: la barra de arriba (la `/` o cualquier lugar que no sea un tramo) se ensancha hasta el ancho de la pildora de abajo y, en la misma animacion, baja hasta ser el panel. Al cerrar hace el camino inverso y vuelve a la medida de la ruta nueva si se eligio una carpeta. Los tramos de arriba siguen llevando ahi y tocar la carpeta actual la sigue renombrando.
+- **Tocar la etiqueta de las hileras** (sin arrastrarla) entra a la coleccion que esta marcando. "Ultimos leidos" no es una carpeta: ahi no hace nada.
+- `VERSION` del service worker: `v36` → `v37`. Spec: `docs/pildoras.md` (4.1, 4.2, 4.3, 4.8, 6).
+
 ## v1.16 — La PC, como el celu
 
 ### Cambiado
