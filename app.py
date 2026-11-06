@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.17.3"
+APP_VERSION = "1.17.4"
 
 @app.context_processor
 def inject_ver():
@@ -1524,7 +1524,9 @@ def book_bookmarks(book_id):
         bm = conn.execute("SELECT * FROM bookmarks WHERE book_id=? AND device_id=? ORDER BY id DESC LIMIT 1", (book_id, device_id)).fetchone()
         conn.close()
         return jsonify(dict(bm)), 201
-    rows = conn.execute("SELECT * FROM bookmarks WHERE book_id=? AND device_id=? ORDER BY created_at DESC", (book_id, device_id)).fetchall()
+    # Los bookmarks son del libro (o sea, del usuario): se ven en todos los
+    # dispositivos. device_id queda solo como registro de donde se creo.
+    rows = conn.execute("SELECT * FROM bookmarks WHERE book_id=? ORDER BY created_at DESC, id DESC", (book_id,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
