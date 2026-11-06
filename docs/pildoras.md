@@ -166,9 +166,10 @@ Alfabetico en cada nivel, salvo **Temporal: siempre la ultima**, fija
 
 ### 4.8 Etiqueta de las hileras (`#rowTag`, biblioteca, v1.16)
 Orden de las hileras: "Ultimos leidos" primero y despues las colecciones de
-primer nivel en el orden de 4.6 (Temporal ultima). En el celu, "Ultimos
-leidos" no es una hilera sino una grilla que llena la primera pantalla
-(`recortarRecientes`); la etiqueta la nombra igual (`[data-name]`).
+primer nivel en el orden de 4.6 (Temporal ultima). En el celu (v1.17.2)
+entran dos tarjetas y media por hilera en cualquier telefono (`medirTarjetas`)
+y las hileras llegan al borde derecho de la pantalla; en la PC miden lo mismo
+que la grilla de una carpeta.
 
 En el inicio las hileras van seguidas y **sin titulos**. Una sola etiqueta de
 vidrio, vertical, fija a la izquierda (32px de ancho), flota sobre los

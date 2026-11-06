@@ -2,6 +2,12 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17.2 — Celu: una hilera de últimos leídos y dos libros y medio
+
+### Cambiado
+- **Celu: "Últimos leídos" vuelve a ser una hilera**, como en la PC y como las de las colecciones (hasta 10 libros), en lugar de la grilla que llenaba la primera pantalla (v1.16.5). Las hileras de las colecciones empiezan justo debajo.
+- **Celu: en cada hilera entran dos libros y medio**, en cualquier teléfono (en un 12 mini, tarjetas de 137px; en un Pro Max, de 159px). El que queda cortado avisa que la hilera se desliza, y las hileras del inicio llegan hasta el borde derecho de la pantalla para que se corte ahí. Adentro de una carpeta la grilla no cambia.
+
 ## v1.17.1 — Borrar carpetas sin perder libros
 
 ### Agregado

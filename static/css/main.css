@@ -596,6 +596,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   /* ── Libros: grilla mas compacta ── */
   :root { --card-min: 132px; --grid-gap-x: 9.6px; }
   .books-row { gap: .6rem; padding-bottom: .5rem; }
+  /* En el inicio las hileras llegan al borde derecho de la pantalla: la
+     tarjeta cortada (entran dos y media) se va por el borde, no antes. */
+  .rows-home .books-row { margin-right: -.75rem; padding-right: .75rem; scroll-padding-right: .75rem; }
   .books-grid { gap: .9rem var(--grid-gap-x); }
   .col-head { display: block; }
   /* Adentro de una carpeta el contenido arranca debajo de la topbar (que
