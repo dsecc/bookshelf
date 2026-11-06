@@ -27,7 +27,7 @@ LIBRARY_LOCK_PATH = "/app/data/library.lock"
 import time as _time
 STATIC_VER = str(int(_time.time()))
 # La que se ve en la tarjeta de Ajustes (la historia, en CHANGELOG.md).
-APP_VERSION = "1.17.2"
+APP_VERSION = "1.17.3"
 
 @app.context_processor
 def inject_ver():
@@ -1190,9 +1190,12 @@ def progress_position(d):
 
 def best_progress(rows):
     """De las filas (progress_data, updated_at) de un libro, la que se
-    muestra: la mas avanzada; a igual posicion, la mas reciente. Devuelve el
-    dict con ts y updated_at, o None."""
-    best = None
+    muestra: la mas avanzada; a igual posicion, la mas reciente. Salvo que
+    haya un salto deliberado ("salto": cuando se fue a un bookmark, a una
+    pagina o a una busqueda): lo leido antes del ultimo salto de cualquier
+    dispositivo no cuenta. Misma regla que pick en progress.js. Devuelve el
+    dict con ts, updated_at y "corte" (el ultimo salto), o None."""
+    rows_ok = []
     for r in rows:
         try:
             d = json.loads(r["progress_data"] or "{}")
@@ -1203,9 +1206,18 @@ def best_progress(rows):
         ts = int(d.get("ts") or 0)
         if not ts and r["updated_at"]:
             ts = int(datetime.strptime(r["updated_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() * 1000)
+        rows_ok.append((d, ts, r["updated_at"]))
+    def num(v):
+        try: return int(v or 0)
+        except (TypeError, ValueError): return 0
+    corte = max((num(d.get("salto")) for d, _, _ in rows_ok), default=0)
+    best = None
+    for d, ts, updated_at in rows_ok:
+        if ts < corte:
+            continue
         key = (progress_position(d), ts)
         if best is None or key > best[0]:
-            best = (key, dict(d, ts=ts, updated_at=r["updated_at"]))
+            best = (key, dict(d, ts=ts, updated_at=updated_at, corte=corte))
     return best[1] if best else None
 
 def attach_progress(conn, books):

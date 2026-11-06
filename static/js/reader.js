@@ -296,14 +296,31 @@ function openBookmarksSheet() {
         active: !!pdfDoc && pos.page === pdfPage,
         onClick: () => { closeNavSheet(); irABookmark(pos); },
       });
+      // Borrar en dos toques: el primero arma (la cruz pasa a tachito rojo y
+      // la pagina dice "¿Borrar?"), el segundo borra y la fila se pliega. Si
+      // no se toca de nuevo en 4 segundos, se desarma.
       const del = document.createElement("button");
       del.className = "nav-sheet-del";
       del.setAttribute("aria-label", "Borrar bookmark");
-      del.innerHTML = RN_ICO.x;
+      del.innerHTML = '<span class="ico-x">' + RN_ICO.x + '</span><span class="ico-del">' + RN_ICO.trash + '</span>';
+      const detalle = fila.querySelector(".row-count");
+      const desarmar = () => {
+        del.classList.remove("seguro");
+        if (detalle) { detalle.textContent = _bmLabel(pos); detalle.classList.remove("pregunta"); }
+      };
+      let timer = null;
       del.onclick = async () => {
-        await borrarBookmark(bm.id);
-        item.remove();
-        if (!_bookmarks.length) vacio();
+        if (!del.classList.contains("seguro")) {
+          del.classList.add("seguro");
+          if (detalle) { detalle.textContent = "¿Borrar?"; detalle.classList.add("pregunta"); }
+          timer = setTimeout(desarmar, 4000);
+          return;
+        }
+        clearTimeout(timer);
+        del.disabled = true;
+        if (!(await borrarBookmark(bm.id))) { del.disabled = false; desarmar(); return; }
+        treeClose(item);
+        if (!_bookmarks.length) setTimeout(vacio, TREE_MS);
       };
       item.appendChild(fila);
       item.appendChild(del);
@@ -448,7 +465,7 @@ function initReaderNav() {
   inp.onkeydown = e => {
     if (e.key === "Enter") {
       const v = parseInt(inp.value, 10);
-      if (_pager && v >= 1 && v <= pdfTotal) _pager.go(v);
+      if (_pager && v >= 1 && v <= pdfTotal) { marcarSalto(); _pager.go(v); }
       inp.blur();
     }
     if (e.key === "Escape") { inp.value = pdfPage; inp.blur(); }
@@ -773,23 +790,100 @@ async function initPDFScroll() {
     canvases.push(c);
   }
 
-  async function renderOne(i) {
-    if (done.has(i)) return;
-    done.add(i);
-    const page = await pdfDoc.getPage(i + 1);
-    const c = canvases[i];
-    // Envolver en contenedor para text layer
-    if (!wrappers[i].classList.contains("pdf-page-container")) {
-      wrappers[i].classList.add("pdf-page-container");
-    }
-    await renderPageWithTextLayer(page, c, availW, 0, null, 0);
-    // Ya hay canvas: el alto real reemplaza a la reserva.
-    wrappers[i].style.minHeight = "";
-    paintSearchHits(i + 1, c);
+  // ── Memoria: solo quedan dibujadas las paginas cerca de la que se lee ────
+  // Cada pagina dibujada es un canvas a la densidad de la pantalla (en un
+  // iPhone, x3: ~7 MB por hoja). Antes se dibujaba toda pagina que pasaba
+  // cerca y no se soltaba nunca: scrollear rapido o saltar de la 196 a la 60
+  // dibujaba las ~130 del medio y iOS mataba la pagina por falta de memoria
+  // ("Ocurrio un problema varias veces"). Ahora:
+  //  - Las que se alejan se sueltan (canvas a 0x0) y su lugar queda reservado
+  //    con el alto que tenian, asi nada se mueve.
+  //  - Mientras se scrollea no se dibuja: recien cuando se frena (DIBUJAR_MS),
+  //    y de a una, empezando por la mas cercana a la que se lee.
+  //  - Los saltos largos (bookmark, ir a pagina, buscar) son instantaneos: un
+  //    scroll animado pasaba por todas las del medio.
+  const QUEDAN = 3;        // paginas dibujadas a cada lado de la actual
+  const DIBUJAR_MS = 140;  // quieto este tiempo = se frenó
+  const rendering = new Set();
+  const cerca = new Set(); // paginas (indices) cerca del viewport, segun renderObserver
+
+  // Si cambia el alto de una pagina que esta ARRIBA de lo que se ve (pasa del
+  // alto estimado al real), se compensa el scroll para que la lectura no
+  // salte. Es el "scroll anchoring" de Chrome, que Safari no tiene; por eso
+  // el nativo va apagado (overflow-anchor: none en reader.css).
+  function anclar(i, antes) {
+    const delta = wrappers[i].offsetHeight - antes;
+    if (delta && S.offsetOf(wrappers[i]) < S.top) S.top = S.top + delta;
   }
+
+  async function renderOne(i) {
+    if (done.has(i) || rendering.has(i)) return;
+    rendering.add(i);
+    try {
+      const page = await pdfDoc.getPage(i + 1);
+      const c = canvases[i];
+      // Envolver en contenedor para text layer
+      if (!wrappers[i].classList.contains("pdf-page-container")) {
+        wrappers[i].classList.add("pdf-page-container");
+      }
+      const antes = wrappers[i].offsetHeight;
+      await renderPageWithTextLayer(page, c, availW, 0, null, 0);
+      c.style.display = "block";
+      done.add(i);
+      // Ya hay canvas: el alto real reemplaza a la reserva.
+      wrappers[i].style.minHeight = "";
+      anclar(i, antes);
+      paintSearchHits(i + 1, c);
+    } finally {
+      rendering.delete(i);
+    }
+  }
+
+  // Suelta el dibujo de una pagina sin mover nada: reserva su alto actual.
+  function soltar(i) {
+    if (!done.has(i) || rendering.has(i)) return;
+    const w = wrappers[i], c = canvases[i];
+    w.style.minHeight = w.offsetHeight + "px";
+    c.width = c.height = 0;      // libera la memoria del canvas
+    c.style.display = "none";
+    w.querySelectorAll(":scope > .textLayer, :scope > .search-hl").forEach(n => n.remove());
+    done.delete(i);
+    pdfDoc.getPage(i + 1).then(pg => pg.cleanup()).catch(() => {});
+  }
+  function soltarLejanas() {
+    const centro = pdfPage - 1;
+    [...done].forEach(i => { if (Math.abs(i - centro) > QUEDAN) soltar(i); });
+  }
+
+  // Dibuja, de a una, las paginas cercanas que falten (la mas proxima a la
+  // actual primero). Se vuelve a llamar sola hasta que no quede ninguna.
+  let bombeando = false, dibujarTimer = null;
+  async function bombear() {
+    if (bombeando) return;
+    bombeando = true;
+    try {
+      for (;;) {
+        const centro = pdfPage - 1;
+        const falta = [...cerca].filter(i => !done.has(i) && Math.abs(i - centro) <= QUEDAN)
+          .sort((a, b) => Math.abs(a - centro) - Math.abs(b - centro))[0];
+        if (falta == null) break;
+        await renderOne(falta);
+      }
+      soltarLejanas();
+    } finally {
+      bombeando = false;
+    }
+  }
+  const dibujarAlFrenar = () => {
+    clearTimeout(dibujarTimer);
+    dibujarTimer = setTimeout(bombear, DIBUJAR_MS);
+  };
 
   const startIdx = Math.max(0, pdfPage - 1);
   await renderOne(startIdx);
+  // La de arriba tambien antes de ubicarse: si no, al dibujarse despues
+  // (alto estimado -> real) correria la lectura.
+  if (startIdx > 0) await renderOne(startIdx - 1);
   // scrollIntoView tambien puede scrollear la ventana/documento entero (no
   // solo este contenedor), tapando la topbar arriba del viewport — se
   // setea el scroll directo sobre "wrap" para que quede contenido ahi.
@@ -801,8 +895,12 @@ async function initPDFScroll() {
   // el documento entero de una — con libros largos, renderizar todo al
   // abrir congelaba la UI y saturaba memoria/CPU.
   const renderObserver = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) renderOne(parseInt(e.target.dataset.page) - 1); });
-  }, { root: S.root, rootMargin: "1200px 0px 1200px 0px" });
+    entries.forEach(e => {
+      const i = parseInt(e.target.dataset.page) - 1;
+      if (e.isIntersecting) cerca.add(i); else cerca.delete(i);
+    });
+    dibujarAlFrenar();
+  }, { root: S.root, rootMargin: "900px 0px 900px 0px" });
   wrappers.forEach(w => renderObserver.observe(w));
 
   // Re-escalar cuando cambia el ancho disponible: rotar el telefono, entrar
@@ -810,14 +908,24 @@ async function initPDFScroll() {
   _scrollRerender = async () => {
     const newW = computeAvailW(wrap);
     if (Math.abs(newW - availW) < 2) return;
+    const factor = newW / availW;
     availW = newW;
-    done.clear();
+    redibujarTodo(factor);
     const center = Math.max(0, pdfPage - 1);
     for (let i = Math.max(0, center - 1); i <= Math.min(pdfTotal - 1, center + 1); i++) {
       await renderOne(i);
     }
     S.top = S.offsetOf(wrappers[center]);
+    bombear();
   };
+  // Cambio de ancho o de zoom: todo lo dibujado queda viejo. Se suelta (con
+  // el alto reservado escalado) y se redibuja lo cercano.
+  function redibujarTodo(factor) {
+    [...done].forEach(soltar);
+    if (factor !== 1) wrappers.forEach(w => {
+      if (w.style.minHeight) w.style.minHeight = Math.round(parseFloat(w.style.minHeight) * factor) + "px";
+    });
+  }
 
   let saveTimer = null;
   // Cuanto de cada pagina se ve. Hace falta el registro COMPLETO: el observer
@@ -856,16 +964,28 @@ async function initPDFScroll() {
   (docScroll ? window : wrap).addEventListener("scroll", () => {
     clearTimeout(guardarTimer);
     guardarTimer = setTimeout(guardarPosicion, 300);
+    dibujarAlFrenar(); // scrolleando: se dibuja (y se suelta lo lejano) al frenar
   }, { passive: true });
   _capturePosition = guardarPosicion;
 
+  // Pagina siguiente/anterior: animado. Mas lejos: instantaneo (ver arriba).
+  // Si se toca varias veces seguidas, solo vale el ultimo salto.
+  let saltoN = 0;
   async function goPage(p) {
     if (p < 1 || p > pdfTotal) return;
-    // Esperar el render ANTES de calcular el destino: la pagina pasa del alto
-    // estimado al real al dibujarse, y sin esperar el salto se calculaba con el
-    // layout viejo y caia una pagina mas abajo.
+    const n = ++saltoN;
+    const cerquita = Math.abs(p - pdfPage) <= 1;
+    // Esperar el render ANTES de calcular el destino (y el de la anterior,
+    // que esta arriba): la pagina pasa del alto estimado al real al
+    // dibujarse, y sin esperar el salto caia en otro lado.
     await renderOne(p - 1);
-    S.to(S.offsetOf(wrappers[p - 1]), true);
+    if (p > 1 && !cerquita) await renderOne(p - 2);
+    if (n !== saltoN) return;
+    if (cerquita) { S.to(S.offsetOf(wrappers[p - 1]), true); return; }
+    pdfPage = p; pagerSet(p, pdfTotal);
+    S.top = S.offsetOf(wrappers[p - 1]);
+    guardarPosicion();
+    bombear();
   }
   window._scrollRendered = () => wrappers.map((w, i) => done.has(i) ? { page: i + 1, canvas: canvases[i] } : null).filter(Boolean);
   pagerUse({
@@ -874,10 +994,11 @@ async function initPDFScroll() {
     // Cambiar el zoom redibuja solo alrededor de la pagina actual; el resto se
     // redibuja al acercarse (renderObserver).
     zoom: async () => {
-      done.clear();
+      redibujarTodo(1);
       const center = pdfPage - 1;
       for (let i = Math.max(0, center - 2); i <= Math.min(pdfTotal - 1, center + 2); i++) await renderOne(i);
       S.top = S.offsetOf(wrappers[center]);
+      bombear();
     },
   });
   pagerSet(pdfPage, pdfTotal);
@@ -1014,7 +1135,21 @@ async function initPDFSpread() {
 
   pagerSet(pdfPage, pdfTotal);
 
-  const alrededor = p => [p - 1, p, p + 1, p + 2, p + 3].filter(n => n >= 1 && n <= pdfTotal).forEach(n => renderOne(n));
+  // Las hojas lejanas se sueltan (como en el modo scroll: cada una es un
+  // canvas grande, y acumularlas hacia que iOS cerrara la pagina). Se vuelven
+  // a dibujar al acercarse.
+  const alrededor = p => {
+    [p - 1, p, p + 1, p + 2, p + 3].filter(n => n >= 1 && n <= pdfTotal).forEach(n => renderOne(n));
+    [...rendered].forEach(n => {
+      if (n !== 1 && (n < p - 4 || n > p + 6)) {
+        const c = pageDivs[n - 1].querySelector("canvas");
+        if (!c) return; // todavia dibujandose
+        c.width = c.height = 0;
+        pageDivs[n - 1].innerHTML = "";
+        rendered.delete(n);
+      }
+    });
+  };
   pf.on("flip", e => {
     pdfPage = e.data + 1;
     pagerSet(pdfPage, pdfTotal);
@@ -1176,10 +1311,20 @@ function initUnsupported() {
 // Local primero, servidor despues: ver progress.js. saveProgress no toca la
 // red; la sincronizacion la maneja Progress con reintentos.
 async function fetchProgress() {
-  try { const p = await Progress.load(bookId); return (p && p.data) || {}; } catch { return {}; }
+  let d = {};
+  try { const p = await Progress.load(bookId); d = (p && p.data) || {}; } catch {}
+  _salto = Number(d.salto) || 0;
+  return d;
 }
+// Salto deliberado (bookmark, ir a pagina, buscar): el progreso que se
+// guarda despues lleva la marca, y le gana a lo leido ANTES del salto aunque
+// eso este mas adelante (ver pick en progress.js). Sin esto, volver de la 196
+// a un bookmark en la 65 duraba hasta reabrir el libro: la regla de "gana lo
+// mas avanzado" te devolvia a la 196.
+let _salto = 0;
+function marcarSalto() { _salto = Date.now(); }
 function saveProgress(data) {
-  Progress.save(bookId, data);
+  Progress.save(bookId, _salto ? Object.assign({}, data, { salto: _salto }) : data);
 }
 
 // Lista en memoria: la usan el drawer de escritorio y los paneles de mobile.
@@ -1190,6 +1335,7 @@ const _bmLabel = pos => pos.page ? "Pag " + pos.page : pos.pct != null ? Math.ro
 const _bmHere = () => pdfDoc ? { page: pdfPage } : _text ? { pct: Math.round(_text.pct() * 10000) / 10000 } : {};
 
 function irABookmark(pos) {
+  marcarSalto();
   if (pos.pct != null && _text) { _text.goTo(pos.pct); return; }
   if (!pos.page) return;
   if (viewMode === "spread" && window._spreadGoPage) window._spreadGoPage(pos.page);
@@ -1197,9 +1343,13 @@ function irABookmark(pos) {
   pdfPage = pos.page;
 }
 
+// Devuelve si se borro. Sin conexion (p. ej. sin Tailscale) lo dice, en vez
+// de quedarse callado y dejar el bookmark donde estaba.
 async function borrarBookmark(id) {
-  await fetch("/api/books/" + bookId + "/bookmarks/" + id + "?device_id=" + deviceId, { method: "DELETE" });
-  await loadBookmarks();
+  const res = await fetch("/api/books/" + bookId + "/bookmarks/" + id + "?device_id=" + deviceId, { method: "DELETE" }).catch(() => null);
+  if (!res || !res.ok) { toast(res ? "No se pudo borrar el bookmark" : "Sin conexion: no se pudo borrar"); return false; }
+  _bookmarks = _bookmarks.filter(b => b.id !== id);
+  return true;
 }
 
 async function loadBookmarks() {
@@ -1211,11 +1361,13 @@ async function loadBookmarks() {
 async function saveBookmark(texto) {
   const label    = (texto || "").trim();
   const position = _bmHere();
-  await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId, {
+  const res = await fetch("/api/books/" + bookId + "/bookmarks?device_id=" + deviceId, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, position })
-  });
+  }).catch(() => null);
+  if (!res || !res.ok) { toast(res ? "No se pudo guardar el bookmark" : "Sin conexion: no se pudo guardar"); return; }
   toggleBookmarkBar(false);
-  loadBookmarks(); toast("Bookmark guardado");
+  await loadBookmarks();
+  toast("Bookmark guardado" + (position.page ? " en la pagina " + position.page : ""));
 }
 
 async function renameBook(nuevo) {
@@ -1310,6 +1462,7 @@ function searchInText(query) {
 function showTextHit(i) {
   searchMatches.forEach(m => m.classList.remove("active"));
   searchIdx = i;
+  marcarSalto();
   const m = searchMatches[i];
   m.classList.add("active");
   m.scrollIntoView({ block: "center" });
@@ -1354,6 +1507,7 @@ async function searchInBook(query) {
 
 function showPdfHit(i) {
   searchIdx = i;
+  marcarSalto();
   const p = searchMatches[i];
   document.getElementById("searchResults").textContent = (i + 1) + "/" + searchMatches.length;
   if (viewMode === "spread" && window._spreadGoPage) window._spreadGoPage(p);

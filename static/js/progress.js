@@ -73,10 +73,19 @@ const Progress = (() => {
     if (d.page != null) return Number(d.page) + Math.min(Math.max(Number(d.frac) || 0, -0.9999), 0.9999);
     return Number(d.percentage) || 0;
   }
+  // Excepcion: un salto deliberado (bookmark, ir a pagina, buscar) marca el
+  // progreso con "salto" (cuando fue). Lo leido ANTES del ultimo salto, en
+  // cualquier dispositivo, ya no cuenta aunque este mas adelante: si no,
+  // volver de la 196 a la 65 por un bookmark te devolvia a la 196 al reabrir.
+  // El servidor manda en "corte" el ultimo salto de todos los dispositivos.
+  const corteDe = x => Math.max(Number(x.data && x.data.salto) || 0, Number(x.data && x.data.corte) || 0);
   // a y b son { data, ts } o null. A igual posicion, la mas reciente.
   function pick(a, b) {
     if (!a) return b;
     if (!b) return a;
+    const corte = Math.max(corteDe(a), corteDe(b));
+    const va = (a.ts || 0) >= corte, vb = (b.ts || 0) >= corte;
+    if (va !== vb) return va ? a : b;
     const pa = position(a.data), pb = position(b.data);
     if (pa !== pb) return pb > pa ? b : a;
     return (b.ts || 0) > (a.ts || 0) ? b : a;

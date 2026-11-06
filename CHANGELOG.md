@@ -2,6 +2,19 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17.3 — El lector no se cae, y los bookmarks llevan a donde tienen que llevar
+
+### Arreglado
+- **El lector se cerraba solo en el iPhone** ("Ocurrió un problema varias veces") al scrollear rápido o al saltar lejos (de la 196 a un bookmark en la 60). En el modo scroll se dibujaba cada página que pasaba cerca y no se soltaba nunca: cada una es un canvas a la densidad de la pantalla (~7 MB en un iPhone), y scrollear rápido hasta el final de un PDF de 220 páginas dejaba **159 dibujadas, ~1,1 GB**; iOS mataba la página. Ahora quedan dibujadas solo las cercanas a la que se lee (3 a cada lado, nunca más de ~7): las que se alejan se sueltan sin mover nada (su lugar queda reservado), mientras se scrollea no se dibuja (recién al frenar, de a una y empezando por la más cercana), y el modo Doble también suelta las hojas lejanas.
+- **Saltar a un bookmark, a una página o a un resultado de búsqueda** es instantáneo cuando es lejos (antes era un scroll animado que pasaba por todas las del medio, las dibujaba y a veces caía en otra página). Siguiente/anterior siguen animados. Si se toca varias veces seguidas, vale el último salto.
+- **La lectura ya no salta** cuando se termina de dibujar una página de más arriba (pasa del alto estimado al real): se compensa el scroll a mano, porque Safari no lo hace solo.
+- **Volver a un bookmark ya no te devuelve a donde estabas.** El progreso cruza entre dispositivos y gana lo más avanzado, así que ir de la 196 a la 65 duraba hasta reabrir el libro. Ahora un salto deliberado (bookmark, ir a página, buscar) queda marcado y lo leído antes del salto, en cualquier dispositivo, deja de contar. Sin saltos todo sigue como antes: un vistazo corto en otro dispositivo no tira para atrás lo leído.
+- **La cruz de un bookmark no lo borraba** cuando el pedido no llegaba al servidor (por ejemplo, sin Tailscale): fallaba callado. Ahora avisa ("Sin conexión: no se pudo borrar"), y lo mismo al guardar uno.
+
+### Cambiado
+- **Borrar un bookmark pide confirmación**: el primer toque convierte la cruz en un tachito rojo y la página pasa a decir *¿Borrar?*; el segundo lo borra y la fila se pliega. Si no se toca de nuevo en 4 segundos, se desarma.
+- Al guardar un bookmark, el aviso dice en qué página quedó ("Bookmark guardado en la página 196").
+
 ## v1.17.2 — Celu: una hilera de últimos leídos y dos libros y medio
 
 ### Cambiado
