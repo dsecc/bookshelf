@@ -2,6 +2,12 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17.5 — Las actualizaciones llegan a la primera
+
+### Arreglado
+- **Después de un deploy, el celu seguía mostrando la versión anterior** por una o más aperturas. El service worker buscaba los archivos de la app ignorando el `?v=` de la URL, así que aunque el HTML nuevo pidiera los archivos nuevos, recibía los viejos; la versión nueva recién aparecía en otra apertura, y solo si iOS había dejado terminar de instalarse al service worker nuevo (con la app abierta y cerrada rápido, eso se podía postergar varias veces). Ahora busca por URL exacta: un `?v=` nuevo se baja de la red (sin conexión sirve la copia que haya). Además, cuando toma el control un service worker nuevo la biblioteca se recarga sola una vez, y al volver a la app se pregunta si hay versión nueva.
+- La tarjeta de créditos de Ajustes muestra también la versión de los archivos de la app en ese dispositivo ("v1.17.5 · app v48"): si queda atrás, todavía no se actualizó.
+
 ## v1.17.4 — Bookmarks en todos los dispositivos
 
 ### Cambiado

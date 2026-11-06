@@ -15,7 +15,7 @@
 // cache-first, asi que sin cambiar el nombre del cache los dispositivos que ya
 // visitaron la app seguirian con los archivos viejos para siempre. Ademas el
 // navegador solo detecta un service worker nuevo si el archivo cambio.
-const VERSION = "v47";
+const VERSION = "v48";
 const SHELL_CACHE = "bookshelf-shell-" + VERSION;
 const DATA_CACHE  = "bookshelf-data-" + VERSION;
 const BOOKS_CACHE = "bookshelf-books-v1"; // sin VERSION: los libros guardados
@@ -98,6 +98,20 @@ async function networkFirst(request, cacheName) {
   }
 }
 
+async function staticFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const exact = await cache.match(request);
+  if (exact) return exact;
+  try {
+    const res = await fetch(request);
+    if (res && res.ok) cache.put(request, res.clone());
+    return res;
+  } catch (err) {
+    const any = await cache.match(request, { ignoreSearch: true });
+    if (any) return any;
+    throw err;
+  }
+}
 async function cacheFirst(request, cacheName) {
   const cached = await matchIgnoringQuery(cacheName, request);
   if (cached) return cached;
@@ -127,9 +141,14 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Estaticos: cache-first (son inmutables por el ?v=).
+  // Estaticos: cache-first por URL EXACTA (con el ?v=). Antes se buscaba
+  // ignorando el ?v=, y despues de un deploy la primera apertura recibia los
+  // archivos viejos aunque el HTML nuevo pidiera los nuevos; la version nueva
+  // recien se veia en otra apertura, si iOS habia dejado terminar al SW nuevo.
+  // Ahora un ?v= que no esta se baja (y queda guardado); sin conexion, sirve
+  // la copia que haya de ese archivo.
   if (url.pathname.startsWith("/static/")) {
-    e.respondWith(cacheFirst(req, SHELL_CACHE));
+    e.respondWith(staticFirst(req));
     return;
   }
 

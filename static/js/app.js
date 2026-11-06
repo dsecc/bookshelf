@@ -766,7 +766,10 @@ async function creditsCard() {
   card.className = "credits-card";
   const d = await fetchJSON("/api/about", null);
   const esc = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  card.innerHTML = "<div class='credits-name'>Bookshelf" + (d && d.version ? " <span>v" + esc(d.version) + "</span>" : "") + "</div>" +
+  card.innerHTML = "<div class='credits-name'>Bookshelf" + (d && d.version ? " <span>v" + esc(d.version) + "</span>" : "") +
+    // Los archivos que usa este dispositivo: si queda atras de la del
+    // servidor, el service worker todavia no se actualizo.
+    " <span class='credits-shell' title='Archivos de la app en este dispositivo'>· app " + esc(APP_SHELL) + "</span></div>" +
     (d ? "<div class='credits-stack'>" + [["Python", d.python], ["Flask", d.flask], ["PyMuPDF", d.pymupdf]]
       .filter(([, v]) => v && v !== "N/A").map(([k, v]) => k + " " + esc(v)).join(" · ") + "</div>" : "");
   return card;
@@ -1115,11 +1118,30 @@ function toast(msg) {
   setTimeout(() => t.classList.remove("show"), 2800);
 }
 
+// Tiene que coincidir con VERSION de sw.js (se suben juntas): la tarjeta de
+// creditos la muestra para saber si este dispositivo tiene los archivos nuevos.
+const APP_SHELL = "v48";
+
 function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   // Desde /sw.js (raiz) el alcance es toda la app; desde /static/js/ solo
   // podria controlar esa carpeta y el modo sin conexion no funcionaria.
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  // Cuando toma el control un service worker nuevo (despues de un deploy), la
+  // pagina se recarga una vez para usar los archivos nuevos, sin esperar a
+  // otra apertura. Y al volver a la app (iOS no la recarga: la retoma) se
+  // pregunta si hay version nueva.
+  const habia = !!navigator.serviceWorker.controller;
+  let recargo = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!habia || recargo) return;
+    recargo = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register("/sw.js").then(reg => {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reg.update().catch(() => {});
+    });
+  }).catch(() => {});
   // Limpiar registros viejos con alcance /static/js/ (version anterior).
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(r => { if (r.scope.indexOf("/static/js/") !== -1) r.unregister(); });
