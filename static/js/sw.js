@@ -15,9 +15,13 @@
 // cache-first, asi que sin cambiar el nombre del cache los dispositivos que ya
 // visitaron la app seguirian con los archivos viejos para siempre. Ademas el
 // navegador solo detecta un service worker nuevo si el archivo cambio.
-const VERSION = "v48";
+const VERSION = "v49";
 const SHELL_CACHE = "bookshelf-shell-" + VERSION;
-const DATA_CACHE  = "bookshelf-data-" + VERSION;
+// Sin VERSION: es solo el respaldo sin conexion (todo lo de datos es
+// network-first). Antes se borraba con cada version y, justo despues de un
+// deploy, el celu quedaba sin copia de la biblioteca: si la red fallaba en ese
+// momento, Safari mostraba "FetchEvent.respondWith received an error".
+const DATA_CACHE  = "bookshelf-data";
 const BOOKS_CACHE = "bookshelf-books-v1"; // sin VERSION: los libros guardados
                                           // por el usuario sobreviven updates
 
@@ -67,6 +71,14 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
+      // Lo de los caches de datos viejos (bookshelf-data-vNN) pasa al nuevo
+      // antes de borrarlos, para no quedar sin respaldo.
+      .then(keys => Promise.all(keys.filter(k => k.startsWith("bookshelf-data-")).map(async k => {
+        const viejo = await caches.open(k), nuevo = await caches.open(DATA_CACHE);
+        for (const req of await viejo.keys()) {
+          if (!(await nuevo.match(req))) { const r = await viejo.match(req); if (r) await nuevo.put(req, r); }
+        }
+      })).then(() => caches.keys()))
       .then(keys => Promise.all(
         keys.filter(k => k.startsWith("bookshelf-") && k !== SHELL_CACHE &&
                          k !== DATA_CACHE && k !== BOOKS_CACHE)
@@ -173,21 +185,46 @@ self.addEventListener("fetch", e => {
 // Sin conexion, una pagina que nunca se visito no esta en el cache. Para el
 // lector cualquier /read/<id> cacheado sirve: reader.js saca el id de la URL,
 // no del HTML. Para el resto se cae a la biblioteca.
-async function navigationWithFallback(req, url) {
-  try {
-    return await networkFirst(req, DATA_CACHE);
-  } catch (err) {
-    const cache = await caches.open(DATA_CACHE);
-    if (url.pathname.startsWith("/read/")) {
-      const keys = await cache.keys();
-      const anyReader = keys.find(k => new URL(k.url).pathname.startsWith("/read/"));
-      if (anyReader) {
-        const hit = await cache.match(anyReader);
-        if (hit) return hit;
-      }
-    }
-    const home = await cache.match("/", { ignoreSearch: true });
-    if (home) return home;
-    throw err;
-  }
+// Safari no acepta para una navegacion una respuesta que vino de un
+// redirect (p. ej. "/" guardado cuando mandaba al login): se rearma limpia.
+function sinRedirect(res) {
+  if (!res || !res.redirected) return res;
+  return res.blob().then(b => new Response(b, { status: res.status, statusText: res.statusText, headers: res.headers }));
 }
+
+// Navegacion: red primero. Si falla se reintenta una vez (Tailscale en iOS
+// despierta el tunel con el primer pedido, que a veces falla), despues la
+// copia guardada, y si no hay ninguna, una pagina propia con "Reintentar".
+// Nunca se deja caer el error: Safari mostraria su pantalla de error, que en
+// la app instalada no tiene salida.
+async function navigationWithFallback(req, url) {
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await fetch(req);
+      if (res && res.ok && !res.redirected) (await caches.open(DATA_CACHE)).put(req, res.clone());
+      return res;
+    } catch (err) {
+      if (intento === 0) await new Promise(r => setTimeout(r, 900));
+    }
+  }
+  const cache = await caches.open(DATA_CACHE);
+  let hit = await cache.match(req, { ignoreSearch: true });
+  if (!hit && url.pathname.startsWith("/read/")) {
+    const anyReader = (await cache.keys()).find(k => new URL(k.url).pathname.startsWith("/read/"));
+    if (anyReader) hit = await cache.match(anyReader);
+  }
+  if (!hit) hit = await cache.match("/", { ignoreSearch: true });
+  if (hit) return sinRedirect(hit);
+  return new Response(SIN_CONEXION, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
+
+const SIN_CONEXION = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d"><title>Bookshelf</title>
+<style>html,body{height:100%;margin:0;background:#0d0d0d;color:#e8e8e8;font:15px -apple-system,system-ui,sans-serif}
+body{display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box}
+p{color:#9a9a9a;line-height:1.5;margin:.4rem 0 1.4rem}h1{font-size:1.1rem;margin:0}
+button{background:#7c6ff7;color:#fff;border:0;border-radius:999px;padding:.7rem 1.6rem;font:inherit;font-weight:600}</style></head>
+<body><div><h1>No se pudo conectar con Bookshelf</h1>
+<p>Fijate que Tailscale este conectado y volve a intentar.</p>
+<button onclick="location.reload()">Reintentar</button></div></body></html>`;

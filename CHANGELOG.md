@@ -2,6 +2,11 @@
 
 > **Resumen de v1.13 a v1.16.6.** Colecciones como carpetas reales (con subcarpetas, *Temporal*, *Papelera* y *Releer biblioteca*); el progreso sigue entre dispositivos y gana lo más avanzado; lector de TXT/Markdown/EPUB; el lector en una sola píldora (PC y celu) con búsqueda que marca la palabra, lupa de renglones y bookmarks; un solo vidrio para toda la navegación (`docs/pildoras.md`); y la biblioteca de la PC pasada al sistema del celu: ruta arriba, píldora abajo, paneles en vez de ventanas, colecciones que bajan desde la topbar, hileras sin títulos con una etiqueta arrastrable, *Últimos leídos* llenando la primera pantalla del celu y el teclado que sube solo la barra. El detalle, versión por versión, abajo.
 
+## v1.17.6 — Sin conexión no hay pantalla de error
+
+### Arreglado
+- **"Safari no puede abrir la página: FetchEvent.respondWith received an error"** al abrir la app. Pasaba si justo en ese momento no llegaba al servidor (por ejemplo, Tailscale despertando o apagado) y además la copia guardada de la biblioteca se había borrado: el respaldo sin conexión se guardaba en un cache con el número de versión, y cada deploy lo borraba. Ahora el respaldo no se borra con las versiones (lo de los caches viejos pasa al nuevo), una navegación que falla se reintenta una vez antes de rendirse, y si de verdad no hay nada guardado se muestra una pantalla propia ("No se pudo conectar con Bookshelf" con *Reintentar*) en vez del error de Safari, que en la app instalada no tiene salida.
+
 ## v1.17.5 — Las actualizaciones llegan a la primera
 
 ### Arreglado

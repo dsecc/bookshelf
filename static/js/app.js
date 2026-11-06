@@ -1120,7 +1120,7 @@ function toast(msg) {
 
 // Tiene que coincidir con VERSION de sw.js (se suben juntas): la tarjeta de
 // creditos la muestra para saber si este dispositivo tiene los archivos nuevos.
-const APP_SHELL = "v48";
+const APP_SHELL = "v49";
 
 function registerSW() {
   if (!("serviceWorker" in navigator)) return;
